@@ -1,53 +1,53 @@
-"use client";
+'use client'
 
-import { useState, useEffect, FormEvent, MouseEvent } from "react";
+import { useState, useEffect, FormEvent, MouseEvent } from 'react'
 
 type DayCell = {
-  day: number | null;
-  key: string | null;
-};
+  day: number | null
+  key: string | null
+}
 
 type TimeMemo = {
-  start: string;
-  end: string;
-  text: string;
-};
+  start: string
+  end: string
+  text: string
+}
 
-type MemoMap = Record<string, TimeMemo[]>;
+type MemoMap = Record<string, TimeMemo[]>
 
 type Holiday = {
-  date: string; // "YYYY-MM-DD"
-  name: string; // 예: "추석", "어린이날"
-};
+  date: string // "YYYY-MM-DD"
+  name: string // 예: "추석", "어린이날"
+}
 
 type Period = {
-  id: number;
-  label: string; // 예: "수행평가 기간", "중간고사 기간"
-  start: string; // "YYYY-MM-DD"
-  end: string; // "YYYY-MM-DD"
-  color: string; // 기간 표시 선 색상
-};
+  id: number
+  label: string // 예: "수행평가 기간", "중간고사 기간"
+  start: string // "YYYY-MM-DD"
+  end: string // "YYYY-MM-DD"
+  color: string // 기간 표시 선 색상
+}
 
 type CalendarEvent = {
-  date: string; // "YYYY-MM-DD"
-  title: string; // 일정 제목
-};
+  date: string // "YYYY-MM-DD"
+  title: string // 일정 제목
+}
 
 // 🔐 localStorage 키 모음 (HomePage와 맞추기)
 const STORAGE_KEYS = {
-  memos: "calendar_memos",
-  colors: "calendar_colors",
-  titles: "calendar_titles",
-  contents: "calendar_contents",
-  periods: "calendar_periods",
-  events: "calendarEvents", // Home 페이지에서 읽는 키
+  memos: 'calendar_memos',
+  colors: 'calendar_colors',
+  titles: 'calendar_titles',
+  contents: 'calendar_contents',
+  periods: 'calendar_periods',
+  events: 'calendarEvents', // Home 페이지에서 읽는 키
 
   // ✅ 뷰 상태 유지용 키
-  viewYear: "calendar_view_year",
-  viewMonth: "calendar_view_month",
-  selectedDate: "calendar_selected_date",
-  contextDate: "calendar_context_date",
-};
+  viewYear: 'calendar_view_year',
+  viewMonth: 'calendar_view_month',
+  selectedDate: 'calendar_selected_date',
+  contextDate: 'calendar_context_date',
+}
 
 // 📦 날짜 메모/기간 → Home에서 사용할 events 배열로 변환
 function buildCalendarEvents(
@@ -55,426 +55,399 @@ function buildCalendarEvents(
   dateNoteContents: Record<string, string[]>,
   periods: Period[]
 ): CalendarEvent[] {
-  const map: Record<string, string[]> = {};
+  const map: Record<string, string[]> = {}
 
   // 1) 날짜 메모 제목
   for (const [date, title] of Object.entries(dateNoteTitles)) {
-    const t = title.trim();
-    if (!t) continue;
-    if (!map[date]) map[date] = [];
-    map[date].push(t);
+    const t = title.trim()
+    if (!t) continue
+    if (!map[date]) map[date] = []
+    map[date].push(t)
   }
 
   // 2) 날짜 메모 내용
   for (const [date, list] of Object.entries(dateNoteContents)) {
     for (const raw of list) {
-      const t = raw.trim();
-      if (!t) continue;
-      if (!map[date]) map[date] = [];
-      map[date].push(t);
+      const t = raw.trim()
+      if (!t) continue
+      if (!map[date]) map[date] = []
+      map[date].push(t)
     }
   }
 
   // 3) 기간 (시작일 기준으로만 넣음)
   for (const p of periods) {
-    const t = p.label.trim();
-    if (!t || !p.start) continue;
-    if (!map[p.start]) map[p.start] = [];
-    if (!map[p.start].includes(t)) map[p.start].push(t);
+    const t = p.label.trim()
+    if (!t || !p.start) continue
+    if (!map[p.start]) map[p.start] = []
+    if (!map[p.start].includes(t)) map[p.start].push(t)
   }
 
-  const events: CalendarEvent[] = [];
+  const events: CalendarEvent[] = []
   for (const [date, titles] of Object.entries(map)) {
-    const uniq = Array.from(new Set(titles));
+    const uniq = Array.from(new Set(titles))
     for (const t of uniq) {
-      events.push({ date, title: t });
+      events.push({ date, title: t })
     }
   }
-  return events;
+  return events
 }
 
 function getHolidayFromMap(
   holidayMap: Record<string, Holiday>,
   dateKey: string | null
 ): Holiday | undefined {
-  if (!dateKey) return undefined;
-  return holidayMap[dateKey];
+  if (!dateKey) return undefined
+  return holidayMap[dateKey]
 }
 
 export default function CalendarPage() {
-  const today = new Date();
+  const today = new Date()
 
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth()); // 0 ~ 11
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [contextDate, setContextDate] = useState<string | null>(null);
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth()) // 0 ~ 11
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [contextDate, setContextDate] = useState<string | null>(null)
 
-  const [memos, setMemos] = useState<MemoMap>({});
-  const [customColors, setCustomColors] = useState<Record<string, string>>({});
+  const [memos, setMemos] = useState<MemoMap>({})
+  const [customColors, setCustomColors] = useState<Record<string, string>>({})
 
   const [dateNoteTitles, setDateNoteTitles] = useState<Record<string, string>>(
     {}
-  );
+  )
   const [dateNoteContents, setDateNoteContents] = useState<
     Record<string, string[]>
-  >({});
+  >({})
 
-  const [dateNoteTitleInput, setDateNoteTitleInput] = useState("");
-  const [dateNoteContentInput, setDateNoteContentInput] = useState("");
+  const [periods, setPeriods] = useState<Period[]>([])
 
-  const [periodLabelInput, setPeriodLabelInput] = useState("");
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
-  const [periodColorInput, setPeriodColorInput] = useState("#ffa000"); // 기본 기간 색
-  const [periods, setPeriods] = useState<Period[]>([]);
-
-  const [memoStartTime, setMemoStartTime] = useState("08:00");
-  const [memoEndTime, setMemoEndTime] = useState("09:00");
-  const [memoText, setMemoText] = useState("");
-
-  const [holidayMap, setHolidayMap] = useState<Record<string, Holiday>>({});
-  const [holidayLoading, setHolidayLoading] = useState(false);
+  const [holidayMap, setHolidayMap] = useState<Record<string, Holiday>>({})
+  const [holidayLoading, setHolidayLoading] = useState(false)
 
   // 🔑 localStorage 로드 완료 여부
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false)
+
+  // 🟣 새 일정 모달 상태
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalStartDate, setModalStartDate] = useState<string>('')
+  const [modalEndDate, setModalEndDate] = useState<string>('')
+  const [modalRangeType, setModalRangeType] = useState<'single' | 'range'>(
+    'single'
+  )
+  const [modalUseTime, setModalUseTime] = useState<boolean>(false)
+  const [modalUsePeriod, setModalUsePeriod] = useState<boolean>(false)
+  const [modalTime, setModalTime] = useState<string>('')
+  const [modalDescription, setModalDescription] = useState<string>('')
 
   // 오늘 날짜 키
   const todayKey = `${today.getFullYear()}-${String(
     today.getMonth() + 1
-  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   // ✅ 페이지 처음 들어올 때 localStorage에서 일정 + 뷰 상태 로드
   useEffect(() => {
     try {
       // 🧭 뷰 상태 복원 (연/월/선택날짜/컨텍스트 날짜)
-      const savedYear = localStorage.getItem(STORAGE_KEYS.viewYear);
-      const savedMonth = localStorage.getItem(STORAGE_KEYS.viewMonth);
-      const savedSelectedDate = localStorage.getItem(STORAGE_KEYS.selectedDate);
-      const savedContextDate = localStorage.getItem(STORAGE_KEYS.contextDate);
+      const savedYear = localStorage.getItem(STORAGE_KEYS.viewYear)
+      const savedMonth = localStorage.getItem(STORAGE_KEYS.viewMonth)
+      const savedSelectedDate = localStorage.getItem(STORAGE_KEYS.selectedDate)
+      const savedContextDate = localStorage.getItem(STORAGE_KEYS.contextDate)
 
       if (savedYear && !Number.isNaN(parseInt(savedYear, 10))) {
-        setYear(parseInt(savedYear, 10));
+        setYear(parseInt(savedYear, 10))
       }
       if (savedMonth && !Number.isNaN(parseInt(savedMonth, 10))) {
-        setMonth(parseInt(savedMonth, 10));
+        setMonth(parseInt(savedMonth, 10))
       }
       if (savedSelectedDate) {
-        setSelectedDate(savedSelectedDate);
+        setSelectedDate(savedSelectedDate)
       }
       if (savedContextDate) {
-        setContextDate(savedContextDate);
+        setContextDate(savedContextDate)
       }
 
       // 🗂 일정 관련 데이터들 복원
-      const savedMemos = localStorage.getItem(STORAGE_KEYS.memos);
-      const savedColors = localStorage.getItem(STORAGE_KEYS.colors);
-      const savedTitles = localStorage.getItem(STORAGE_KEYS.titles);
-      const savedContents = localStorage.getItem(STORAGE_KEYS.contents);
-      const savedPeriods = localStorage.getItem(STORAGE_KEYS.periods);
+      const savedMemos = localStorage.getItem(STORAGE_KEYS.memos)
+      const savedColors = localStorage.getItem(STORAGE_KEYS.colors)
+      const savedTitles = localStorage.getItem(STORAGE_KEYS.titles)
+      const savedContents = localStorage.getItem(STORAGE_KEYS.contents)
+      const savedPeriods = localStorage.getItem(STORAGE_KEYS.periods)
 
-      if (savedMemos) setMemos(JSON.parse(savedMemos));
-      if (savedColors) setCustomColors(JSON.parse(savedColors));
-      if (savedTitles) setDateNoteTitles(JSON.parse(savedTitles));
-      if (savedContents) setDateNoteContents(JSON.parse(savedContents));
-      if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
+      if (savedMemos) setMemos(JSON.parse(savedMemos))
+      if (savedColors) setCustomColors(JSON.parse(savedColors))
+      if (savedTitles) setDateNoteTitles(JSON.parse(savedTitles))
+      if (savedContents) setDateNoteContents(JSON.parse(savedContents))
+      if (savedPeriods) setPeriods(JSON.parse(savedPeriods))
     } catch (e) {
-      console.warn("캘린더 데이터 로드 중 오류:", e);
+      console.warn('캘린더 데이터 로드 중 오류:', e)
     } finally {
       // ✅ 로드 완료 플래그
-      setLoaded(true);
+      setLoaded(true)
     }
-  }, []);
+  }, [])
 
   // ✅ 메모/색상/기간이 바뀔 때마다 localStorage에 저장 + Home용 events 생성
   useEffect(() => {
-    // 🔒 아직 로딩이 끝나지 않았다면 저장 금지 (기존 데이터 덮어쓰기 방지)
-    if (!loaded) return;
+    if (!loaded) return
 
     try {
-      localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(memos));
-      localStorage.setItem(STORAGE_KEYS.colors, JSON.stringify(customColors));
-      localStorage.setItem(STORAGE_KEYS.titles, JSON.stringify(dateNoteTitles));
+      localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(memos))
+      localStorage.setItem(STORAGE_KEYS.colors, JSON.stringify(customColors))
+      localStorage.setItem(STORAGE_KEYS.titles, JSON.stringify(dateNoteTitles))
       localStorage.setItem(
         STORAGE_KEYS.contents,
         JSON.stringify(dateNoteContents)
-      );
-      localStorage.setItem(STORAGE_KEYS.periods, JSON.stringify(periods));
+      )
+      localStorage.setItem(STORAGE_KEYS.periods, JSON.stringify(periods))
 
       const events = buildCalendarEvents(
         dateNoteTitles,
         dateNoteContents,
         periods
-      );
-      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(events));
+      )
+      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(events))
     } catch (e) {
-      console.warn("캘린더 데이터 저장 중 오류:", e);
+      console.warn('캘린더 데이터 저장 중 오류:', e)
     }
-  }, [memos, customColors, dateNoteTitles, dateNoteContents, periods, loaded]);
+  }, [memos, customColors, dateNoteTitles, dateNoteContents, periods, loaded])
 
   // ✅ 연/월/선택 날짜/컨텍스트 날짜 바뀔 때마다 뷰 상태 저장
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.viewYear, String(year));
-      localStorage.setItem(STORAGE_KEYS.viewMonth, String(month));
+      localStorage.setItem(STORAGE_KEYS.viewYear, String(year))
+      localStorage.setItem(STORAGE_KEYS.viewMonth, String(month))
 
       if (selectedDate) {
-        localStorage.setItem(STORAGE_KEYS.selectedDate, selectedDate);
+        localStorage.setItem(STORAGE_KEYS.selectedDate, selectedDate)
       } else {
-        localStorage.removeItem(STORAGE_KEYS.selectedDate);
+        localStorage.removeItem(STORAGE_KEYS.selectedDate)
       }
 
       if (contextDate) {
-        localStorage.setItem(STORAGE_KEYS.contextDate, contextDate);
+        localStorage.setItem(STORAGE_KEYS.contextDate, contextDate)
       } else {
-        localStorage.removeItem(STORAGE_KEYS.contextDate);
+        localStorage.removeItem(STORAGE_KEYS.contextDate)
       }
     } catch (e) {
-      console.warn("캘린더 뷰 상태 저장 중 오류:", e);
+      console.warn('캘린더 뷰 상태 저장 중 오류:', e)
     }
-  }, [year, month, selectedDate, contextDate]);
+  }, [year, month, selectedDate, contextDate])
 
   // 🔄 연도 바뀔 때 한국 공휴일 API에서 가져오기
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     async function loadHolidays() {
       try {
-        setHolidayLoading(true);
-        const res = await fetch(`/api/holidays?year=${year}`);
-        if (!res.ok) throw new Error("failed to fetch holidays");
-        const data: Holiday[] = await res.json();
+        setHolidayLoading(true)
+        const res = await fetch(`/api/holidays?year=${year}`)
+        if (!res.ok) throw new Error('failed to fetch holidays')
+        const data: Holiday[] = await res.json()
 
-        if (cancelled) return;
+        if (cancelled) return
 
-        const map: Record<string, Holiday> = {};
+        const map: Record<string, Holiday> = {}
         for (const h of data) {
-          map[h.date] = h;
+          map[h.date] = h
         }
-        setHolidayMap(map);
+        setHolidayMap(map)
       } catch (e) {
-        console.error("공휴일 가져오기 실패:", e);
-        setHolidayMap({});
+        console.error('공휴일 가져오기 실패:', e)
+        setHolidayMap({})
       } finally {
         if (!cancelled) {
-          setHolidayLoading(false);
+          setHolidayLoading(false)
         }
       }
     }
 
-    loadHolidays();
+    loadHolidays()
     return () => {
-      cancelled = true;
-    };
-  }, [year]);
+      cancelled = true
+    }
+  }, [year])
 
   // 📅 달력 셀 만들기
-  const firstDay = new Date(year, month, 1).getDay();
-  const lastDate = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay()
+  const lastDate = new Date(year, month + 1, 0).getDate()
 
-  const cells: DayCell[] = [];
+  const cells: DayCell[] = []
   for (let i = 0; i < firstDay; i++) {
-    cells.push({ day: null, key: null });
+    cells.push({ day: null, key: null })
   }
   for (let d = 1; d <= lastDate; d++) {
-    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+    const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(
       d
-    ).padStart(2, "0")}`;
-    cells.push({ day: d, key });
+    ).padStart(2, '0')}`
+    cells.push({ day: d, key })
   }
 
   // 🔧 연/월 이동
   const handlePrevMonth = () => {
-    let newYear = year;
-    let newMonth = month - 1;
+    let newYear = year
+    let newMonth = month - 1
     if (newMonth < 0) {
-      newMonth = 11;
-      newYear = year - 1;
+      newMonth = 11
+      newYear = year - 1
     }
-    setYear(newYear);
-    setMonth(newMonth);
-    setSelectedDate(null);
-    setContextDate(null);
-  };
+    setYear(newYear)
+    setMonth(newMonth)
+    setSelectedDate(null)
+    setContextDate(null)
+  }
 
   const handleNextMonth = () => {
-    let newYear = year;
-    let newMonth = month + 1;
+    let newYear = year
+    let newMonth = month + 1
     if (newMonth > 11) {
-      newMonth = 0;
-      newYear = year + 1;
+      newMonth = 0
+      newYear = year + 1
     }
-    setYear(newYear);
-    setMonth(newMonth);
-    setSelectedDate(null);
-    setContextDate(null);
-  };
+    setYear(newYear)
+    setMonth(newMonth)
+    setSelectedDate(null)
+    setContextDate(null)
+  }
+
+  const openScheduleModal = (dateKey: string) => {
+    setSelectedDate(dateKey)
+    setContextDate(dateKey)
+    setModalStartDate(dateKey)
+    setModalEndDate(dateKey)
+    setModalRangeType('single')
+    setModalUseTime(false)
+    setModalUsePeriod(false)
+    setModalTime('')
+    setModalDescription('')
+    setIsModalOpen(true)
+  }
 
   const handleRightClickDay = (
     e: MouseEvent<HTMLButtonElement>,
     key: string | null
   ) => {
-    e.preventDefault();
-    if (!key) return;
-    setSelectedDate(key);
-    setContextDate(key);
-  };
+    e.preventDefault()
+    if (!key) return
+    openScheduleModal(key)
+  }
 
-  // 🕒 시간 메모 추가
-  const handleAddMemo = (e: FormEvent) => {
-    e.preventDefault();
-    if (!contextDate) return;
-    if (!memoText.trim()) return;
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+  }
 
-    setMemos((prev) => {
-      const prevList = prev[contextDate] ?? [];
-      const newList: TimeMemo[] = [
-        ...prevList,
-        { start: memoStartTime, end: memoEndTime, text: memoText.trim() },
-      ];
+  const handleModalSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!modalStartDate) {
+      alert('시작일을 선택하세요.')
+      return
+    }
+    if (!modalDescription.trim()) {
+      alert('설명을 입력하세요.')
+      return
+    }
 
-      newList.sort((a, b) =>
-        a.start < b.start ? -1 : a.start > b.start ? 1 : 0
-      );
+    const start = modalStartDate
+    const end =
+      modalRangeType === 'range' && modalEndDate ? modalEndDate : modalStartDate
 
-      return { ...prev, [contextDate]: newList };
-    });
-
-    setMemoText("");
-  };
-
-  const handleDeleteMemo = (dateKey: string, index: number) => {
-    setMemos((prev) => {
-      const list = prev[dateKey];
-      if (!list) return prev;
-
-      const newList = list.filter((_, i) => i !== index);
-      const next: MemoMap = { ...prev };
-
-      if (newList.length === 0) {
-        delete next[dateKey];
-      } else {
-        next[dateKey] = newList;
-      }
-
-      return next;
-    });
-  };
-
-  // 🎨 날짜 배경색
-  const handleSetColor = (dateKey: string, color: string | null) => {
-    setCustomColors((prev) => {
-      const next = { ...prev };
-      if (!color) {
-        delete next[dateKey];
-      } else {
-        next[dateKey] = color;
-      }
-      return next;
-    });
-  };
-
-  // 📝 날짜 메모 제목
-  const handleAddDateTitle = () => {
-    if (!contextDate) return;
-    if (!dateNoteTitleInput.trim()) return;
-
+    // 설명을 해당 날짜의 제목으로 저장 → 홈 D-Day에 사용
     setDateNoteTitles((prev) => ({
       ...prev,
-      [contextDate]: dateNoteTitleInput.trim(),
-    }));
+      [start]: modalDescription.trim(),
+    }))
 
-    setDateNoteTitleInput("");
-  };
+    // 시간 선택 시 시간 메모도 저장 (선택사항)
+    if (modalUseTime && modalTime) {
+      setMemos((prev) => {
+        const list = prev[start] ?? []
+        const newList: TimeMemo[] = [
+          ...list,
+          { start: modalTime, end: modalTime, text: modalDescription.trim() },
+        ]
+        newList.sort((a, b) =>
+          a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+        )
+        return { ...prev, [start]: newList }
+      })
+    }
 
-  // 📝 날짜 메모 내용
-  const handleAddDateContent = () => {
-    if (!contextDate) return;
-    if (!dateNoteContentInput.trim()) return;
-
-    setDateNoteContents((prev) => {
-      const list = prev[contextDate] ?? [];
-      return {
+    // 기간 설정일 경우 기간 정보도 추가
+    if (modalRangeType === 'range' && start && end && start <= end) {
+      setPeriods((prev) => [
         ...prev,
-        [contextDate]: [...list, dateNoteContentInput.trim()],
-      };
-    });
+        {
+          id: Date.now(),
+          label: modalDescription.trim(),
+          start,
+          end,
+          color: '#7c3aed', // 기본 보라색 기간 라인 (원 코드 유지)
+        },
+      ])
+    }
 
-    setDateNoteContentInput("");
-  };
+    setIsModalOpen(false)
+  }
 
-  const handleDeleteDateContent = (dateKey: string, index: number) => {
+  // 🔴 일정(이 날짜의 데이터) 전체 삭제
+  const handleDeleteScheduleForDate = () => {
+    // 모달에서 바꾼 시작일이 있으면 그걸 기준으로, 없으면 선택된 날짜 기준으로 삭제
+    const dateKey = modalStartDate || selectedDate
+    if (!dateKey) return
+
+    const ok = window.confirm('이 날짜의 모든 일정을 삭제할까요?')
+    if (!ok) return
+
+    // 날짜 메모 제목 삭제
+    setDateNoteTitles((prev) => {
+      const next = { ...prev }
+      delete next[dateKey]
+      return next
+    })
+
+    // 날짜 메모 내용 삭제
     setDateNoteContents((prev) => {
-      const list = prev[dateKey];
-      if (!list) return prev;
+      const next = { ...prev }
+      delete next[dateKey]
+      return next
+    })
 
-      const newList = list.filter((_, i) => i !== index);
-      const next: Record<string, string[]> = { ...prev };
+    // 시간 메모 삭제
+    setMemos((prev) => {
+      const next = { ...prev }
+      delete next[dateKey]
+      return next
+    })
 
-      if (newList.length === 0) {
-        delete next[dateKey];
-      } else {
-        next[dateKey] = newList;
-      }
+    // 날짜 색상 초기화
+    setCustomColors((prev) => {
+      const next = { ...prev }
+      delete next[dateKey]
+      return next
+    })
 
-      return next;
-    });
-  };
+    // 이 날짜가 포함된 기간(시작일~종료일 범위에 들어가는 것) 전부 삭제
+    setPeriods((prev) =>
+      prev.filter((p) => !(p.start <= dateKey && dateKey <= p.end))
+    )
 
-  // 📌 기간 추가 / 삭제
-  const handleAddPeriod = () => {
-    if (!periodLabelInput.trim() || !periodStart || !periodEnd) return;
+    setIsModalOpen(false)
+  }
 
-    const start = periodStart <= periodEnd ? periodStart : periodEnd;
-    const end = periodStart <= periodEnd ? periodEnd : periodStart;
-
-    setPeriods((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        label: periodLabelInput.trim(),
-        start,
-        end,
-        color: periodColorInput || "#ffa000",
-      },
-    ]);
-
-    setPeriodLabelInput("");
-    setPeriodStart("");
-    setPeriodEnd("");
-  };
-
-  const handleDeletePeriod = (id: number) => {
-    setPeriods((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const currentMemoList: TimeMemo[] = contextDate
-    ? memos[contextDate] ?? []
-    : [];
-  const contextHoliday = getHolidayFromMap(holidayMap, contextDate);
-  const currentDateTitle: string = contextDate
-    ? dateNoteTitles[contextDate] ?? ""
-    : "";
-  const currentDateContents: string[] = contextDate
-    ? dateNoteContents[contextDate] ?? []
-    : [];
-
-  const periodsForContext = contextDate
-    ? periods.filter((p) => p.start <= contextDate && contextDate <= p.end)
-    : [];
+  const cellsWithRender = cells // 그냥 가독성용 별칭
 
   return (
     <div className="page-wrapper">
       <main className="main-section">
         <div className="calendar-column">
           <div className="card">
-            <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
               캘린더
             </h2>
-            <p style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
+            <p style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
               오늘: {todayKey}
             </p>
             {holidayLoading && (
-              <p style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+              <p style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                 공휴일 불러오는 중...
               </p>
             )}
@@ -513,75 +486,75 @@ export default function CalendarPage() {
             </div>
 
             <div className="calendar-grid">
-              {cells.map((cell, index) => {
+              {cellsWithRender.map((cell, index) => {
                 if (cell.day === null) {
-                  return <div key={index} className="day-cell empty" />;
+                  return <div key={index} className="day-cell empty" />
                 }
 
-                const weekdayIndex = index % 7;
-                const isSun = weekdayIndex === 0;
-                const isSat = weekdayIndex === 6;
+                const weekdayIndex = index % 7
+                const isSun = weekdayIndex === 0
+                const isSat = weekdayIndex === 6
 
-                const holidayInfo = getHolidayFromMap(holidayMap, cell.key);
-                const isHoliday = !!holidayInfo;
+                const holidayInfo = getHolidayFromMap(holidayMap, cell.key)
+                const isHoliday = !!holidayInfo
 
-                const isSelected = selectedDate === cell.key;
-                const isToday = cell.key === todayKey;
+                const isSelected = selectedDate === cell.key
+                const isToday = cell.key === todayKey
 
                 const customColor = cell.key
                   ? customColors[cell.key]
-                  : undefined;
+                  : undefined
 
                 const periodsForDay = cell.key
                   ? periods.filter(
-                    (p) =>
-                      p.start <= (cell.key as string) &&
-                      (cell.key as string) <= p.end
-                  )
-                  : [];
-                const firstPeriodForDay = periodsForDay[0];
-                const isInPeriod = periodsForDay.length > 0;
+                      (p) =>
+                        p.start <= (cell.key as string) &&
+                        (cell.key as string) <= p.end
+                    )
+                  : []
+                const firstPeriodForDay = periodsForDay[0]
+                const isInPeriod = periodsForDay.length > 0
 
                 let dayStyle:
                   | { background?: string; borderColor?: string }
-                  | undefined;
+                  | undefined
 
                 if (customColor) {
                   dayStyle = !isSelected
                     ? {
-                      background: customColor,
-                      borderColor: customColor,
-                    }
-                    : { background: customColor };
+                        background: customColor,
+                        borderColor: customColor,
+                      }
+                    : { background: customColor }
                 }
 
                 const hasTimeMemo =
-                  !!cell.key && !!memos[cell.key] && memos[cell.key].length > 0;
+                  !!cell.key && !!memos[cell.key] && memos[cell.key].length > 0
 
                 const hasDateNote =
                   !!cell.key &&
                   ((dateNoteTitles[cell.key] &&
-                    dateNoteTitles[cell.key].trim() !== "") ||
+                    dateNoteTitles[cell.key].trim() !== '') ||
                     (dateNoteContents[cell.key] &&
-                      dateNoteContents[cell.key].length > 0));
+                      dateNoteContents[cell.key].length > 0))
 
-                const hasAnyNote = hasTimeMemo || hasDateNote;
+                const hasAnyNote = hasTimeMemo || hasDateNote
 
                 const dateTitle =
                   cell.key && dateNoteTitles[cell.key]
                     ? dateNoteTitles[cell.key].trim()
-                    : "";
+                    : ''
 
                 const dayClassNames = [
-                  "day-cell",
-                  isSun && "sun",
-                  isSat && "sat",
-                  isHoliday && "holiday",
-                  isToday && "today",
-                  isSelected && "selected",
+                  'day-cell',
+                  isSun && 'sun',
+                  isSat && 'sat',
+                  isHoliday && 'holiday',
+                  isToday && 'today',
+                  isSelected && 'selected',
                 ]
                   .filter(Boolean)
-                  .join(" ");
+                  .join(' ')
 
                 return (
                   <button
@@ -591,24 +564,23 @@ export default function CalendarPage() {
                     style={dayStyle}
                     onClick={() => {
                       if (cell.key) {
-                        setSelectedDate(cell.key);
-                        setContextDate(cell.key);
+                        openScheduleModal(cell.key)
                       }
                     }}
                     onContextMenu={(e) => handleRightClickDay(e, cell.key)}
                   >
                     <div
                       style={{
-                        position: "relative",
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
+                        position: 'relative',
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
                         paddingTop: 6,
                         paddingInline: 4,
-                        boxSizing: "border-box",
+                        boxSizing: 'border-box',
                       }}
                     >
                       {isToday && <span className="today-badge">오늘</span>}
@@ -643,347 +615,148 @@ export default function CalendarPage() {
                       )}
                     </div>
                   </button>
-                );
+                )
               })}
             </div>
           </div>
           {/* ⬆⬆⬆ 캘린더 화면 부분 끝 ⬆⬆⬆ */}
-
-          {contextDate && (
-            <div className="card memo-card">
-              <div className="memo-header">
-                <span className="memo-title">메모</span>
-                <span className="memo-date">{contextDate}</span>
-              </div>
-
-              {contextHoliday && (
-                <div className="holiday-banner">
-                  <span className="holiday-label">공휴일</span>
-                  <span className="holiday-name">{contextHoliday.name}</span>
-                </div>
-              )}
-
-              <div className="date-note-row">
-                <label className="date-note-label">
-                  날짜 메모 제목
-                  <div className="date-note-input-row">
-                    <input
-                      type="text"
-                      className="date-note-input"
-                      placeholder="이 날짜 메모의 제목을 적어주세요"
-                      value={dateNoteTitleInput}
-                      onChange={(e) => setDateNoteTitleInput(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="memo-add-btn"
-                      onClick={handleAddDateTitle}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </label>
-              </div>
-
-              <div className="date-note-display-card">
-                <div className="date-note-display-title">메모 내용</div>
-
-                {currentDateTitle && (
-                  <div className="date-note-title-line">
-                    <span className="date-note-title-label">제목</span>
-                    <span className="date-note-title-text">
-                      {currentDateTitle}
-                    </span>
-                    <button
-                      type="button"
-                      className="memo-delete-btn"
-                      onClick={() => {
-                        if (!contextDate) return;
-                        setDateNoteTitles((prev) => {
-                          const next = { ...prev };
-                          delete next[contextDate];
-                          return next;
-                        });
-                      }}
-                    >
-                      제목 삭제
-                    </button>
-                  </div>
-                )}
-
-                <div className="date-note-input-row" style={{ marginTop: 6 }}>
-                  <input
-                    type="text"
-                    className="date-note-input"
-                    placeholder="메모 내용을 입력하세요"
-                    value={dateNoteContentInput}
-                    onChange={(e) => setDateNoteContentInput(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="memo-add-btn"
-                    onClick={handleAddDateContent}
-                  >
-                    추가
-                  </button>
-                </div>
-
-                {currentDateContents.length === 0 ? (
-                  <p className="date-note-empty">
-                    등록된 메모 내용이 없습니다.
-                  </p>
-                ) : (
-                  <div className="date-note-list">
-                    {currentDateContents.map((content, idx) => (
-                      <div key={idx} className="date-note-item">
-                        <span className="date-note-text">{content}</span>
-                        <button
-                          type="button"
-                          className="memo-delete-btn"
-                          onClick={() =>
-                            handleDeleteDateContent(contextDate as string, idx)
-                          }
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="period-card">
-                <div className="period-inline-row">
-                  <span className="period-header-inline">기간 설정</span>
-
-                  <label className="period-label-inline">
-                    시작일
-                    <input
-                      type="date"
-                      className="period-input"
-                      value={periodStart}
-                      onChange={(e) => setPeriodStart(e.target.value)}
-                    />
-                  </label>
-
-                  <label className="period-label-inline">
-                    종료일
-                    <input
-                      type="date"
-                      className="period-input"
-                      value={periodEnd}
-                      onChange={(e) => setPeriodEnd(e.target.value)}
-                    />
-                  </label>
-
-                  <label className="period-label-inline">
-                    선 색상
-                    <input
-                      type="color"
-                      className="period-color-input"
-                      value={periodColorInput}
-                      onChange={(e) => setPeriodColorInput(e.target.value)}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    className="memo-add-btn"
-                    onClick={handleAddPeriod}
-                  >
-                    기간 추가
-                  </button>
-                </div>
-
-                <div className="period-desc-row">
-                  <input
-                    type="text"
-                    className="period-input period-desc-input"
-                    placeholder="예: 수행평가 기간, 중간고사 기간"
-                    value={periodLabelInput}
-                    onChange={(e) => setPeriodLabelInput(e.target.value)}
-                  />
-                </div>
-
-                {periodsForContext.length === 0 ? (
-                  <p className="period-empty">
-                    이 날짜에 포함되는 기간이 없습니다.
-                  </p>
-                ) : (
-                  <div className="period-list">
-                    {periodsForContext.map((p) => (
-                      <div key={p.id} className="period-item">
-                        <div className="period-tag-label">
-                          <span
-                            className="period-color-dot"
-                            style={{ background: p.color }}
-                          />
-                          {p.label}
-                        </div>
-                        <div className="period-tag-dates">
-                          {p.start} ~ {p.end}
-                        </div>
-                        <button
-                          type="button"
-                          className="memo-delete-btn"
-                          onClick={() => handleDeletePeriod(p.id)}
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="color-row">
-                <span className="color-label">색상</span>
-                <div className="color-options">
-                  <button
-                    type="button"
-                    className="color-pill default"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, null)
-                    }
-                  >
-                    기본
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill yellow"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#fff9c4")
-                    }
-                  >
-                    노랑
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill green"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#c8e6c9")
-                    }
-                  >
-                    초록
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill purple"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#e1bee7")
-                    }
-                  >
-                    보라
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill orange"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#ffe0b2")
-                    }
-                  >
-                    주황
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill pink"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#ffc1e3")
-                    }
-                  >
-                    분홍
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill blue"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#bbdefb")
-                    }
-                  >
-                    파랑
-                  </button>
-                  <button
-                    type="button"
-                    className="color-pill gray"
-                    onClick={() =>
-                      contextDate && handleSetColor(contextDate, "#eeeeee")
-                    }
-                  >
-                    회색
-                  </button>
-                </div>
-              </div>
-
-              <form className="memo-form" onSubmit={handleAddMemo}>
-                <div className="memo-input-row">
-                  <label className="memo-label">
-                    시작
-                    <input
-                      type="time"
-                      value={memoStartTime}
-                      onChange={(e) => setMemoStartTime(e.target.value)}
-                      className="memo-time-input"
-                    />
-                  </label>
-                  <label className="memo-label">
-                    종료
-                    <input
-                      type="time"
-                      value={memoEndTime}
-                      onChange={(e) => setMemoEndTime(e.target.value)}
-                      className="memo-time-input"
-                    />
-                  </label>
-                  <label className="memo-label memo-text-label">
-                    내용
-                    <input
-                      type="text"
-                      value={memoText}
-                      onChange={(e) => setMemoText(e.target.value)}
-                      placeholder="메모를 입력하세요"
-                      className="memo-text-input"
-                    />
-                  </label>
-                  <button type="submit" className="memo-add-btn">
-                    추가
-                  </button>
-                </div>
-              </form>
-
-              <div className="memo-list">
-                {currentMemoList.length === 0 ? (
-                  <p className="memo-empty">등록된 메모가 없습니다.</p>
-                ) : (
-                  currentMemoList.map((m, idx) => (
-                    <div key={idx} className="memo-item">
-                      <span className="memo-time">
-                        {m.start}~{m.end}
-                      </span>
-                      <span className="memo-text">{m.text}</span>
-                      <button
-                        type="button"
-                        className="memo-delete-btn"
-                        onClick={() =>
-                          handleDeleteMemo(contextDate as string, idx)
-                        }
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <p className="memo-hint">
-                ※ 날짜를 클릭 또는 우클릭하면 해당 날짜에 메모를 작성할 수
-                있습니다.
-              </p>
-            </div>
-          )}
         </div>
       </main>
 
-      {/* ⬇ 기존 스타일 그대로 ⬇ */}
+      {/* 🟢 새 일정 추가 모달 (심플 버전) */}
+      {isModalOpen && (
+        <div className="modal-backdrop" onClick={handleModalClose}>
+          <div
+            className="modal-panel"
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+          >
+            <div className="modal-header">
+              <span className="modal-title">새 일정 추가</span>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={handleModalClose}
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="modal-body" onSubmit={handleModalSubmit}>
+              {/* 시작일 */}
+              <div className="modal-field">
+                <label className="modal-label">시작일</label>
+                <input
+                  type="date"
+                  className="modal-input"
+                  value={modalStartDate}
+                  onChange={(e) => setModalStartDate(e.target.value)}
+                />
+              </div>
+
+              {/* 기간 설정 */}
+              <div className="modal-field">
+                <label className="modal-label">기간 설정</label>
+                <div className="modal-radio-row">
+                  <label className="modal-radio">
+                    <input
+                      type="radio"
+                      checked={modalRangeType === 'single'}
+                      onChange={() => setModalRangeType('single')}
+                    />
+                    <span>하루</span>
+                  </label>
+                  <label className="modal-radio">
+                    <input
+                      type="radio"
+                      checked={modalRangeType === 'range'}
+                      onChange={() => setModalRangeType('range')}
+                    />
+                    <span>기간 설정</span>
+                  </label>
+                </div>
+                {modalRangeType === 'range' && (
+                  <input
+                    type="date"
+                    className="modal-input modal-range-end"
+                    value={modalEndDate}
+                    onChange={(e) => setModalEndDate(e.target.value)}
+                  />
+                )}
+              </div>
+
+              {/* 시간 / 교시 선택 토글 */}
+              <div className="modal-field">
+                <label className="modal-label">시간 설정</label>
+                <div className="modal-radio-row">
+                  <button
+                    type="button"
+                    className={'modal-toggle ' + (modalUseTime ? 'active' : '')}
+                    onClick={() => {
+                      setModalUseTime(true)
+                      setModalUsePeriod(false)
+                    }}
+                  >
+                    시간
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      'modal-toggle ' + (modalUsePeriod ? 'active' : '')
+                    }
+                    onClick={() => {
+                      setModalUsePeriod(true)
+                      setModalUseTime(false)
+                    }}
+                  >
+                    교시
+                  </button>
+                </div>
+              </div>
+
+              {/* 시간 입력 (선택) */}
+              <div className="modal-field">
+                <label className="modal-label">시간 (선택)</label>
+                <input
+                  type="time"
+                  className="modal-input"
+                  value={modalTime}
+                  onChange={(e) => setModalTime(e.target.value)}
+                  disabled={!modalUseTime}
+                />
+              </div>
+
+              {/* 설명 */}
+              <div className="modal-field">
+                <label className="modal-label">설명</label>
+                <textarea
+                  className="modal-textarea"
+                  placeholder="일정 설명을 입력하세요"
+                  value={modalDescription}
+                  onChange={(e) => setModalDescription(e.target.value)}
+                />
+              </div>
+
+              {/* 추가 버튼 */}
+              <button type="submit" className="modal-submit-btn">
+                일정 추가
+              </button>
+
+              {/* 삭제 버튼 */}
+              <button
+                type="button"
+                className="modal-delete-btn"
+                onClick={handleDeleteScheduleForDate}
+              >
+                이 날짜의 일정 전체 삭제
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ⬇ 스타일 ⬇ */}
       <style jsx>{`
         .page-wrapper {
           width: 100%;
@@ -991,7 +764,7 @@ export default function CalendarPage() {
           display: flex;
           flex-direction: column;
           background: #f5f7fb;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
             sans-serif;
         }
 
@@ -1200,450 +973,177 @@ export default function CalendarPage() {
           border-radius: 999px;
         }
 
-        .memo-card {
-          margin-top: 4px;
+        /* 🟢 모달 스타일 (심플/기본 팝업 느낌) */
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
         }
 
-        .memo-header {
+        .modal-panel {
+          width: 360px;
+          max-width: 92%;
+          background: #ffffff;
+          border-radius: 12px;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+          overflow: hidden;
+        }
+
+        .modal-header {
+          padding: 10px 14px;
+          border-bottom: 1px solid #e5e7eb;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 10px;
+          background: #f9fafb;
         }
 
-        .memo-title {
-          font-weight: 600;
+        .modal-title {
           font-size: 14px;
-        }
-
-        .memo-date {
-          font-size: 13px;
-          color: #666666;
-        }
-
-        .holiday-banner {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: #ffecec;
-          border: 1px solid #ffbcbc;
-          font-size: 12px;
-          color: #c62828;
-          margin-bottom: 10px;
-        }
-
-        .holiday-label {
-          font-weight: 700;
-        }
-
-        .holiday-name {
-          font-weight: 500;
-        }
-
-        .date-note-row {
-          margin-bottom: 10px;
-        }
-
-        .date-note-label {
-          display: flex;
-          flex-direction: column;
-          font-size: 12px;
-          color: #444444;
-        }
-
-        .date-note-input-row {
-          display: flex;
-          gap: 8px;
-          margin-top: 4px;
-        }
-
-        .date-note-input {
-          padding: 6px 8px;
-          border-radius: 8px;
-          border: 1px solid #d0d0d0;
-          font-size: 12px;
-          width: 100%;
-        }
-
-        .date-note-display-card {
-          border-radius: 10px;
-          border: 1px solid #eeeeee;
-          background: #fafafa;
-          padding: 8px 10px;
-          margin-bottom: 10px;
-        }
-
-        .date-note-display-title {
-          font-size: 12px;
           font-weight: 600;
-          margin-bottom: 6px;
+          color: #111827;
         }
 
-        .date-note-title-line {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 6px;
-          font-size: 12px;
-        }
-
-        .date-note-title-label {
-          font-weight: 600;
-          color: #555555;
-        }
-
-        .date-note-title-text {
-          flex: 1;
-          word-break: break-word;
-        }
-
-        .date-note-empty {
-          font-size: 12px;
-          color: #999999;
-          margin: 6px 0 0;
-        }
-
-        .date-note-list {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          margin-top: 6px;
-        }
-
-        .date-note-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12px;
-        }
-
-        .date-note-text {
-          flex: 1;
-          word-break: break-word;
-        }
-
-        .period-card {
-          border-radius: 10px;
-          border: 1px solid #eeeeee;
-          background: #fafafa;
-          padding: 6px 8px;
-          margin-bottom: 8px;
-        }
-
-        .period-inline-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: nowrap;
-        }
-
-        .period-header-inline {
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .period-label-inline {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 11px;
-          color: #444444;
-          white-space: nowrap;
-        }
-
-        .period-input {
-          padding: 4px 6px;
-          border-radius: 8px;
-          border: 1px solid #d0d0d0;
-          font-size: 11px;
-          box-sizing: border-box;
-        }
-
-        .period-color-input {
-          width: 32px;
-          height: 20px;
-          padding: 0;
-          border-radius: 4px;
-          border: 1px solid #d0d0d0;
-        }
-
-        .period-desc-row {
-          margin-top: 4px;
-        }
-
-        .period-desc-input {
-          width: 100%;
-        }
-
-        .period-list {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          margin-top: 4px;
-          max-height: 60px;
-          overflow-y: auto;
-        }
-
-        .period-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-          font-size: 11px;
-          padding: 2px 0;
-        }
-
-        .period-tag-label {
-          font-weight: 600;
-          color: #333333;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .period-color-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          border: 1px solid #e5e5e5;
-        }
-
-        .period-tag-dates {
-          font-size: 10px;
-          color: #777777;
-        }
-
-        .period-empty {
-          font-size: 11px;
-          color: #999999;
-          margin-top: 2px;
-        }
-
-        .color-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 8px;
-          flex-wrap: wrap;
-        }
-
-        .color-label {
-          font-size: 12px;
-          color: #555555;
-          font-weight: 500;
-        }
-
-        .color-options {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
-
-        .color-pill {
+        .modal-close-btn {
           border: none;
-          border-radius: 999px;
-          padding: 4px 10px;
-          font-size: 11px;
+          background: transparent;
+          font-size: 18px;
+          line-height: 1;
           cursor: pointer;
-          background: #f2f2f2;
-          color: #333333;
+          color: #6b7280;
         }
 
-        .color-pill.default {
-          background: #f2f2f2;
+        .modal-close-btn:hover {
+          color: #111827;
         }
 
-        .color-pill.yellow {
-          background: #fff9c4;
-        }
-
-        .color-pill.green {
-          background: #c8e6c9;
-        }
-
-        .color-pill.purple {
-          background: #e1bee7;
-        }
-
-        .color-pill.orange {
-          background: #ffe0b2;
-        }
-
-        .color-pill.pink {
-          background: #ffc1e3;
-        }
-
-        .color-pill.blue {
-          background: #bbdefb;
-        }
-
-        .color-pill.gray {
-          background: #eeeeee;
-        }
-
-        .color-pill:hover {
-          filter: brightness(0.97);
-        }
-
-        .memo-form {
-          margin-bottom: 10px;
-        }
-
-        .memo-input-row {
-          display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .memo-label {
+        .modal-body {
+          padding: 14px 16px 16px;
           display: flex;
           flex-direction: column;
-          font-size: 12px;
-          color: #444444;
+          gap: 10px;
+          background: #ffffff;
         }
 
-        .memo-time-input {
+        .modal-field {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .modal-label {
+          font-size: 12px;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .modal-input {
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          padding: 7px 9px;
+          font-size: 12px;
+          outline: none;
+          background: #ffffff;
+        }
+
+        .modal-input:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+        }
+
+        .modal-range-end {
           margin-top: 4px;
-          padding: 6px 8px;
-          border-radius: 8px;
-          border: 1px solid #d0d0d0;
-          font-size: 12px;
-          min-width: 100px;
         }
 
-        .memo-text-label {
-          flex: 1;
-        }
-
-        .memo-text-input {
-          margin-top: 4px;
-          padding: 6px 8px;
-          border-radius: 8px;
-          border: 1px solid #d0d0d0;
-          font-size: 12px;
-          width: 100%;
-        }
-
-        .memo-add-btn {
-          border: none;
-          background: #27a9ff;
-          color: #ffffff;
-          border-radius: 999px;
-          padding: 7px 14px;
-          font-size: 12px;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .memo-add-btn:hover {
-          filter: brightness(0.96);
-        }
-
-        .memo-list {
-          border-top: 1px solid #eeeeee;
-          padding-top: 8px;
-          margin-top: 4px;
-          max-height: 180px;
-          overflow-y: auto;
-        }
-
-        .memo-empty {
-          margin: 6px 0 0;
-          font-size: 12px;
-          color: #888888;
-        }
-
-        .memo-item {
+        .modal-radio-row {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 4px 0;
+          margin-top: 2px;
+          flex-wrap: wrap;
+        }
+
+        .modal-radio {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
           font-size: 12px;
+          color: #4b5563;
         }
 
-        .memo-time {
-          font-weight: 600;
-          min-width: 80px;
+        .modal-radio input {
+          accent-color: #2563eb;
         }
 
-        .memo-text {
-          flex: 1;
-          word-break: break-word;
-        }
-
-        .memo-delete-btn {
-          border: none;
-          background: #f2f2f2;
+        .modal-toggle {
           border-radius: 999px;
-          padding: 4px 10px;
-          font-size: 11px;
+          border: 1px solid #d1d5db;
+          padding: 5px 12px;
+          font-size: 12px;
+          background: #ffffff;
           cursor: pointer;
-          white-space: nowrap;
+          min-width: 60px;
         }
 
-        .memo-delete-btn:hover {
-          background: #e2e2e2;
+        .modal-toggle.active {
+          background: #e5f0ff;
+          border-color: #2563eb;
+          color: #1d4ed8;
+          font-weight: 600;
         }
 
-        .memo-hint {
-          margin: 8px 0 0;
-          font-size: 11px;
-          color: #999999;
+        .modal-textarea {
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          padding: 8px 9px;
+          font-size: 12px;
+          min-height: 70px;
+          resize: none;
+          outline: none;
+          background: #ffffff;
         }
 
-        .memo-card {
-          padding: 10px 14px !important;
-          margin-top: 0 !important;
-          max-height: 260px;
-          overflow-y: auto;
+        .modal-textarea:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
         }
 
-        .memo-header {
-          margin-bottom: 8px !important;
+        .modal-submit-btn {
+          margin-top: 6px;
+          border: none;
+          width: 100%;
+          border-radius: 8px;
+          padding: 9px 12px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #ffffff;
+          cursor: pointer;
+          background: #2563eb;
         }
 
-        .date-note-row {
-          margin-bottom: 6px !important;
+        .modal-submit-btn:hover {
+          background: #1d4ed8;
         }
 
-        .date-note-input,
-        .memo-text-input,
-        .memo-time-input,
-        .period-input {
-          height: 32px;
+        .modal-delete-btn {
+          margin-top: 4px;
+          border: none;
+          width: 100%;
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #b91c1c;
+          cursor: pointer;
+          background: #fee2e2;
         }
 
-        .date-note-display-card {
-          padding: 6px 8px !important;
-          margin-bottom: 8px !important;
-        }
-
-        .color-row {
-          margin-bottom: 6px !important;
-        }
-
-        .memo-form {
-          margin-bottom: 6px !important;
-        }
-
-        .memo-add-btn {
-          padding: 5px 12px !important;
-        }
-
-        .memo-item {
-          padding: 3px 0 !important;
-        }
-
-        .memo-list {
-          max-height: 130px !important;
-        }
-
-        .memo-hint {
-          margin-top: 4px !important;
+        .modal-delete-btn:hover {
+          background: #fecaca;
         }
 
         @media (max-width: 768px) {
@@ -1656,16 +1156,8 @@ export default function CalendarPage() {
             max-width: 100%;
             padding: 0 12px;
           }
-
-          .memo-input-row {
-            align-items: stretch;
-          }
-
-          .period-inline-row {
-            flex-wrap: wrap;
-          }
         }
       `}</style>
     </div>
-  );
+  )
 }
