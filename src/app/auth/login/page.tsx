@@ -54,8 +54,15 @@ export default function LoginPage() {
       return
     }
 
-    // ⭐ user 전체 데이터 저장하도록 수정
-    localStorage.setItem('loggedInUser', JSON.stringify(found))
+    // ⭐ 저장할 데이터 최소화 (비밀번호 제거)
+    const safeUser = {
+      username: found.username,
+      school: found.school,
+      grade: found.grade,
+      level: found.level,
+    }
+
+    localStorage.setItem('loggedInUser', JSON.stringify(safeUser))
 
     showAlert('로그인 성공!', () => {
       window.location.href = '/'

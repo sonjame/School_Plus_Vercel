@@ -8,7 +8,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [user, setUser] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [userSchool, setUserSchool] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true)
   const [isPC, setIsPC] = useState<boolean>(true)
@@ -18,16 +18,24 @@ export default function RootLayout({
     show: false,
     message: '',
     type: 'alert',
-    onConfirm: () => { },
-    onCancel: () => { },
+    onConfirm: () => {},
+    onCancel: () => {},
   })
 
   // 🔥 게시판 드롭다운
   const [dropOpen, setDropOpen] = useState(false)
 
+  // ⭐ 로그인 정보 불러오기
   useEffect(() => {
     const saved = localStorage.getItem('loggedInUser')
-    setUser(saved)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setUser(parsed) // ★ 객체 저장
+      } catch {
+        setUser(null)
+      }
+    }
 
     const school = localStorage.getItem('userSchool')
     setUserSchool(school)
@@ -53,7 +61,7 @@ export default function RootLayout({
         setModal((m) => ({ ...m, show: false }))
         if (callback) callback()
       },
-      onCancel: () => { },
+      onCancel: () => {},
     })
   }
 
@@ -216,7 +224,7 @@ export default function RootLayout({
                     fontWeight: 600,
                   }}
                 >
-                  👋 {user} 님
+                  👋 {user.username} 님
                 </div>
                 <button
                   onClick={handleLogout}

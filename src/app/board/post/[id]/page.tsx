@@ -103,10 +103,22 @@ export default function PostDetailPage() {
     )
     setComments(savedComments)
 
-    const user = localStorage.getItem('loggedInUser')
-    setUsername(user)
+    // ⭐ 수정된 부분: 로그인 정보 파싱
+    const savedUser = localStorage.getItem('loggedInUser')
+    let parsedUser = null
 
-    if (user && foundPost) setIsAuthor(user === foundPost.author)
+    try {
+      parsedUser = savedUser ? JSON.parse(savedUser).username : null
+    } catch {
+      parsedUser = savedUser
+    }
+
+    setUsername(parsedUser)
+
+    // ⭐ 수정된 부분: 작성자 여부 체크
+    if (parsedUser && foundPost) {
+      setIsAuthor(String(parsedUser).trim() === String(foundPost.author).trim())
+    }
   }, [])
 
   /* 스크랩 여부 */
@@ -214,7 +226,7 @@ export default function PostDetailPage() {
     })
   }
 
-  /* 게시글 삭제 함수 추가 (🔥 수정된 부분) */
+  /* 게시글 삭제 */
   const deletePost = () => {
     showConfirm('게시글을 삭제하시겠습니까?', () => {
       const list = JSON.parse(localStorage.getItem(storageKey) || '[]')
@@ -486,19 +498,28 @@ export default function PostDetailPage() {
               />
             )}
 
-            <button
-              style={btnBlue}
-              onClick={() => {
-                setReportOpen(false)
-                showAlert('신고가 접수되었습니다.')
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '12px',
+                marginTop: '12px',
               }}
             >
-              제출
-            </button>
+              <button style={btnGray} onClick={() => setReportOpen(false)}>
+                닫기
+              </button>
 
-            <button style={btnGray} onClick={() => setReportOpen(false)}>
-              닫기
-            </button>
+              <button
+                style={btnBlue}
+                onClick={() => {
+                  setReportOpen(false)
+                  showAlert('신고가 접수되었습니다.')
+                }}
+              >
+                제출
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -509,7 +530,14 @@ export default function PostDetailPage() {
           <div style={modalBox}>
             <p>{modal.message}</p>
 
-            <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+            <div
+              style={{
+                marginTop: '10px',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center', // ⭐ 중앙 정렬 추가됨
+              }}
+            >
               {modal.type === 'confirm' && (
                 <button style={btnGray} onClick={modal.onCancel}>
                   취소
