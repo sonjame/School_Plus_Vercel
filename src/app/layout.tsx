@@ -9,7 +9,6 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const [user, setUser] = useState<any>(null)
-  const [userSchool, setUserSchool] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true)
   const [isPC, setIsPC] = useState<boolean>(true)
 
@@ -25,20 +24,23 @@ export default function RootLayout({
   // 🔥 게시판 드롭다운
   const [dropOpen, setDropOpen] = useState(false)
 
-  // ⭐ 로그인 정보 불러오기
+  // ⭐ 로그인 정보 불러오기 & 업데이트 반영
   useEffect(() => {
-    const saved = localStorage.getItem('loggedInUser')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        setUser(parsed) // ★ 객체 저장
-      } catch {
-        setUser(null)
+    const loadUser = () => {
+      const saved = localStorage.getItem('loggedInUser')
+      if (saved) {
+        try {
+          setUser(JSON.parse(saved))
+        } catch {
+          setUser(null)
+        }
       }
     }
 
-    const school = localStorage.getItem('userSchool')
-    setUserSchool(school)
+    loadUser()
+
+    // 🔥 학교 변경 후 새로 저장된 값 반영
+    window.addEventListener('storage', loadUser)
 
     const check = () => {
       const wide = window.innerWidth >= 800
@@ -48,7 +50,11 @@ export default function RootLayout({
 
     check()
     window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
+
+    return () => {
+      window.removeEventListener('storage', loadUser)
+      window.removeEventListener('resize', check)
+    }
   }, [])
 
   // ⭐ alert 모달
@@ -97,6 +103,28 @@ export default function RootLayout({
 
   return (
     <html lang="ko">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@0;1&display=swap"
+          rel="stylesheet"
+        />
+
+        <style>{`
+        .material-symbols-rounded {
+          font-family: 'Material Symbols Rounded';
+          font-weight: normal;
+          font-style: normal;
+          font-size: 24px;
+          display: inline-block;
+          line-height: 1;
+          white-space: nowrap;
+        }
+      `}</style>
+      </head>
       <body
         style={{
           margin: 0,
@@ -142,6 +170,10 @@ export default function RootLayout({
             gap: '16px',
             transition: 'left 0.3s ease',
             zIndex: 998,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
           }}
         >
           {/* 모바일 X */}
@@ -162,7 +194,7 @@ export default function RootLayout({
             </button>
           )}
 
-          {/* ⭐ 로고(학교 이름 표시 부분) */}
+          {/* 학교 이름 표시 */}
           <Link
             href="/"
             style={{
@@ -173,14 +205,19 @@ export default function RootLayout({
               textDecoration: 'none',
             }}
           >
-            {userSchool ? `🏫 ${userSchool}` : 'School Community'}
+            {user?.school ? `🏫 ${user.school}` : 'School Community'}
           </Link>
 
-          {/* 게시판 */}
+          {/* 메뉴 */}
+          <MenuItem icon="👤" label="내정보" href="/my-info" />
+
           <div
             style={{ position: 'relative' }}
             onMouseEnter={() => isPC && setDropOpen(true)}
             onMouseLeave={() => isPC && setDropOpen(false)}
+            onClick={() => {
+              if (!isPC) setDropOpen((prev) => !prev)
+            }}
           >
             <MenuItem icon="📋" label="게시판" href="/board" />
 
@@ -211,7 +248,10 @@ export default function RootLayout({
           <MenuItem icon="📅" label="일정" href="/calendar" />
           <MenuItem icon="⏰" label="시간표" href="/timetable" />
           <MenuItem icon="📊" label="모의고사" href="/scores" />
+          <MenuItem icon="📊" label="내신점수" href="/grade" />
           <MenuItem icon="🏫" label="학교인증" href="/school_certification" />
+          <MenuItem icon="🍚" label="급식표" href="/meal" />
+          <MenuItem icon="📚" label="도서관" href="/Library" />
 
           {/* 로그인/로그아웃 */}
           <div style={{ marginTop: 'auto' }}>
@@ -224,7 +264,7 @@ export default function RootLayout({
                     fontWeight: 600,
                   }}
                 >
-                  👋 {user.username} 님
+                  👋 {user.name || user.username} 님
                 </div>
                 <button
                   onClick={handleLogout}
@@ -248,7 +288,7 @@ export default function RootLayout({
           </div>
         </aside>
 
-        {/* 모바일 오버레이 */}
+        {/* overlay */}
         {!isPC && sidebarOpen && (
           <div
             onClick={() => setSidebarOpen(false)}
@@ -266,10 +306,9 @@ export default function RootLayout({
 
         {/* 메인 */}
         <main
+          className="min-h-screen"
           style={{
             marginLeft: isPC ? '220px' : '0px',
-            padding: isPC ? '24px' : '12px',
-            transition: '0.3s',
           }}
         >
           {children}
@@ -363,7 +402,7 @@ export default function RootLayout({
   )
 }
 
-/* 드롭다운 항목 */
+/* 메뉴 섹션 UI */
 function dropdownItem(href: string, label: string) {
   return (
     <Link
@@ -381,7 +420,6 @@ function dropdownItem(href: string, label: string) {
   )
 }
 
-/* 메뉴 아이템 */
 function MenuItem({
   icon,
   label,

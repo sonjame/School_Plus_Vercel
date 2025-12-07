@@ -9,7 +9,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [users, setUsers] = useState<any[]>([])
 
-  // ⭐ 모달 상태
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
 
@@ -17,6 +16,17 @@ export default function LoginPage() {
     const savedUsers = JSON.parse(localStorage.getItem('users') || '[]')
     setUsers(savedUsers)
   }, [])
+
+  // ⭐ Enter 키로 로그인 실행
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        login()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
 
   const inputWrapper: React.CSSProperties = {
     width: '100%',
@@ -34,7 +44,6 @@ export default function LoginPage() {
     boxSizing: 'border-box',
   }
 
-  // ⭐ 알림 모달
   const showAlert = (msg: string, callback?: () => void) => {
     setModalMessage(msg)
     setShowModal(true)
@@ -54,15 +63,23 @@ export default function LoginPage() {
       return
     }
 
-    // ⭐ 저장할 데이터 최소화 (비밀번호 제거)
     const safeUser = {
       username: found.username,
+      name: found.name,
+      email: found.email,
       school: found.school,
       grade: found.grade,
       level: found.level,
+      eduCode: found.eduCode,
+      schoolCode: found.schoolCode,
     }
 
     localStorage.setItem('loggedInUser', JSON.stringify(safeUser))
+    localStorage.setItem('userSchool', safeUser.school)
+
+    if (safeUser.eduCode) localStorage.setItem('eduCode', safeUser.eduCode)
+    if (safeUser.schoolCode)
+      localStorage.setItem('schoolCode', safeUser.schoolCode)
 
     showAlert('로그인 성공!', () => {
       window.location.href = '/'
@@ -173,6 +190,27 @@ export default function LoginPage() {
               style={{ color: '#4FC3F7', fontWeight: 600 }}
             >
               회원가입
+            </Link>
+          </p>
+          <p
+            style={{
+              textAlign: 'center',
+              marginTop: '14px',
+              fontSize: '14px',
+            }}
+          >
+            <Link
+              href="/auth/find-id"
+              style={{ color: '#4FC3F7', fontWeight: 600 }}
+            >
+              아이디 찾기
+            </Link>
+            {'  /  '}
+            <Link
+              href="/auth/find-password"
+              style={{ color: '#4FC3F7', fontWeight: 600 }}
+            >
+              비밀번호 찾기
             </Link>
           </p>
         </div>

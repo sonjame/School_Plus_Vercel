@@ -1,25 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Footer from '../components/Footer'
+import LibraryRecommend from '../components/Library'
 import TimetablePreview from '../components/Dashboard/TimetablePreview'
 import Link from 'next/link'
 
 interface Post {
-  id: number
+  id: string
   author: string
   title: string
   content: string
-  likes?: number
-  category?: string
+  likes: number
+  category: string
+  createdAt: number
 }
 
+// ⬇️ startTime(시간) 필드 포함
 interface HomeCalendarItem {
-  dateLabel: string // "11월 11일 (월)"
-  event: string // 일정 제목
-  ddayLabel: string // "D-3", "D-Day"
-  diffDays: number // 오늘 기준 날짜 차이
-  weekdayIndex: number // 0=일,1=월...
-  weekdayLabel: string // "월" 같은 한글 요일
+  dateLabel: string
+  event: string
+  ddayLabel: string
+  diffDays: number
+  weekdayIndex: number
+  weekdayLabel: string
+  startTime?: string // "HH:MM"
 }
 
 export default function HomePage() {
@@ -28,70 +33,132 @@ export default function HomePage() {
   const [today, setToday] = useState<string>('')
   const [calendar, setCalendar] = useState<HomeCalendarItem[]>([])
 
+  // 🔵 추가된 부분: 추천도서 표시 여부
+  const [showRecommend, setShowRecommend] = useState(false)
+
   useEffect(() => {
     // 로그인 유저
     setUser(localStorage.getItem('loggedInUser') || null)
 
-    // 게시글
-    setPosts(JSON.parse(localStorage.getItem('posts_all') || '[]'))
+    /* ==========================================
+       🔥 A 방식: 모든 게시판 데이터 합치기
+    ========================================== */
+    const boardKeys = [
+      'board_free',
+      'board_promo',
+      'board_club',
+      'board_grade1',
+      'board_grade2',
+      'board_grade3',
+    ]
 
-    // 오늘 요일
+    let allPosts: Post[] = []
+
+    boardKeys.forEach((key) => {
+      const list = JSON.parse(localStorage.getItem(key) || '[]')
+      allPosts = [...allPosts, ...list]
+    })
+
+    // 최신순 정렬
+    allPosts.sort((a, b) => b.createdAt - a.createdAt)
+    setPosts(allPosts)
+
+    /* ==========================================
+       📆 오늘 요일
+    ========================================== */
     const dayNames = ['일', '월', '화', '수', '목', '금', '토']
     const now = new Date()
     setToday(`${dayNames[now.getDay()]}요일`)
 
-    // 🔗 캘린더 페이지에서 저장한 일정(localStorage) 읽어오기
+    /* ==========================================
+       📅 홈 캘린더 일정 불러오기
+       👉 이번 주(월~일) 안 + 오늘 이후 일정만
+    ========================================== */
     try {
-      const raw = localStorage.getItem('calendarEvents') // CalendarPage의 STORAGE_KEYS.events와 맞춤
-      if (!raw) {
-        setCalendar([])
-        return
+      /* 🔹 기존 일정 읽기 */
+      const rawCalendar =
+        localStorage.getItem('calendarEvents') ||
+        localStorage.getItem('calendar_events')
+
+      /* 🔹 학사일정 읽기 */
+      const rawAcademic = localStorage.getItem('academicEvents')
+
+      let events: { date: string; title: string; startTime?: string }[] = []
+
+      // calendarEvents 병합
+      if (rawCalendar) {
+        const parsed = JSON.parse(rawCalendar)
+        if (Array.isArray(parsed)) {
+          events = [...parsed]
+        }
       }
 
-      type CalendarEvent = { date: string; title: string }
-      const events: CalendarEvent[] = JSON.parse(raw) || []
+      // academicEvents 병합 (📌 학사일정은 dictionary 구조라서 flatten 해야 함)
+      if (rawAcademic) {
+        const schoolMap = JSON.parse(rawAcademic) // { "2025-05-01": [ {title}, ... ] }
+
+        Object.keys(schoolMap).forEach((date) => {
+          const dayEvents = schoolMap[date]
+          if (Array.isArray(dayEvents)) {
+            dayEvents.forEach((ev) =>
+              events.push({
+                date,
+                title: ev.title,
+                startTime: ev.startTime,
+              })
+            )
+          }
+        })
+      }
 
       const todayDate = new Date()
+      const msPerDay = 1000 * 60 * 60 * 24
+
       const todayZero = new Date(
         todayDate.getFullYear(),
         todayDate.getMonth(),
         todayDate.getDate()
       ).getTime()
 
+      const todayWeekday = todayDate.getDay()
+      const diffToMonday = (todayWeekday + 6) % 7
+      const weekStartZero = todayZero - diffToMonday * msPerDay
+      const weekEndZero = weekStartZero + 6 * msPerDay
+
       const upcoming: HomeCalendarItem[] = []
       const dayNames2 = ['일', '월', '화', '수', '목', '금', '토']
 
       for (const ev of events) {
-        if (!ev.date) continue
-        const [y, m, d] = ev.date.split('-').map(Number)
+        if (!ev || !ev.date || !ev.title) continue
+
+        const parts = ev.date.split('-').map(Number)
+        if (parts.length !== 3) continue
+        const [y, m, d] = parts
         if (!y || !m || !d) continue
 
         const dateObj = new Date(y, m - 1, d)
-        const diffMs = dateObj.getTime() - todayZero
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+        const dateZero = new Date(y, m - 1, d).getTime()
+        if (Number.isNaN(dateZero)) continue
 
-        // 🔎 오늘 ~ 7일 이내 일정만
-        if (diffDays < 0 || diffDays > 7) continue
+        if (dateZero < todayZero) continue
+        if (dateZero < weekStartZero || dateZero > weekEndZero) continue
 
-        const weekdayIndex = dateObj.getDay() // 0~6
+        const diffDays = Math.floor((dateZero - todayZero) / msPerDay)
+        const weekdayIndex = dateObj.getDay()
         const weekdayLabel = dayNames2[weekdayIndex]
-        const dateLabel = `${m}월 ${d}일 (${weekdayLabel})`
-
-        let ddayLabel = diffDays === 0 ? 'D-Day' : `D-${diffDays}`
 
         upcoming.push({
-          dateLabel,
+          dateLabel: `${m}월 ${d}일 (${weekdayLabel})`,
           event: ev.title,
-          ddayLabel,
+          ddayLabel: diffDays === 0 ? 'D-Day' : `D-${diffDays}`,
           diffDays,
           weekdayIndex,
           weekdayLabel,
+          startTime: ev.startTime,
         })
       }
 
-      // 가까운 순으로 정렬
       upcoming.sort((a, b) => a.diffDays - b.diffDays)
-
       setCalendar(upcoming)
     } catch (e) {
       console.warn('홈 화면 일정 로드 오류:', e)
@@ -99,38 +166,42 @@ export default function HomePage() {
     }
   }, [])
 
+  /* ==========================================
+     🔥 인기 게시물 3개
+  ========================================== */
   const popularPosts = [...posts]
     .sort((a, b) => (b.likes || 0) - (a.likes || 0))
     .slice(0, 3)
 
-  // 오늘 / 이번주 분리
+  /* ==========================================
+     📆 오늘 & 이번주 일정 분리
+  ========================================== */
   const todayItems = calendar.filter((c) => c.diffDays === 0)
   const weekItems = calendar.filter((c) => c.diffDays > 0)
 
-  // 요일별 그룹 (월~일 순서)
-  const weekdayOrder = [1, 2, 3, 4, 5, 6, 0]
-  const weekdayLabels: Record<number, string> = {
-    0: '일',
-    1: '월',
-    2: '화',
-    3: '수',
-    4: '목',
-    5: '금',
-    6: '토',
+  const timeToMinutes = (time?: string): number => {
+    if (!time) return 24 * 60 + 59
+    const [h, m] = time.split(':').map(Number)
+    if (Number.isNaN(h) || Number.isNaN(m)) return 24 * 60 + 59
+    return h * 60 + m
   }
 
-  const weekByWeekday: Record<number, HomeCalendarItem[]> = {
-    0: [],
-    1: [],
-    2: [],
-    3: [],
-    4: [],
-    5: [],
-    6: [],
-  }
-  weekItems.forEach((item) => {
-    weekByWeekday[item.weekdayIndex].push(item)
+  const sortedTodayItems = [...todayItems].sort(
+    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+  )
+
+  const visibleTodayItems = sortedTodayItems.slice(0, 3)
+  const extraTodayCount = Math.max(sortedTodayItems.length - 3, 0)
+
+  const sortedWeekItems = [...weekItems].sort((a, b) => {
+    if (a.diffDays === b.diffDays) {
+      return timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+    }
+    return a.diffDays - b.diffDays
   })
+
+  const visibleWeekItems = sortedWeekItems.slice(0, 3)
+  const extraWeekCount = Math.max(sortedWeekItems.length - 3, 0)
 
   return (
     <div
@@ -143,7 +214,7 @@ export default function HomePage() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
       }}
     >
-      {/* ------------------ 상단 제목 ------------------ */}
+      {/* ------------------ 상단 ------------------ */}
       <h2
         style={{
           fontSize: 'clamp(20px, 4vw, 28px)',
@@ -153,7 +224,7 @@ export default function HomePage() {
           textAlign: 'center',
         }}
       >
-        💙 학교 커뮤니티 메인
+        💙 학교 커뮤니티 메인 💙
       </h2>
 
       <p
@@ -167,7 +238,39 @@ export default function HomePage() {
         학생 생활을 한눈에 확인하세요 📚
       </p>
 
-      {/* ================== 오늘 일정 ================== */}
+      {/* 🔥 오늘의 급식 */}
+      <section style={{ marginBottom: '26px' }}>
+        <Footer />
+      </section>
+
+      {/* 🔵 오늘의 추천 도서 버튼 */}
+      <section style={{ marginBottom: '16px', textAlign: 'left' }}>
+        <button
+          onClick={() => setShowRecommend(!showRecommend)}
+          style={{
+            padding: '10px 18px',
+            background: '#4FC3F7',
+            color: 'white',
+            borderRadius: '10px',
+            fontWeight: 600,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+          }}
+        >
+          {showRecommend ? '추천 도서 접기' : '오늘의 추천 도서 보기'}
+        </button>
+      </section>
+
+      {/* 🔵 오늘의 추천 도서 섹션 (토글) */}
+      {showRecommend && (
+        <section style={{ marginBottom: '26px' }}>
+          <LibraryRecommend />
+        </section>
+      )}
+
+      {/* ------------------ 오늘 일정 ------------------ */}
       <section style={{ marginBottom: '26px' }}>
         <h3
           style={{
@@ -182,58 +285,78 @@ export default function HomePage() {
           📆 오늘 일정
         </h3>
 
-        {todayItems.length === 0 ? (
+        {sortedTodayItems.length === 0 ? (
           <p style={{ color: '#888', fontSize: '14px' }}>
             오늘은 등록된 일정이 없습니다.
           </p>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gap: '12px',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            }}
-          >
-            {todayItems.map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  backgroundColor: '#E1F5FE',
-                  borderRadius: '14px',
-                  padding: '14px 16px',
-                  fontSize: 'clamp(13px, 2.2vw, 15px)',
-                }}
-              >
+          <>
+            <div
+              style={{
+                display: 'grid',
+                gap: '12px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              }}
+            >
+              {visibleTodayItems.map((item, idx) => (
                 <div
+                  key={idx}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 6,
+                    backgroundColor: '#E1F5FE',
+                    borderRadius: '14px',
+                    padding: '14px 16px',
+                    fontSize: 'clamp(13px, 2.2vw, 15px)',
                   }}
                 >
-                  <strong style={{ color: '#0277BD' }}>{item.dateLabel}</strong>
-                  <span
+                  <div
                     style={{
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: '#c62828',
-                      padding: '3px 10px',
-                      borderRadius: '999px',
-                      background: '#ffebee',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 6,
                     }}
                   >
-                    {item.ddayLabel}
-                  </span>
+                    <strong style={{ color: '#0277BD' }}>
+                      {item.dateLabel}
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#c62828',
+                        padding: '3px 10px',
+                        borderRadius: '999px',
+                        background: '#ffebee',
+                      }}
+                    >
+                      {item.ddayLabel}
+                    </span>
+                  </div>
+                  <p style={{ marginTop: '2px', color: '#555' }}>
+                    {item.event}
+                  </p>
                 </div>
-                <p style={{ marginTop: '2px', color: '#555' }}>{item.event}</p>
+              ))}
+            </div>
+
+            {extraTodayCount > 0 && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  textAlign: 'right',
+                  fontSize: '13px',
+                  color: '#555',
+                  fontWeight: 600,
+                }}
+              >
+                + 외 {extraTodayCount}개
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </section>
 
-      {/* ================== 이번 주 일정 (오늘 아래, 요일 가로줄 + 사이즈 업) ================== */}
+      {/* ------------------ 이번 주 일정 ------------------ */}
       <section style={{ marginBottom: '36px' }}>
         <h3
           style={{
@@ -245,129 +368,81 @@ export default function HomePage() {
             marginBottom: '14px',
           }}
         >
-          📅 이번 주 일정
+          📅 일정
         </h3>
 
-        {weekItems.length === 0 ? (
+        {sortedWeekItems.length === 0 ? (
           <p style={{ color: '#888', fontSize: '14px' }}>
-            7일 이내에 등록된 일정이 없습니다.
+            이번 주에 등록된 일정이 없습니다.
           </p>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-              gap: '10px',
-            }}
-          >
-            {weekdayOrder.map((wIdx) => {
-              const list = weekByWeekday[wIdx]
-              return (
+          <>
+            <div
+              style={{
+                display: 'grid',
+                gap: '12px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              }}
+            >
+              {visibleWeekItems.map((item, idx) => (
                 <div
-                  key={wIdx}
+                  key={idx}
                   style={{
-                    background: '#F5FBFF',
+                    backgroundColor: '#E1F5FE',
                     borderRadius: '14px',
-                    padding: '10px 10px 12px',
-                    minHeight: '135px', // ▶ 크기 키움
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
+                    padding: '14px 16px',
+                    fontSize: 'clamp(13px, 2.2vw, 15px)',
                   }}
                 >
-                  {/* 요일 헤더 */}
                   <div
                     style={{
-                      textAlign: 'center',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      color:
-                        wIdx === 0
-                          ? '#E53935'
-                          : wIdx === 6
-                          ? '#1E88E5'
-                          : '#0277BD',
-                      marginBottom: '4px',
-                      borderBottom: '1px solid #BBDEFB',
-                      paddingBottom: '3px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 6,
                     }}
                   >
-                    {weekdayLabels[wIdx]}
-                  </div>
-
-                  {/* 요일별 일정 */}
-                  {list.length === 0 ? (
+                    <strong style={{ color: '#0277BD' }}>
+                      {item.dateLabel}
+                    </strong>
                     <span
                       style={{
-                        fontSize: '11px',
-                        color: '#999',
-                        textAlign: 'center',
-                        marginTop: '4px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#c62828',
+                        padding: '3px 10px',
+                        borderRadius: '999px',
+                        background: '#ffebee',
                       }}
                     >
-                      일정 없음
+                      {item.ddayLabel}
                     </span>
-                  ) : (
-                    list.map((item, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          backgroundColor: '#E1F5FE',
-                          borderRadius: '10px',
-                          padding: '6px 8px',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: 3,
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: '#0277BD',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                            }}
-                          >
-                            {item.dateLabel.split('(')[0]}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: '#c62828',
-                              padding: '2px 7px',
-                              borderRadius: '999px',
-                              background: '#ffebee',
-                            }}
-                          >
-                            {item.ddayLabel}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            marginTop: '1px',
-                            color: '#555',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {item.event}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                  </div>
+                  <p style={{ marginTop: '2px', color: '#555' }}>
+                    {item.event}
+                  </p>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+
+            {extraWeekCount > 0 && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  textAlign: 'right',
+                  fontSize: '13px',
+                  color: '#555',
+                  fontWeight: 600,
+                }}
+              >
+                + 외 {extraWeekCount}개
+              </div>
+            )}
+          </>
         )}
       </section>
 
-      {/* ------------------ 📚 오늘의 시간표 ------------------ */}
+      {/* ------------------ 오늘 시간표 ------------------ */}
       <section style={{ marginBottom: '36px' }}>
         <h3
           style={{
@@ -385,10 +460,10 @@ export default function HomePage() {
         <TodayTimetable today={today} />
       </section>
 
-      {/* ------------------ 🗓 주간 시간표 미리보기 ------------------ */}
+      {/* ------------------ 주간 시간표 ------------------ */}
       <TimetablePreview />
 
-      {/* ------------------ 🔥 인기 게시물 ------------------ */}
+      {/* ------------------ 인기 게시물 ------------------ */}
       <section style={{ marginTop: '36px' }}>
         <h3
           style={{

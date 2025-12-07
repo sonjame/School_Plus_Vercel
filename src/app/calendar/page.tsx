@@ -17,39 +17,46 @@ type MemoMap = Record<string, TimeMemo[]>
 
 type Holiday = {
   date: string // "YYYY-MM-DD"
-  name: string // 예: "추석", "어린이날"
+  name: string
 }
 
 type Period = {
   id: number
-  label: string // 예: "수행평가 기간", "중간고사 기간"
-  start: string // "YYYY-MM-DD"
-  end: string // "YYYY-MM-DD"
-  color: string // 기간 표시 선 색상
+  label: string
+  start: string
+  end: string
+  color: string
 }
 
 type CalendarEvent = {
-  date: string // "YYYY-MM-DD"
-  title: string // 일정 제목
+  date: string
+  title: string
 }
 
-// 🔐 localStorage 키 모음 (HomePage와 맞추기)
+// 🎓 학사일정 타입
+type AcademicEvent = {
+  date: string // YYYY-MM-DD
+  title: string // 일정명
+}
+
+// 🔐 localStorage keys
 const STORAGE_KEYS = {
   memos: 'calendar_memos',
   colors: 'calendar_colors',
   titles: 'calendar_titles',
   contents: 'calendar_contents',
   periods: 'calendar_periods',
-  events: 'calendarEvents', // Home 페이지에서 읽는 키
+  events: 'calendarEvents',
 
-  // ✅ 뷰 상태 유지용 키
   viewYear: 'calendar_view_year',
   viewMonth: 'calendar_view_month',
   selectedDate: 'calendar_selected_date',
   contextDate: 'calendar_context_date',
 }
 
-// 📦 날짜 메모/기간 → Home에서 사용할 events 배열로 변환
+const COLOR_PRESETS = ['#DBEAFE', '#FFE4D5', '#DCFCE7', '#FEE2E2', '#EDE9FE']
+
+// 캘린더 이벤트 구성 함수
 function buildCalendarEvents(
   dateNoteTitles: Record<string, string>,
   dateNoteContents: Record<string, string[]>,
@@ -57,7 +64,6 @@ function buildCalendarEvents(
 ): CalendarEvent[] {
   const map: Record<string, string[]> = {}
 
-  // 1) 날짜 메모 제목
   for (const [date, title] of Object.entries(dateNoteTitles)) {
     const t = title.trim()
     if (!t) continue
@@ -65,7 +71,6 @@ function buildCalendarEvents(
     map[date].push(t)
   }
 
-  // 2) 날짜 메모 내용
   for (const [date, list] of Object.entries(dateNoteContents)) {
     for (const raw of list) {
       const t = raw.trim()
@@ -75,7 +80,6 @@ function buildCalendarEvents(
     }
   }
 
-  // 3) 기간 (시작일 기준으로만 넣음)
   for (const p of periods) {
     const t = p.label.trim()
     if (!t || !p.start) continue
@@ -86,10 +90,9 @@ function buildCalendarEvents(
   const events: CalendarEvent[] = []
   for (const [date, titles] of Object.entries(map)) {
     const uniq = Array.from(new Set(titles))
-    for (const t of uniq) {
-      events.push({ date, title: t })
-    }
+    for (const t of uniq) events.push({ date, title: t })
   }
+
   return events
 }
 
@@ -103,55 +106,76 @@ function getHolidayFromMap(
 
 export default function CalendarPage() {
   const today = new Date()
-
   const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth()) // 0 ~ 11
+  const [month, setMonth] = useState(today.getMonth())
+
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [contextDate, setContextDate] = useState<string | null>(null)
 
   const [memos, setMemos] = useState<MemoMap>({})
   const [customColors, setCustomColors] = useState<Record<string, string>>({})
-
   const [dateNoteTitles, setDateNoteTitles] = useState<Record<string, string>>(
     {}
   )
   const [dateNoteContents, setDateNoteContents] = useState<
     Record<string, string[]>
   >({})
-
   const [periods, setPeriods] = useState<Period[]>([])
 
   const [holidayMap, setHolidayMap] = useState<Record<string, Holiday>>({})
   const [holidayLoading, setHolidayLoading] = useState(false)
-
-  // 🔑 localStorage 로드 완료 여부
   const [loaded, setLoaded] = useState(false)
 
-  // 🟣 새 일정 모달 상태
+  // 🎓 학사일정
+  const [academicEvents, setAcademicEvents] = useState<
+    Record<string, AcademicEvent[]>
+  >({})
+
+  // 📌 🔥 추가된 부분: 저장된 학교 코드 불러오기
+  const [eduCode, setEduCode] = useState<string | null>(null)
+  const [schoolCode, setSchoolCode] = useState<string | null>(null)
+
+  // modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalStartDate, setModalStartDate] = useState<string>('')
-  const [modalEndDate, setModalEndDate] = useState<string>('')
+  const [modalStartDate, setModalStartDate] = useState('')
+  const [modalEndDate, setModalEndDate] = useState('')
   const [modalRangeType, setModalRangeType] = useState<'single' | 'range'>(
     'single'
   )
-  const [modalUseTime, setModalUseTime] = useState<boolean>(false)
-  const [modalUsePeriod, setModalUsePeriod] = useState<boolean>(false)
-  const [modalTime, setModalTime] = useState<string>('')
-  const [modalDescription, setModalDescription] = useState<string>('')
+  const [modalStartTime, setModalStartTime] = useState('')
+  const [modalEndTime, setModalEndTime] = useState('')
+  const [modalTitle, setModalTitle] = useState('')
+  const [modalDescription, setModalDescription] = useState('')
+  const [modalColor, setModalColor] = useState('')
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
-  // 오늘 날짜 키
   const todayKey = `${today.getFullYear()}-${String(
     today.getMonth() + 1
   ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  // ✅ 페이지 처음 들어올 때 localStorage에서 일정 + 뷰 상태 로드
+  // 🔵 삭제 확인 모달 상태
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {},
+  })
+
+  // 📌 🔥 학교코드 로드 추가
+  useEffect(() => {
+    const storedEdu = localStorage.getItem('eduCode')
+    const storedSchool = localStorage.getItem('schoolCode')
+
+    setEduCode(storedEdu ?? null)
+    setSchoolCode(storedSchool ?? null)
+  }, [])
+
+  // -------- 로컬 저장 데이터 불러오기 --------
   useEffect(() => {
     try {
-      // 🧭 뷰 상태 복원 (연/월/선택날짜/컨텍스트 날짜)
       const savedYear = localStorage.getItem(STORAGE_KEYS.viewYear)
       const savedMonth = localStorage.getItem(STORAGE_KEYS.viewMonth)
-      const savedSelectedDate = localStorage.getItem(STORAGE_KEYS.selectedDate)
-      const savedContextDate = localStorage.getItem(STORAGE_KEYS.contextDate)
 
       if (savedYear && !Number.isNaN(parseInt(savedYear, 10))) {
         setYear(parseInt(savedYear, 10))
@@ -159,14 +183,12 @@ export default function CalendarPage() {
       if (savedMonth && !Number.isNaN(parseInt(savedMonth, 10))) {
         setMonth(parseInt(savedMonth, 10))
       }
-      if (savedSelectedDate) {
-        setSelectedDate(savedSelectedDate)
-      }
-      if (savedContextDate) {
-        setContextDate(savedContextDate)
-      }
 
-      // 🗂 일정 관련 데이터들 복원
+      const savedSelected = localStorage.getItem(STORAGE_KEYS.selectedDate)
+      const savedContext = localStorage.getItem(STORAGE_KEYS.contextDate)
+      if (savedSelected) setSelectedDate(savedSelected)
+      if (savedContext) setContextDate(savedContext)
+
       const savedMemos = localStorage.getItem(STORAGE_KEYS.memos)
       const savedColors = localStorage.getItem(STORAGE_KEYS.colors)
       const savedTitles = localStorage.getItem(STORAGE_KEYS.titles)
@@ -178,18 +200,16 @@ export default function CalendarPage() {
       if (savedTitles) setDateNoteTitles(JSON.parse(savedTitles))
       if (savedContents) setDateNoteContents(JSON.parse(savedContents))
       if (savedPeriods) setPeriods(JSON.parse(savedPeriods))
-    } catch (e) {
-      console.warn('캘린더 데이터 로드 중 오류:', e)
+    } catch (err) {
+      console.warn('로드 오류: ', err)
     } finally {
-      // ✅ 로드 완료 플래그
       setLoaded(true)
     }
   }, [])
 
-  // ✅ 메모/색상/기간이 바뀔 때마다 localStorage에 저장 + Home용 events 생성
+  // -------- 데이터 변경 → 저장 + Home events --------
   useEffect(() => {
     if (!loaded) return
-
     try {
       localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(memos))
       localStorage.setItem(STORAGE_KEYS.colors, JSON.stringify(customColors))
@@ -200,18 +220,14 @@ export default function CalendarPage() {
       )
       localStorage.setItem(STORAGE_KEYS.periods, JSON.stringify(periods))
 
-      const events = buildCalendarEvents(
-        dateNoteTitles,
-        dateNoteContents,
-        periods
-      )
-      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(events))
-    } catch (e) {
-      console.warn('캘린더 데이터 저장 중 오류:', e)
+      const evs = buildCalendarEvents(dateNoteTitles, dateNoteContents, periods)
+      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(evs))
+    } catch {
+      // ignore
     }
   }, [memos, customColors, dateNoteTitles, dateNoteContents, periods, loaded])
 
-  // ✅ 연/월/선택 날짜/컨텍스트 날짜 바뀔 때마다 뷰 상태 저장
+  // ✅ 뷰 상태 저장 (연/월/선택된 날짜)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.viewYear, String(year))
@@ -229,45 +245,83 @@ export default function CalendarPage() {
         localStorage.removeItem(STORAGE_KEYS.contextDate)
       }
     } catch (e) {
-      console.warn('캘린더 뷰 상태 저장 중 오류:', e)
+      console.warn('뷰 상태 저장 오류:', e)
     }
   }, [year, month, selectedDate, contextDate])
 
-  // 🔄 연도 바뀔 때 한국 공휴일 API에서 가져오기
+  // -------- 공휴일 Fetch --------
   useEffect(() => {
     let cancelled = false
-
-    async function loadHolidays() {
+    async function load() {
       try {
         setHolidayLoading(true)
         const res = await fetch(`/api/holidays?year=${year}`)
-        if (!res.ok) throw new Error('failed to fetch holidays')
+        if (!res.ok) throw new Error('holiday error')
         const data: Holiday[] = await res.json()
-
         if (cancelled) return
-
         const map: Record<string, Holiday> = {}
-        for (const h of data) {
-          map[h.date] = h
-        }
+        for (const h of data) map[h.date] = h
         setHolidayMap(map)
-      } catch (e) {
-        console.error('공휴일 가져오기 실패:', e)
+      } catch {
         setHolidayMap({})
       } finally {
-        if (!cancelled) {
-          setHolidayLoading(false)
-        }
+        if (!cancelled) setHolidayLoading(false)
       }
     }
-
-    loadHolidays()
+    load()
     return () => {
       cancelled = true
     }
   }, [year])
 
-  // 📅 달력 셀 만들기
+  // 🎓 -------- 학사일정 Fetch --------
+  useEffect(() => {
+    async function loadAcademic() {
+      // 🔥 학교코드가 없으면 호출 안함
+      if (!eduCode || !schoolCode) return
+
+      try {
+        const y = year
+        const m = String(month + 1).padStart(2, '0')
+
+        const from = `${y}${m}01`
+        const to = `${y}${m}31`
+
+        // 🔥 학교코드 값 적용
+        const API_KEY = process.env.NEXT_PUBLIC_NEIS_KEY
+        const API_URL = `https://open.neis.go.kr/hub/SchoolSchedule?KEY=${API_KEY}&Type=json&ATPT_OFCDC_SC_CODE=${eduCode}&SD_SCHUL_CODE=${schoolCode}&AA_FROM_YMD=${from}&AA_TO_YMD=${to}`
+
+        const res = await fetch(API_URL)
+        if (!res.ok) throw new Error('학사일정 오류')
+
+        const json = await res.json()
+        const rows = json.SchoolSchedule?.[1]?.row || []
+
+        const mapped: AcademicEvent[] = rows.map((item: any): AcademicEvent => {
+          const ymd = item.AA_YMD
+          return {
+            date: `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`,
+            title: item.EVENT_NM,
+          }
+        })
+
+        const map: Record<string, AcademicEvent[]> = {}
+        mapped.forEach((ev) => {
+          if (!map[ev.date]) map[ev.date] = []
+          map[ev.date].push(ev)
+        })
+
+        setAcademicEvents(map)
+      } catch (err) {
+        console.error('학사일정 불러오기 실패:', err)
+        setAcademicEvents({})
+      }
+    }
+
+    loadAcademic()
+  }, [year, month, eduCode, schoolCode]) // 🔥 학교 값 바뀌면 다시 fetch
+
+  // 📅 셀 생성
   const firstDay = new Date(year, month, 1).getDay()
   const lastDate = new Date(year, month + 1, 0).getDate()
 
@@ -282,7 +336,43 @@ export default function CalendarPage() {
     cells.push({ day: d, key })
   }
 
-  // 🔧 연/월 이동
+  // ✅ 날짜 클릭 시: 모달 오픈
+  const openScheduleModal = (dateKey: string) => {
+    setSelectedDate(dateKey)
+    setContextDate(dateKey)
+
+    setModalStartDate(dateKey)
+    setModalEndDate(dateKey)
+    setModalRangeType('single')
+
+    // 🔥 기존 값 불러오지 않고 모두 초기화
+    setModalTitle('')
+    setModalStartTime('')
+    setModalEndTime('')
+    setModalDescription('')
+    setModalColor('')
+
+    // 수정모드 아님
+    setEditingIndex(null)
+
+    setIsModalOpen(true)
+  }
+
+  const handleRightClickDay = (
+    e: MouseEvent<HTMLButtonElement>,
+    key: string | null
+  ) => {
+    e.preventDefault()
+    if (!key) return
+    openScheduleModal(key)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setEditingIndex(null)
+  }
+
+  // 🔧 이전달 / 다음달
   const handlePrevMonth = () => {
     let newYear = year
     let newMonth = month - 1
@@ -309,131 +399,178 @@ export default function CalendarPage() {
     setContextDate(null)
   }
 
-  const openScheduleModal = (dateKey: string) => {
-    setSelectedDate(dateKey)
-    setContextDate(dateKey)
-    setModalStartDate(dateKey)
-    setModalEndDate(dateKey)
-    setModalRangeType('single')
-    setModalUseTime(false)
-    setModalUsePeriod(false)
-    setModalTime('')
-    setModalDescription('')
-    setIsModalOpen(true)
+  // ✏️ 기존 일정 "수정" 버튼 / 리스트 아이템 클릭 시
+  const handleEditExistingSchedule = (index: number) => {
+    const dateKey = selectedDate
+    if (!dateKey) return
+
+    const titleList = dateNoteContents[dateKey] || []
+    const memoList = memos[dateKey] || []
+
+    setEditingIndex(index)
+    setModalTitle(titleList[index] || '')
+    setModalDescription(memoList[index]?.text || '')
+    setModalStartTime(memoList[index]?.start || '')
+    setModalEndTime(memoList[index]?.end || '')
   }
 
-  const handleRightClickDay = (
-    e: MouseEvent<HTMLButtonElement>,
-    key: string | null
-  ) => {
+  // 🗑 기존 일정 하나 삭제
+  const handleDeleteScheduleItem = (index: number) => {
+    const dateKey = selectedDate
+    if (!dateKey) return
+
+    // 제목 리스트 삭제
+    setDateNoteContents((prev) => {
+      const list = prev[dateKey] || []
+      const newList = list.filter((_, i) => i !== index)
+      const next = { ...prev }
+      if (newList.length === 0) delete next[dateKey]
+      else next[dateKey] = newList
+      return next
+    })
+
+    // 대표 제목 재계산
+    setDateNoteTitles((prev) => {
+      const newContents =
+        dateNoteContents[dateKey]?.filter((_, i) => i !== index) || []
+      const next = { ...prev }
+      next[dateKey] = newContents[0] || ''
+      return next
+    })
+
+    // 메모 삭제
+    setMemos((prev) => {
+      const list = prev[dateKey] || []
+      const newList = list.filter((_, i) => i !== index)
+      const next = { ...prev }
+      if (newList.length === 0) delete next[dateKey]
+      else next[dateKey] = newList
+      return next
+    })
+
+    setEditingIndex(null)
+  }
+
+  // ✅ single / range 처리 + 설명/시간/색상 저장
+  const handleModalSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!key) return
-    openScheduleModal(key)
-  }
+    if (!modalStartDate) return
+    if (!modalTitle.trim()) return
 
-  const handleModalClose = () => {
+    const dateKey = modalStartDate
+
+    // 🔵 제목 리스트 저장
+    setDateNoteContents((prev) => {
+      const next = { ...prev }
+      const list = next[dateKey] ? [...next[dateKey]] : []
+
+      if (editingIndex !== null) {
+        list[editingIndex] = modalTitle.trim()
+      } else {
+        list.push(modalTitle.trim())
+      }
+
+      next[dateKey] = list
+      return next
+    })
+
+    // 🔥 대표 제목 최신 업데이트 (이 부분이 가장 중요)
+    setDateNoteTitles((prev) => {
+      const next = { ...prev }
+
+      // 기존 리스트
+      const oldList = dateNoteContents[dateKey] || []
+
+      // 최신 리스트 생성
+      let updatedList = [...oldList]
+
+      if (editingIndex !== null) {
+        updatedList[editingIndex] = modalTitle.trim()
+      } else {
+        updatedList.push(modalTitle.trim())
+      }
+
+      // 첫 번째 제목을 대표 제목으로 설정
+      next[dateKey] = updatedList[0] || ''
+
+      return next
+    })
+
+    // 🟡 설명·시간 저장
+    setMemos((prev) => {
+      const next = { ...prev }
+      const list = next[dateKey] ? [...next[dateKey]] : []
+      const memo = {
+        start: modalStartTime || '',
+        end: modalEndTime || '',
+        text: modalDescription || '',
+      }
+
+      if (editingIndex !== null) list[editingIndex] = memo
+      else list.push(memo)
+
+      next[dateKey] = list
+      return next
+    })
+
     setIsModalOpen(false)
+    setEditingIndex(null)
   }
 
-  const handleModalSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    if (!modalStartDate) {
-      alert('시작일을 선택하세요.')
-      return
-    }
-    if (!modalDescription.trim()) {
-      alert('설명을 입력하세요.')
-      return
-    }
-
-    const start = modalStartDate
-    const end =
-      modalRangeType === 'range' && modalEndDate ? modalEndDate : modalStartDate
-
-    // 설명을 해당 날짜의 제목으로 저장 → 홈 D-Day에 사용
-    setDateNoteTitles((prev) => ({
-      ...prev,
-      [start]: modalDescription.trim(),
-    }))
-
-    // 시간 선택 시 시간 메모도 저장 (선택사항)
-    if (modalUseTime && modalTime) {
-      setMemos((prev) => {
-        const list = prev[start] ?? []
-        const newList: TimeMemo[] = [
-          ...list,
-          { start: modalTime, end: modalTime, text: modalDescription.trim() },
-        ]
-        newList.sort((a, b) =>
-          a.start < b.start ? -1 : a.start > b.start ? 1 : 0
-        )
-        return { ...prev, [start]: newList }
-      })
-    }
-
-    // 기간 설정일 경우 기간 정보도 추가
-    if (modalRangeType === 'range' && start && end && start <= end) {
-      setPeriods((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          label: modalDescription.trim(),
-          start,
-          end,
-          color: '#7c3aed', // 기본 보라색 기간 라인 (원 코드 유지)
-        },
-      ])
-    }
-
-    setIsModalOpen(false)
-  }
-
-  // 🔴 일정(이 날짜의 데이터) 전체 삭제
   const handleDeleteScheduleForDate = () => {
-    // 모달에서 바꾼 시작일이 있으면 그걸 기준으로, 없으면 선택된 날짜 기준으로 삭제
     const dateKey = modalStartDate || selectedDate
     if (!dateKey) return
 
-    const ok = window.confirm('이 날짜의 모든 일정을 삭제할까요?')
-    if (!ok) return
+    setConfirmModal({
+      show: true,
+      title: '일정 삭제',
+      message: '이 날짜에 저장된 모든 일정을 삭제할까요?',
+      onConfirm: () => {
+        setDateNoteTitles((prev) => {
+          const next = { ...prev }
+          delete next[dateKey]
+          return next
+        })
 
-    // 날짜 메모 제목 삭제
-    setDateNoteTitles((prev) => {
-      const next = { ...prev }
-      delete next[dateKey]
-      return next
+        setDateNoteContents((prev) => {
+          const next = { ...prev }
+          delete next[dateKey]
+          return next
+        })
+
+        setMemos((prev) => {
+          const next = { ...prev }
+          delete next[dateKey]
+          return next
+        })
+
+        setCustomColors((prev) => {
+          const next = { ...prev }
+          delete next[dateKey]
+          return next
+        })
+
+        setPeriods((prev) =>
+          prev.filter((p) => !(p.start <= dateKey && dateKey <= p.end))
+        )
+
+        setEditingIndex(null)
+        setIsModalOpen(false)
+
+        // 🔹 모달 닫기
+        setConfirmModal((p) => ({ ...p, show: false }))
+      },
+      onCancel: () => {
+        setConfirmModal((p) => ({ ...p, show: false }))
+      },
     })
-
-    // 날짜 메모 내용 삭제
-    setDateNoteContents((prev) => {
-      const next = { ...prev }
-      delete next[dateKey]
-      return next
-    })
-
-    // 시간 메모 삭제
-    setMemos((prev) => {
-      const next = { ...prev }
-      delete next[dateKey]
-      return next
-    })
-
-    // 날짜 색상 초기화
-    setCustomColors((prev) => {
-      const next = { ...prev }
-      delete next[dateKey]
-      return next
-    })
-
-    // 이 날짜가 포함된 기간(시작일~종료일 범위에 들어가는 것) 전부 삭제
-    setPeriods((prev) =>
-      prev.filter((p) => !(p.start <= dateKey && dateKey <= p.end))
-    )
-
-    setIsModalOpen(false)
   }
 
-  const cellsWithRender = cells // 그냥 가독성용 별칭
+  const cellsWithRender = cells
+
+  useEffect(() => {
+    localStorage.setItem('academicEvents', JSON.stringify(academicEvents))
+  }, [academicEvents])
 
   return (
     <div className="page-wrapper">
@@ -453,7 +590,6 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* ⬇⬇⬇ 캘린더 화면 부분 ⬇⬇⬇ */}
           <div className="card calendar-card">
             <div className="calendar-header-row">
               <button
@@ -485,6 +621,7 @@ export default function CalendarPage() {
               <div className="weekday sat">토</div>
             </div>
 
+            {/* 📌 달력 셀 렌더링 */}
             <div className="calendar-grid">
               {cellsWithRender.map((cell, index) => {
                 if (cell.day === null) {
@@ -545,6 +682,15 @@ export default function CalendarPage() {
                     ? dateNoteTitles[cell.key].trim()
                     : ''
 
+                const scheduleCount =
+                  (cell.key && dateNoteContents[cell.key]?.length) || 0
+
+                // 🎓 학사일정
+                const academicList =
+                  cell.key && academicEvents[cell.key]
+                    ? academicEvents[cell.key]
+                    : []
+
                 const dayClassNames = [
                   'day-cell',
                   isSun && 'sun',
@@ -563,11 +709,14 @@ export default function CalendarPage() {
                     className={dayClassNames}
                     style={dayStyle}
                     onClick={() => {
-                      if (cell.key) {
-                        openScheduleModal(cell.key)
-                      }
+                      if (cell.key) openScheduleModal(cell.key)
                     }}
-                    onContextMenu={(e) => handleRightClickDay(e, cell.key)}
+                    onContextMenu={(e) =>
+                      handleRightClickDay(
+                        e as unknown as MouseEvent<HTMLButtonElement>,
+                        cell.key
+                      )
+                    }
                   >
                     <div
                       style={{
@@ -587,16 +736,38 @@ export default function CalendarPage() {
 
                       <span className="day-number">{cell.day}</span>
 
+                      {/* 공휴일 이름 */}
                       {holidayInfo && (
                         <div className="holiday-cell-name">
                           {holidayInfo.name}
                         </div>
                       )}
 
+                      {/* 사용자 지정 제목 */}
                       {dateTitle && (
-                        <div className="day-title">{dateTitle}</div>
+                        <div className="day-title">
+                          {dateTitle}
+                          {scheduleCount > 1 && (
+                            <span style={{ fontSize: 9, marginLeft: 2 }}>
+                              외 {scheduleCount - 1}개
+                            </span>
+                          )}
+                        </div>
                       )}
 
+                      {/* 🎓 학사일정 태그 */}
+                      {academicList.length > 0 && (
+                        <div className="academic-tag">
+                          {academicList[0].title}
+                          {academicList.length > 1 && (
+                            <span style={{ fontSize: 9, marginLeft: 2 }}>
+                              외 {academicList.length - 1}개
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 기간 태그 */}
                       {firstPeriodForDay && (
                         <div className="period-tag">
                           <span className="period-tag-label">
@@ -605,8 +776,10 @@ export default function CalendarPage() {
                         </div>
                       )}
 
+                      {/* 메모 점 표시 */}
                       {hasAnyNote && <span className="memo-dot" />}
 
+                      {/* 기간 라인 */}
                       {isInPeriod && firstPeriodForDay && (
                         <div
                           className="period-line"
@@ -619,11 +792,10 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
-          {/* ⬆⬆⬆ 캘린더 화면 부분 끝 ⬆⬆⬆ */}
         </div>
       </main>
 
-      {/* 🟢 새 일정 추가 모달 (심플 버전) */}
+      {/* 🟢 새 일정 추가 / 수정 모달 */}
       {isModalOpen && (
         <div className="modal-backdrop" onClick={handleModalClose}>
           <div
@@ -633,7 +805,9 @@ export default function CalendarPage() {
             }}
           >
             <div className="modal-header">
-              <span className="modal-title">새 일정 추가</span>
+              <span className="modal-title">
+                {editingIndex === null ? '새 일정 추가' : '기존 일정 수정'}
+              </span>
               <button
                 type="button"
                 className="modal-close-btn"
@@ -655,7 +829,7 @@ export default function CalendarPage() {
                 />
               </div>
 
-              {/* 기간 설정 */}
+              {/* 기간 */}
               <div className="modal-field">
                 <label className="modal-label">기간 설정</label>
                 <div className="modal-radio-row">
@@ -676,6 +850,7 @@ export default function CalendarPage() {
                     <span>기간 설정</span>
                   </label>
                 </div>
+
                 {modalRangeType === 'range' && (
                   <input
                     type="date"
@@ -686,44 +861,63 @@ export default function CalendarPage() {
                 )}
               </div>
 
-              {/* 시간 / 교시 선택 토글 */}
+              {/* 시간 */}
               <div className="modal-field">
-                <label className="modal-label">시간 설정</label>
-                <div className="modal-radio-row">
+                <label className="modal-label">시간 (선택)</label>
+                <div className="modal-time-row">
+                  <input
+                    type="time"
+                    className="modal-input modal-time-input"
+                    value={modalStartTime}
+                    onChange={(e) => setModalStartTime(e.target.value)}
+                  />
+                  <span className="modal-time-separator">~</span>
+                  <input
+                    type="time"
+                    className="modal-input modal-time-input"
+                    value={modalEndTime}
+                    onChange={(e) => setModalEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* 셀 색상 */}
+              <div className="modal-field">
+                <label className="modal-label">셀 색상 (선택)</label>
+                <div className="modal-color-row">
+                  <div className="color-palette">
+                    {COLOR_PRESETS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={
+                          'color-swatch' +
+                          (modalColor === color ? ' selected' : '')
+                        }
+                        style={{ background: color }}
+                        onClick={() => setModalColor(color)}
+                      />
+                    ))}
+                  </div>
                   <button
                     type="button"
-                    className={'modal-toggle ' + (modalUseTime ? 'active' : '')}
-                    onClick={() => {
-                      setModalUseTime(true)
-                      setModalUsePeriod(false)
-                    }}
+                    className="modal-color-reset-btn"
+                    onClick={() => setModalColor('')}
                   >
-                    시간
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      'modal-toggle ' + (modalUsePeriod ? 'active' : '')
-                    }
-                    onClick={() => {
-                      setModalUsePeriod(true)
-                      setModalUseTime(false)
-                    }}
-                  >
-                    교시
+                    기본으로
                   </button>
                 </div>
               </div>
 
-              {/* 시간 입력 (선택) */}
+              {/* 제목 */}
               <div className="modal-field">
-                <label className="modal-label">시간 (선택)</label>
+                <label className="modal-label">제목 (날짜 요약)</label>
                 <input
-                  type="time"
+                  type="text"
                   className="modal-input"
-                  value={modalTime}
-                  onChange={(e) => setModalTime(e.target.value)}
-                  disabled={!modalUseTime}
+                  placeholder="예: 시험 기간, 수행평가"
+                  value={modalTitle}
+                  onChange={(e) => setModalTitle(e.target.value)}
                 />
               </div>
 
@@ -732,18 +926,115 @@ export default function CalendarPage() {
                 <label className="modal-label">설명</label>
                 <textarea
                   className="modal-textarea"
-                  placeholder="일정 설명을 입력하세요"
+                  placeholder="일정 상세 설명 입력"
                   value={modalDescription}
                   onChange={(e) => setModalDescription(e.target.value)}
                 />
               </div>
 
-              {/* 추가 버튼 */}
+              {/* 🎓 이 날짜의 학사일정 표시 (읽기 전용) */}
+              {(modalStartDate || selectedDate) &&
+                (() => {
+                  const dateKey = modalStartDate || selectedDate || ''
+                  if (!dateKey) return null
+                  const list = academicEvents[dateKey] || []
+                  if (!list.length) return null
+
+                  return (
+                    <div className="modal-field">
+                      <label className="modal-label">
+                        학사일정 (조회 전용)
+                      </label>
+                      <div className="academic-list">
+                        {list.map((ev, idx) => (
+                          <div key={idx} className="academic-item">
+                            <span className="academic-dot">●</span>
+                            <span className="academic-title">{ev.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+              {/* 기존 일정 리스트 */}
+              {selectedDate &&
+                (() => {
+                  const dateKey = selectedDate
+                  const memoList = memos[dateKey] || []
+                  const descList = dateNoteContents[dateKey] || []
+                  const maxLen = Math.max(memoList.length, descList.length)
+
+                  if (maxLen === 0) return null
+
+                  return (
+                    <div className="modal-field">
+                      <label className="modal-label">
+                        이 날짜에 저장된 일정
+                      </label>
+                      <div className="schedule-list">
+                        {Array.from({ length: maxLen }).map((_, i) => {
+                          const memo = memoList[i]
+                          const title = dateNoteTitles[dateKey] || ''
+
+                          const desc =
+                            descList[i] && descList[i].trim()
+                              ? descList[i]
+                              : memo?.text && memo.text.trim()
+                              ? memo.text
+                              : title // 🔥 제목 fallback
+
+                          const timeLabel =
+                            memo && (memo.start || memo.end)
+                              ? `${memo.start || ''} ~ ${memo.end || ''}`
+                              : '시간 없음'
+
+                          return (
+                            <div
+                              key={i}
+                              className="schedule-list-item"
+                              onClick={() => handleEditExistingSchedule(i)}
+                            >
+                              <div className="schedule-list-main">
+                                <span className="schedule-time">
+                                  {timeLabel}
+                                </span>
+                                <span className="schedule-desc">{desc}</span>
+                              </div>
+                              <div className="schedule-list-actions">
+                                <button
+                                  type="button"
+                                  className="schedule-edit-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditExistingSchedule(i)
+                                  }}
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  type="button"
+                                  className="schedule-delete-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteScheduleItem(i)
+                                  }}
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
               <button type="submit" className="modal-submit-btn">
-                일정 추가
+                {editingIndex === null ? '일정 추가' : '일정 수정 저장'}
               </button>
 
-              {/* 삭제 버튼 */}
               <button
                 type="button"
                 className="modal-delete-btn"
@@ -752,6 +1043,81 @@ export default function CalendarPage() {
                 이 날짜의 일정 전체 삭제
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 📌 일정 삭제 Confirm Modal */}
+      {confirmModal.show && (
+        <div className="modal-backdrop" onClick={() => confirmModal.onCancel()}>
+          <div
+            className="modal-panel"
+            style={{
+              maxWidth: '340px',
+              border: '2px solid #2563eb',
+              paddingBottom: '18px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ background: '#eff6ff' }}>
+              <span className="modal-title">{confirmModal.title}</span>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => confirmModal.onCancel()}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '18px 14px 6px',
+                fontSize: '13px',
+                color: '#374151',
+                whiteSpace: 'pre-line',
+              }}
+            >
+              {confirmModal.message}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '10px',
+                marginTop: '10px',
+              }}
+            >
+              <button
+                onClick={confirmModal.onConfirm}
+                style={{
+                  background: '#2563eb',
+                  color: '#fff',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  border: 'none',
+                }}
+              >
+                삭제
+              </button>
+
+              <button
+                onClick={confirmModal.onCancel}
+                style={{
+                  background: '#9ca3af',
+                  color: '#fff',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  border: 'none',
+                }}
+              >
+                취소
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -866,19 +1232,21 @@ export default function CalendarPage() {
           cursor: pointer;
           padding: 0;
           box-sizing: border-box;
+          position: relative;
+          overflow: hidden;
         }
 
         .day-cell.sun,
         .day-cell.holiday {
           color: #e53935;
-          background: rgba(255, 0, 0, 0.08);
-          border-color: rgba(255, 0, 0, 0.15);
+          background: rgba(255, 0, 0, 0.04);
+          border-color: rgba(255, 0, 0, 0.1);
         }
 
         .day-cell.sat {
           color: #1e88e5;
-          background: rgba(30, 136, 229, 0.08);
-          border-color: rgba(30, 136, 229, 0.15);
+          background: rgba(30, 136, 229, 0.04);
+          border-color: rgba(30, 136, 229, 0.1);
         }
 
         .day-cell.today:not(.selected) {
@@ -927,14 +1295,16 @@ export default function CalendarPage() {
 
         .day-title {
           margin-top: 4px;
-          font-size: 10px;
+          font-size: 9px;
           line-height: 1.2;
           color: #555555;
           text-align: center;
           width: 100%;
+          max-height: 24px;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
         }
 
         .memo-dot {
@@ -973,7 +1343,22 @@ export default function CalendarPage() {
           border-radius: 999px;
         }
 
-        /* 🟢 모달 스타일 (심플/기본 팝업 느낌) */
+        /* 📌 학사일정 스타일 (캘린더 셀) */
+        .academic-tag {
+          margin-top: 2px;
+          font-size: 9px;
+          line-height: 1.2;
+          padding: 1px 6px;
+          border-radius: 999px;
+          background: rgba(187, 222, 251, 0.8);
+          color: #0d47a1;
+          border: 1px solid #90caf9;
+          max-width: 100%;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+
         .modal-backdrop {
           position: fixed;
           inset: 0;
@@ -985,7 +1370,7 @@ export default function CalendarPage() {
         }
 
         .modal-panel {
-          width: 360px;
+          width: 380px;
           max-width: 92%;
           background: #ffffff;
           border-radius: 12px;
@@ -1079,23 +1464,6 @@ export default function CalendarPage() {
           accent-color: #2563eb;
         }
 
-        .modal-toggle {
-          border-radius: 999px;
-          border: 1px solid #d1d5db;
-          padding: 5px 12px;
-          font-size: 12px;
-          background: #ffffff;
-          cursor: pointer;
-          min-width: 60px;
-        }
-
-        .modal-toggle.active {
-          background: #e5f0ff;
-          border-color: #2563eb;
-          color: #1d4ed8;
-          font-weight: 600;
-        }
-
         .modal-textarea {
           border-radius: 6px;
           border: 1px solid #d1d5db;
@@ -1110,6 +1478,138 @@ export default function CalendarPage() {
         .modal-textarea:focus {
           border-color: #2563eb;
           box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+        }
+
+        .modal-time-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .modal-time-input {
+          flex: 1;
+        }
+
+        .modal-time-separator {
+          font-size: 12px;
+          color: #4b5563;
+        }
+
+        .modal-color-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .color-palette {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .color-swatch {
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          border: 2px solid transparent;
+          padding: 0;
+          cursor: pointer;
+        }
+
+        .color-swatch.selected {
+          border-color: #111827;
+        }
+
+        .modal-color-reset-btn {
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 11px;
+          cursor: pointer;
+          background: #f3f4f6;
+          color: #374151;
+          white-space: nowrap;
+        }
+
+        .modal-color-reset-btn:hover {
+          background: #e5e7eb;
+        }
+
+        .schedule-list {
+          border-radius: 8px;
+          border: 1px solid #e5e7eb;
+          padding: 6px 8px;
+          max-height: 150px;
+          overflow-y: auto;
+          background: #f9fafb;
+        }
+
+        .schedule-list-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          padding: 4px 0;
+          border-bottom: 1px solid #e5e7eb;
+          cursor: pointer;
+        }
+
+        .schedule-list-item:last-child {
+          border-bottom: none;
+        }
+
+        .schedule-list-main {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .schedule-time {
+          font-size: 11px;
+          color: #6b7280;
+        }
+
+        .schedule-desc {
+          font-size: 12px;
+          color: #111827;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .schedule-list-actions {
+          display: flex;
+          gap: 4px;
+        }
+
+        .schedule-edit-btn,
+        .schedule-delete-btn {
+          border-radius: 6px;
+          border: none;
+          padding: 4px 8px;
+          font-size: 11px;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .schedule-edit-btn {
+          background: #e0f2fe;
+          color: #0369a1;
+        }
+
+        .schedule-edit-btn:hover {
+          background: #bae6fd;
+        }
+
+        .schedule-delete-btn {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .schedule-delete-btn:hover {
+          background: #fecaca;
         }
 
         .modal-submit-btn {
@@ -1144,6 +1644,41 @@ export default function CalendarPage() {
 
         .modal-delete-btn:hover {
           background: #fecaca;
+        }
+
+        /* 🎓 모달 내 학사일정 리스트 */
+        .academic-list {
+          border-radius: 8px;
+          border: 1px solid #dbeafe;
+          padding: 6px 8px;
+          background: #eff6ff;
+          max-height: 120px;
+          overflow-y: auto;
+        }
+
+        .academic-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 0;
+          font-size: 12px;
+          color: #1d4ed8;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .academic-dot {
+          font-size: 10px;
+          color: #1d4ed8;
+        }
+
+        .academic-title {
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         @media (max-width: 768px) {
