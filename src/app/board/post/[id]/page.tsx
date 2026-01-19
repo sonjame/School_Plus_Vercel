@@ -9,15 +9,6 @@ export default function PostDetailPage() {
   const postId = params.id
   const router = useRouter()
 
-  const boardKeys = [
-    'board_free',
-    'board_promo',
-    'board_club',
-    'board_grade1',
-    'board_grade2',
-    'board_grade3',
-  ]
-
   const [post, setPost] = useState<any>(null)
   const [storageKey, setStorageKey] = useState<string>('')
 
@@ -43,9 +34,24 @@ export default function PostDetailPage() {
 
   const [openCommentMenu, setOpenCommentMenu] = useState<string | null>(null)
 
+  /* 🔒 댓글 작성 권한 (학년별) */
+  const myGrade =
+    typeof window !== 'undefined' ? localStorage.getItem('userGrade') : null
+
+  const isGradeBoard =
+    post && ['grade1', 'grade2', 'grade3'].includes(post.category)
+
+  const canComment = !isGradeBoard || post?.category === myGrade
+
   /* 🔥 투표 관련 상태 */
   const [myVoteIndex, setMyVoteIndex] = useState<number | null>(null)
   const [totalVotes, setTotalVotes] = useState(0)
+
+  const [myUserId, setMyUserId] = useState<number | null>(null)
+  useEffect(() => {
+    const uid = localStorage.getItem('userId')
+    if (uid) setMyUserId(Number(uid))
+  }, [])
 
   const [modal, setModal] = useState({
     show: false,
@@ -86,65 +92,85 @@ export default function PostDetailPage() {
      게시글 + 댓글 로딩
   ------------------------------------------- */
   useEffect(() => {
-    let foundPost: any = null
-    let foundKey = ''
-
-    for (const key of boardKeys) {
-      const list = JSON.parse(localStorage.getItem(key) || '[]')
-      const match = list.find((p: any) => String(p.id) === String(postId))
-      if (match) {
-        foundPost = match
-        foundKey = key
-        break
-      }
-    }
-
-    if (foundPost) {
-      // 🔥 투표 구조 보정 (voters 없으면 빈배열)
-      // 🔥 기존 투표 데이터 보존하도록 수정
-      if (foundPost.vote?.enabled && Array.isArray(foundPost.vote.options)) {
-        foundPost.vote.options = foundPost.vote.options.map((opt: any) => ({
-          optionId: opt.optionId ?? crypto.randomUUID(), // key ID 보정
-          text: opt.text,
-          voters: Array.isArray(opt.voters) ? opt.voters : [],
-          votes: typeof opt.votes === 'number' ? opt.votes : 0,
-        }))
+    async function loadPost() {
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        showAlert('로그인이 필요합니다.', () => router.push('/login'))
+        return
       }
 
-      setPost(foundPost)
-      setStorageKey(foundKey)
+      const res = await fetch(`/api/posts/${postId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      })
+
+      if (!res.ok) {
+        showAlert('게시글을 찾을 수 없습니다.', () => router.push('/board'))
+        return
+      }
+
+      const data = await res.json()
+      setPost(data)
     }
 
-    /* 로그인 유저 정보 로드 */
-    try {
-      const saved = localStorage.getItem('loggedInUser')
-      const parsed = JSON.parse(saved || '{}')
-
-      setUsername(parsed.username || '')
-      setMyName(parsed.name || '') // 실명
-    } catch {}
-
-    /* 댓글 로드 */
-    const rawComments = JSON.parse(
-      localStorage.getItem(`comments_${postId}`) || '[]'
-    )
-    setComments(rawComments)
+    loadPost()
   }, [postId])
+
+  /* 🔥 댓글 로딩 (DB) */
+  useEffect(() => {
+    async function loadComments() {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setComments(Array.isArray(data) ? data : [])
+    }
+
+    loadComments()
+  }, [postId])
+
+  /* 🔥 스크랩 상태 초기 동기화 */
+  useEffect(() => {
+    async function loadScrapStatus() {
+      const userId = localStorage.getItem('userId')
+      if (!userId || !postId) return
+
+      const res = await fetch(`/api/posts/${postId}/scrap`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setScrapped(data.scrapped)
+    }
+
+    loadScrapStatus()
+  }, [postId])
+
+  useEffect(() => {
+    const name = localStorage.getItem('name')
+    const username = localStorage.getItem('username')
+
+    if (name) setMyName(name)
+    if (username) setUsername(username)
+  }, [])
 
   /* 게시글 작성자 체크 */
   useEffect(() => {
-    if (!post || !myName) return
-    setIsAuthor(post.author === myName)
-  }, [post, myName])
+    if (!post || myUserId === null) return
+    setIsAuthor(post.user_id === myUserId)
+  }, [post, myUserId])
 
   /* 스크랩 여부 */
-  useEffect(() => {
-    if (!post || !username) return
-
-    const key = `scrap_${username}`
-    const saved = JSON.parse(localStorage.getItem(key) || '[]')
-    setScrapped(saved.includes(postId))
-  }, [post, username, postId])
 
   /* 🔥 투표 관련 계산 (총 투표수, 내 선택 옵션 인덱스) */
   useEffect(() => {
@@ -155,21 +181,18 @@ export default function PostDetailPage() {
     }
 
     const options = post.vote.options
+
     const total = options.reduce(
       (sum: number, opt: any) => sum + (opt.votes || 0),
-      0
+      0,
     )
     setTotalVotes(total)
 
-    if (username) {
-      const idx = options.findIndex((opt: any) =>
-        (opt.voters || []).includes(username)
-      )
-      setMyVoteIndex(idx >= 0 ? idx : null)
-    } else {
-      setMyVoteIndex(null)
-    }
-  }, [post, username])
+    // ⭐ 서버에서 내려준 값 그대로 사용
+    setMyVoteIndex(
+      typeof post.vote.myVoteIndex === 'number' ? post.vote.myVoteIndex : null,
+    )
+  }, [post])
 
   /* ------------------------------------------
      댓글 트리 생성
@@ -188,89 +211,131 @@ export default function PostDetailPage() {
   /* ------------------------------------------
      댓글 작성 (실명)
   ------------------------------------------- */
-  const writeComment = () => {
+
+  const writeComment = async () => {
+    if (!canComment) {
+      showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
+      return
+    }
     if (!commentValue.trim()) return
 
-    const newComment = {
-      id: crypto.randomUUID(),
-      content: commentValue,
-      author: myName || '익명',
-      createdAt: new Date().toLocaleString(),
-      parent: null,
-      likes: 0, // 👍 추가
-      likedUsers: [], // 👍 추가
-    }
+    const userId = localStorage.getItem('userId')
+    if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const updated = [...comments, newComment]
-    setComments(updated)
+    const res = await fetch(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({
+        content: commentValue,
+        parent: null,
+      }),
+    })
 
-    localStorage.setItem(`comments_${postId}`, JSON.stringify(updated))
+    if (!res.ok) return showAlert('댓글 작성 실패')
+
+    const newComment = await res.json()
+    setComments((prev) => [...prev, newComment])
     setCommentValue('')
   }
 
   /* ------------------------------------------
      대댓글 작성 (실명)
   ------------------------------------------- */
-  const writeReply = () => {
+  const writeReply = async () => {
+    if (!canComment) {
+      showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
+      return
+    }
     if (!replyValue.trim() || !replyTarget) return
 
-    const newReply = {
-      id: crypto.randomUUID(),
-      content: replyValue,
-      author: myName || '익명',
-      createdAt: new Date().toLocaleString(),
-      parent: replyTarget,
-      likes: 0, // 👍 추가
-      likedUsers: [], // 👍 추가
-    }
+    const userId = localStorage.getItem('userId')
+    if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const updated = [...comments, newReply]
-    setComments(updated)
+    const res = await fetch(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({
+        content: replyValue,
+        parent: replyTarget,
+      }),
+    })
 
-    localStorage.setItem(`comments_${postId}`, JSON.stringify(updated))
+    if (!res.ok) return showAlert('답글 작성 실패')
 
+    const newReply = await res.json()
+    setComments((prev) => [...prev, newReply])
     setReplyValue('')
     setReplyTarget(null)
   }
 
   /* 댓글 수정 */
-  const saveEdit = () => {
-    const updated = comments.map((c) =>
-      c.id === editId ? { ...c, content: editValue } : c
-    )
+  const saveEdit = async () => {
+    if (!editId) return
 
-    setComments(updated)
-    localStorage.setItem(`comments_${postId}`, JSON.stringify(updated))
+    const res = await fetch(`/api/comments/${editId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({ content: editValue }),
+    })
+
+    if (!res.ok) return showAlert('댓글 수정 실패')
+
+    setComments((prev) =>
+      prev.map((c) => (c.id === editId ? { ...c, content: editValue } : c)),
+    )
 
     setEditId(null)
     setEditValue('')
   }
 
   /* 댓글 삭제 */
-  const deleteComment = (id: string) => {
-    showConfirm('댓글을 삭제하시겠습니까?', () => {
-      const updated = comments.filter((c) => c.id !== id && c.parent !== id)
-      setComments(updated)
+  const deleteComment = async (id: string) => {
+    showConfirm('댓글을 삭제하시겠습니까?', async () => {
+      const res = await fetch(`/api/comments/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      })
 
-      localStorage.setItem(`comments_${postId}`, JSON.stringify(updated))
+      if (!res.ok) return showAlert('댓글 삭제 실패')
+
+      setComments((prev) => prev.filter((c) => c.id !== id && c.parent !== id))
     })
   }
 
   /* 게시글 삭제 */
-  const deletePost = () => {
-    if (!storageKey || !post) return
+  const deletePost = async () => {
+    showConfirm('게시글을 삭제하시겠습니까?', async () => {
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        showAlert('로그인이 필요합니다.')
+        return
+      }
 
-    showConfirm('게시글을 삭제하시겠습니까?', () => {
-      const list = JSON.parse(localStorage.getItem(storageKey) || '[]')
-      const updated = list.filter((p: any) => p.id !== post.id)
-      localStorage.setItem(storageKey, JSON.stringify(updated))
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      })
 
-      const all = JSON.parse(localStorage.getItem('posts_all') || '[]')
-      const updatedAll = all.filter((p: any) => p.id !== post.id)
-      localStorage.setItem('posts_all', JSON.stringify(updatedAll))
+      if (!res.ok) {
+        showAlert('삭제 권한이 없거나 오류가 발생했습니다.')
+        return
+      }
 
       showAlert('게시글이 삭제되었습니다.', () => {
-        router.push(`/board`)
+        router.push('/board')
       })
     })
   }
@@ -291,7 +356,7 @@ export default function PostDetailPage() {
             acc[opt.optionId] = opt // 기존 voters data 보존
             return acc
           },
-          {}
+          {},
         )
 
         let mergedVote = p.vote
@@ -336,49 +401,51 @@ export default function PostDetailPage() {
   }
 
   /* 좋아요 */
-  const handleLike = () => {
-    if (!username) return showAlert('로그인이 필요합니다.')
-    if (!post || !storageKey) return
+  const handleLike = async () => {
+    const userId = localStorage.getItem('userId')
+    if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const likeKey = `like_postIds_${username}`
-    const liked = JSON.parse(localStorage.getItem(likeKey) || '[]')
-    const already = liked.includes(postId)
+    const res = await fetch(`/api/posts/${postId}/like`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({
+        userId: Number(userId), // 🔥 이게 핵심
+      }),
+    })
 
-    const newLikes = already ? post.likes - 1 : post.likes + 1
+    if (!res.ok) {
+      showAlert('좋아요 처리 실패')
+      return
+    }
 
-    const updatedPost = { ...post, likes: newLikes }
-    setPost(updatedPost)
-    updatePostInStorage(updatedPost)
-
-    const newLiked = already
-      ? liked.filter((x: string) => x !== postId)
-      : [...liked, postId]
-
-    localStorage.setItem(likeKey, JSON.stringify(newLiked))
+    const data = await res.json()
+    setPost((prev: any) => ({ ...prev, likes: data.likes }))
   }
 
   /* ------------------------------------------
    스크랩 (북마크)
 ------------------------------------------- */
-  const toggleScrap = () => {
-    if (!username) return showAlert('로그인이 필요합니다.')
+  const toggleScrap = async () => {
+    const userId = localStorage.getItem('userId')
+    if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const key = `scrap_${username}`
-    const saved = JSON.parse(localStorage.getItem(key) || '[]')
+    const res = await fetch(`/api/posts/${postId}/scrap`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+    })
 
-    let updated: string[] = []
-
-    if (saved.includes(postId)) {
-      updated = saved.filter((i: string) => i !== postId)
-      setScrapped(false)
-      showAlert('스크랩이 해제되었습니다.')
-    } else {
-      updated = [...saved, postId]
-      setScrapped(true)
-      showAlert('스크랩되었습니다.')
+    if (!res.ok) {
+      showAlert('스크랩 처리 실패')
+      return
     }
 
-    localStorage.setItem(key, JSON.stringify(updated))
+    const data = await res.json()
+    setScrapped(data.scrapped)
   }
 
   const copyLink = () => {
@@ -388,98 +455,66 @@ export default function PostDetailPage() {
   }
 
   /* 🔥 투표 클릭 처리 (투표 취소 + 재투표 지원) */
-  const handleVote = (index: number) => {
-    if (!post || !post.vote?.enabled || !Array.isArray(post.vote.options))
-      return
+  const handleVote = async (index: number) => {
+    if (!post || !post.vote?.enabled) return
 
-    if (!username) {
-      showAlert('투표는 로그인 후 이용 가능합니다.')
+    const token = localStorage.getItem('accessToken')
+    if (!token) {
+      showAlert('로그인이 필요합니다.')
       return
     }
 
-    const options = post.vote.options.map((opt: any) => {
-      if (!Array.isArray(opt.voters)) {
-        opt.voters = []
-      }
-      if (typeof opt.votes !== 'number') {
-        opt.votes = 0
-      }
-      return opt
+    const res = await fetch(`/api/posts/${postId}/vote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        optionIndex: index,
+      }),
     })
 
-    const myPrevIndex = myVoteIndex // 이전에 내가 투표했는지
-    const clicked = index
-
-    // -----------------------------
-    // 1) ❌ 같은 항목을 다시 누르면: 투표 취소
-    // -----------------------------
-    if (myPrevIndex === clicked) {
-      const prevOpt = options[myPrevIndex]
-      prevOpt.votes = Math.max(0, prevOpt.votes - 1)
-      prevOpt.voters = prevOpt.voters.filter((u: string) => u !== username)
-
-      const updatedPost = {
-        ...post,
-        vote: {
-          ...post.vote,
-          options,
-        },
-      }
-
-      setPost(updatedPost)
-      updatePostInStorage(updatedPost)
+    if (!res.ok) {
+      showAlert('투표 처리 실패')
       return
     }
 
-    // -----------------------------
-    // 2) 🔄 다른 항목을 누르면: 이전 투표 취소 후 새 항목 투표
-    // -----------------------------
-    if (myPrevIndex !== null) {
-      // 기존 항목에서 제거
-      const prevOpt = options[myPrevIndex]
-      prevOpt.votes = Math.max(0, prevOpt.votes - 1)
-      prevOpt.voters = prevOpt.voters.filter((u: string) => u !== username)
-    }
-
-    // 새 항목에 추가
-    const newOpt = options[clicked]
-    newOpt.votes += 1
-    newOpt.voters.push(username)
-
-    const updatedPost = {
-      ...post,
-      vote: {
-        ...post.vote,
-        options,
+    // 🔥 다시 서버에서 게시글을 불러온다
+    const refreshed = await fetch(`/api/posts/${postId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
       },
-    }
+    })
 
-    setPost(updatedPost)
-    updatePostInStorage(updatedPost)
+    const data = await refreshed.json()
+    setPost(data)
   }
 
   /* 댓글 좋아요 */
-  const toggleCommentLike = (commentId: string) => {
-    if (!username) return showAlert('로그인이 필요합니다.')
-
-    const updated = comments.map((c) => {
-      if (c.id !== commentId) return c
-
-      const already = c.likedUsers?.includes(username)
-
-      const newLikes = already ? (c.likes || 0) - 1 : (c.likes || 0) + 1
-
-      return {
-        ...c,
-        likes: newLikes,
-        likedUsers: already
-          ? c.likedUsers.filter((u: string) => u !== username)
-          : [...(c.likedUsers || []), username],
-      }
+  const toggleCommentLike = async (commentId: string) => {
+    const res = await fetch(`/api/comments/${commentId}/like`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
     })
 
-    setComments(updated)
-    localStorage.setItem(`comments_${postId}`, JSON.stringify(updated))
+    if (!res.ok) return showAlert('댓글 좋아요 실패')
+
+    const data = await res.json()
+
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              likes: data.likes,
+              likedByMe: !c.likedByMe, // 🔥 핵심
+            }
+          : c,
+      ),
+    )
   }
 
   /* ------------------------------------------
@@ -487,22 +522,38 @@ export default function PostDetailPage() {
   ------------------------------------------- */
   const renderComments = (list: any[], depth = 0) =>
     list.map((c) => {
-      const writer = c.author
-      const isWriter = writer === myName
+      const isWriter = c.user_id === myUserId
+      const isReply = depth > 0
 
       return (
         <div
           key={c.id}
           style={{
-            marginLeft: depth * 20,
-            background: '#F7FBFF',
-            border: '1px solid #E0EEF8',
-            padding: '14px',
-            borderRadius: '10px',
-            marginBottom: '12px',
+            marginLeft: isReply ? 32 : 0,
+            background: isReply ? '#F6F7F9' : '#FFFFFF',
+            border: '1px solid #E5E7EB',
+            padding: isReply ? '10px 12px' : '14px',
+            borderRadius: 8,
+            marginBottom: 10,
             position: 'relative',
           }}
         >
+          {/* 🔥 에타 스타일 왼쪽 세로 라인 (답글만) */}
+          {isReply && (
+            <div
+              style={{
+                position: 'absolute',
+                left: -16,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: '#E5E7EB',
+                borderRadius: 2,
+              }}
+            />
+          )}
+
+          {/* 메뉴 버튼 */}
           <button
             style={menuBtn}
             onClick={() =>
@@ -556,47 +607,93 @@ export default function PostDetailPage() {
             </div>
           ) : (
             <>
-              <div style={{ fontWeight: 600 }}>{c.content}</div>
-              <small style={{ color: '#666' }}>
-                {writer} · {c.createdAt}
-              </small>
+              {/* 댓글 내용 */}
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  lineHeight: 1.5,
+                  color: '#111827',
+                }}
+              >
+                {c.content}
+              </div>
 
-              {/* 🔥 댓글 좋아요 */}
+              {/* 작성자 / 시간 */}
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  color: '#6B7280',
+                }}
+              >
+                {c.author} · {new Date(c.created_at).toLocaleString()}
+              </div>
+
+              {/* 좋아요 */}
               <button
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: c.likedUsers?.includes(username) ? '#E91E63' : '#888',
-                  fontSize: '13px',
+                  color: c.likedUsers?.includes(username)
+                    ? '#E91E63'
+                    : '#9CA3AF',
+                  fontSize: 12,
                   cursor: 'pointer',
-                  marginTop: '6px',
-                  marginRight: '8px',
+                  marginTop: 6,
+                  marginRight: 8,
                 }}
                 onClick={() => toggleCommentLike(c.id)}
               >
                 💙 {c.likes || 0}
               </button>
 
-              {/* 답글 버튼 */}
-              <button style={btnSmall} onClick={() => setReplyTarget(c.id)}>
-                ↪ 답글
-              </button>
+              {/* 🔥 답글 버튼은 부모 댓글 + 권한 있을 때만 */}
+              {!isReply && canComment && (
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#2563EB',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setReplyTarget(c.id)}
+                >
+                  ↪ 답글
+                </button>
+              )}
             </>
           )}
 
+          {/* 답글 입력창 */}
           {replyTarget === c.id && (
-            <div style={{ marginTop: '10px' }}>
+            <div
+              style={{
+                marginTop: 10,
+                marginLeft: 32,
+                background: '#F9FAFB',
+                border: '1px solid #E5E7EB',
+                borderRadius: 8,
+                padding: 10,
+              }}
+            >
               <textarea
-                style={textBox}
+                style={{
+                  ...textBox,
+                  marginBottom: 8,
+                }}
                 value={replyValue}
                 onChange={(e) => setReplyValue(e.target.value)}
               />
-              <button style={btnBlue} onClick={writeReply}>
-                답글 작성
-              </button>
-              <button style={btnGray} onClick={() => setReplyTarget(null)}>
-                취소
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={btnBlue} onClick={writeReply}>
+                  답글 작성
+                </button>
+                <button style={btnGray} onClick={() => setReplyTarget(null)}>
+                  취소
+                </button>
+              </div>
             </div>
           )}
 
@@ -610,7 +707,8 @@ export default function PostDetailPage() {
   if (!post)
     return <p style={{ padding: '20px' }}>게시글을 찾을 수 없습니다.</p>
 
-  const created = new Date(post.createdAt)
+  const created = new Date(post.created_at)
+
   const dateStr = created.toLocaleString()
 
   /* 🔥 투표 마감 여부 */
@@ -618,9 +716,10 @@ export default function PostDetailPage() {
     post?.vote?.endAt && new Date() > new Date(post.vote.endAt)
 
   const hasVote =
-    post.vote?.enabled &&
-    Array.isArray(post.vote.options) &&
-    post.vote.options.length > 0
+    !!post.vote &&
+    post.vote.enabled === true &&
+    Array.isArray(post.vote.options)
+
   const alreadyVoted = myVoteIndex !== null
 
   return (
@@ -629,10 +728,10 @@ export default function PostDetailPage() {
         {post.category === 'free'
           ? '📢 자유게시판'
           : post.category === 'promo'
-          ? '📣 홍보게시판'
-          : post.category === 'club'
-          ? '🎭 동아리게시판'
-          : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
+            ? '📣 홍보게시판'
+            : post.category === 'club'
+              ? '🎭 동아리게시판'
+              : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
       </h3>
 
       {/* 게시글 카드 */}
@@ -860,16 +959,34 @@ export default function PostDetailPage() {
       <div style={commentCard}>
         <h3 style={{ marginBottom: '10px' }}>💬 댓글</h3>
 
-        <textarea
-          style={textBox}
-          placeholder="댓글 입력..."
-          value={commentValue}
-          onChange={(e) => setCommentValue(e.target.value)}
-        />
+        {canComment ? (
+          <>
+            <textarea
+              style={textBox}
+              placeholder="댓글 입력..."
+              value={commentValue}
+              onChange={(e) => setCommentValue(e.target.value)}
+            />
 
-        <button style={btnBlue} onClick={writeComment}>
-          댓글 작성
-        </button>
+            <button style={btnBlue} onClick={writeComment}>
+              댓글 작성
+            </button>
+          </>
+        ) : (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: 8,
+              background: '#F1F5F9',
+              color: '#64748B',
+              fontSize: 14,
+              fontWeight: 600,
+              textAlign: 'center',
+            }}
+          >
+            🔒 해당 학년만 댓글을 작성할 수 있습니다
+          </div>
+        )}
 
         <hr style={{ margin: '20px 0' }} />
 
@@ -925,9 +1042,35 @@ export default function PostDetailPage() {
 
               <button
                 style={btnBlue}
-                onClick={() => {
+                onClick={async () => {
+                  if (!reportType) {
+                    showAlert('신고 유형을 선택해주세요.')
+                    return
+                  }
+
+                  const res = await fetch(`/api/posts/${postId}/report`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${localStorage.getItem(
+                        'accessToken',
+                      )}`,
+                    },
+                    body: JSON.stringify({
+                      type: reportType,
+                      content: reportType === '기타' ? reportText : null,
+                    }),
+                  })
+
+                  if (!res.ok) {
+                    showAlert('신고 처리 중 오류가 발생했습니다.')
+                    return
+                  }
+
                   setReportOpen(false)
-                  showAlert('신고가 접수되었습니다.')
+                  setReportType('')
+                  setReportText('')
+                  showAlert('🚨 신고가 접수되었습니다.')
                 }}
               >
                 제출

@@ -3,36 +3,52 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
+interface Post {
+  id: string
+  title: string
+}
+
 interface BoardSection {
   key: string
   title: string
-  icon: string // 필수
-  posts: any[]
+  icon: string
+  posts: Post[]
 }
 
 export default function BoardMainPage() {
   const [sections, setSections] = useState<BoardSection[]>([])
 
   useEffect(() => {
-    // 🔹 여기서 icon까지 같이 정의해주기
-    const boards: Omit<BoardSection, 'posts'>[] = [
-      { key: 'free', title: '자유게시판', icon: '' },
-      { key: 'promo', title: '홍보게시판', icon: '' },
-      { key: 'club', title: '동아리게시판', icon: '' },
-      { key: 'grade1', title: '1학년게시판', icon: '' },
-      { key: 'grade2', title: '2학년게시판', icon: '' },
-      { key: 'grade3', title: '3학년게시판', icon: '' },
+    const boards = [
+      { key: 'free', title: '자유게시판', icon: '📝' },
+      { key: 'promo', title: '홍보게시판', icon: '📢' },
+      { key: 'club', title: '동아리게시판', icon: '🎯' },
+      { key: 'grade1', title: '1학년게시판', icon: '1️⃣' },
+      { key: 'grade2', title: '2학년게시판', icon: '2️⃣' },
+      { key: 'grade3', title: '3학년게시판', icon: '3️⃣' },
     ]
 
-    const loaded: BoardSection[] = boards.map((b) => {
-      const saved = localStorage.getItem('board_' + b.key)
-      return {
-        ...b,
-        posts: saved ? JSON.parse(saved) : [],
-      }
-    })
+    async function load() {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
 
-    setSections(loaded)
+      const result = []
+
+      for (const b of boards) {
+        const res = await fetch(`/api/posts?category=${b.key}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        const posts = res.ok ? await res.json() : []
+        result.push({ ...b, posts })
+      }
+
+      setSections(result)
+    }
+
+    load()
   }, [])
 
   return (
@@ -53,8 +69,8 @@ export default function BoardMainPage() {
                   : '게시글 없음'}
               </p>
 
-              {s.posts.slice(0, 2).map((p, idx) => (
-                <p key={idx} style={miniPost}>
+              {s.posts.slice(0, 2).map((p) => (
+                <p key={p.id} style={miniPost}>
                   • {p.title}
                 </p>
               ))}
@@ -105,10 +121,10 @@ const cardInner: React.CSSProperties = {
   cursor: 'pointer',
 }
 
-  ; (cardInner as any)[':hover'] = {
-    transform: 'translateY(-4px)',
-    boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
-  }
+;(cardInner as any)[':hover'] = {
+  transform: 'translateY(-4px)',
+  boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+}
 
 const cardIcon: React.CSSProperties = {
   fontSize: '32px',

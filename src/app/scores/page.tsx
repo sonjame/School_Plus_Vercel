@@ -12,6 +12,12 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
+const getScoreStorageKey = (grade: number) => {
+  const userId = localStorage.getItem('userId')
+  if (!userId) return null
+  return `mock_scores_user_${userId}_grade_${grade}`
+}
+
 type SubjectKey =
   | 'korean'
   | 'math'
@@ -150,8 +156,8 @@ export default function ScoresPage() {
       explorationArea === '사회탐구'
         ? social
         : explorationArea === '과학탐구'
-        ? science
-        : vocational // 고3
+          ? science
+          : vocational // 고3
   }
 
   // 탐구 과목 선택
@@ -235,8 +241,10 @@ export default function ScoresPage() {
   // ⭐ 저장된 점수 로드 (학년 변경/초기)
   // ---------------------------------------------
   const loadSavedScores = (g: number) => {
-    const key = `mock_scores_grade_${g}`
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null
+    const key = getScoreStorageKey(g)
+    if (!key) return
+
+    const raw = localStorage.getItem(key)
     const parsed = raw ? JSON.parse(raw) : {}
     setSavedData(parsed)
   }
@@ -261,74 +269,144 @@ export default function ScoresPage() {
   // ⭐ 월 변경 시 전체 초기화
   const handleMonthSelect = (m: string) => {
     setSelectedMonth(m)
-    setScores(emptyScores)
-    setExplorationArea('')
-    setExplorationSubjects([])
-    setExploreScores({ sub1: '', sub2: '' })
-    setSecondLang('')
-    setSecondLangScore('')
+
+    if (!grade) return
+
+    const key = getScoreStorageKey(grade)
+    if (!key) return
+    const raw = localStorage.getItem(key)
+    const parsed: Record<string, SavedEntry> = raw ? JSON.parse(raw) : {}
+    const saved = parsed[m]
+
+    if (!saved) {
+      // 저장된 데이터 없으면 초기화
+      setScores(emptyScores)
+      setExploreScores({ sub1: '', sub2: '' })
+      setExplorationSubjects([])
+      setSecondLang('')
+      setSecondLangScore('')
+      return
+    }
+
+    // ✅ 필수 과목 복원
+    setScores({
+      korean: saved.korean?.toString() ?? '',
+      math: saved.math?.toString() ?? '',
+      english: saved.english?.toString() ?? '',
+      history: saved.history?.toString() ?? '',
+    })
+
+    // ✅ 탐구 과목 복원
+    const subjects: string[] = []
+    if (saved.explore1Name) subjects.push(saved.explore1Name)
+    if (saved.explore2Name) subjects.push(saved.explore2Name)
+
+    setExplorationSubjects(subjects)
+    setExploreScores({
+      sub1: saved.explore1?.toString() ?? '',
+      sub2: saved.explore2?.toString() ?? '',
+    })
+
+    // ✅ 제2외국어 복원
+    if (saved.secondLangName) {
+      setSecondLang(saved.secondLangName)
+      setSecondLangScore(saved.secondLang?.toString() ?? '')
+    }
   }
 
   // ---------------------------------------------
   // ⭐ 점수 저장 (localStorage: 학년별 / 월별)
   // ---------------------------------------------
-  const handleSaveScores = () => {
+  const handleSaveScores = async () => {
     if (!grade || !selectedMonth) return
 
-    const key = `mock_scores_grade_${grade}`
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null
-    const parsed: Record<string, SavedEntry> = raw ? JSON.parse(raw) : {}
+    // 1️⃣ 프론트 localStorage 저장 (기존 유지)
+    // -----------------------------
+    const key = getScoreStorageKey(grade)
+    if (!key) return
+    const raw = localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : {}
 
-    const entry: SavedEntry = {
+    const getToken = () => {
+      const stored = localStorage.getItem('loggedInUser')
+      if (!stored) return null
+      try {
+        return JSON.parse(stored).token
+      } catch {
+        return null
+      }
+    }
+
+    parsed[selectedMonth] = {
+      // 필수
       korean: scores.korean ? Number(scores.korean) : null,
       math: scores.math ? Number(scores.math) : null,
       english: scores.english ? Number(scores.english) : null,
       history: scores.history ? Number(scores.history) : null,
-      // 탐구
-      explore1:
-        grade === 1
-          ? exploreScores.sub1
-            ? Number(exploreScores.sub1)
-            : null
-          : explorationSubjects[0]
-          ? exploreScores.sub1
-            ? Number(exploreScores.sub1)
-            : null
-          : null,
-      explore1Name:
-        grade === 1
-          ? '통합사회'
-          : explorationSubjects[0]
-          ? explorationSubjects[0]
-          : null,
-      explore2:
-        grade === 1
-          ? exploreScores.sub2
-            ? Number(exploreScores.sub2)
-            : null
-          : explorationSubjects[1]
-          ? exploreScores.sub2
-            ? Number(exploreScores.sub2)
-            : null
-          : null,
-      explore2Name:
-        grade === 1
-          ? '통합과학'
-          : explorationSubjects[1]
-          ? explorationSubjects[1]
-          : null,
+
+      // 탐구 1
+      explore1: exploreScores.sub1 ? Number(exploreScores.sub1) : null,
+      explore1Name: grade === 1 ? '통합사회' : (explorationSubjects[0] ?? null),
+
+      // 탐구 2
+      explore2: exploreScores.sub2 ? Number(exploreScores.sub2) : null,
+      explore2Name: grade === 1 ? '통합과학' : (explorationSubjects[1] ?? null),
+
       // 제2외국어
       secondLang:
         grade === 3 && secondLangScore ? Number(secondLangScore) : null,
-      secondLangName: grade === 3 && secondLang ? secondLang : null,
+      secondLangName: grade === 3 ? (secondLang ?? null) : null,
     }
 
-    parsed[selectedMonth] = entry
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(parsed))
-    }
+    localStorage.setItem(key, JSON.stringify(parsed))
     setSavedData(parsed)
+
+    // 2️⃣ MySQL 저장 (🔥 추가)
+    // -----------------------------
+    const payload: Record<string, number> = {}
+
+    if (scores.korean) payload['국어'] = Number(scores.korean)
+    if (scores.math) payload['수학'] = Number(scores.math)
+    if (scores.english) payload['영어'] = Number(scores.english)
+    if (scores.history) payload['한국사'] = Number(scores.history)
+
+    if (grade === 1) {
+      if (exploreScores.sub1) payload['통합사회'] = Number(exploreScores.sub1)
+      if (exploreScores.sub2) payload['통합과학'] = Number(exploreScores.sub2)
+    }
+
+    if (grade !== 1) {
+      if (explorationSubjects[0] && exploreScores.sub1) {
+        payload[explorationSubjects[0]] = Number(exploreScores.sub1)
+      }
+      if (explorationSubjects[1] && exploreScores.sub2) {
+        payload[explorationSubjects[1]] = Number(exploreScores.sub2)
+      }
+    }
+
+    if (grade === 3 && secondLang && secondLangScore) {
+      payload[secondLang] = Number(secondLangScore)
+    }
+
+    const token = getToken()
+    if (!token) {
+      alert('로그인이 필요합니다')
+      return
+    }
+
+    await fetch('/api/mock-scores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`, // ✅ 수정 완료
+      },
+      body: JSON.stringify({
+        grade,
+        month: selectedMonth,
+        scores: payload,
+      }),
+    })
+
     setShowModal(true)
     setTimeout(() => setShowModal(false), 1500)
   }
@@ -354,14 +432,14 @@ export default function ScoresPage() {
     { key: 'korean', label: '국어' },
     { key: 'math', label: '수학' },
     { key: 'english', label: '영어' },
-    { key: 'history', label: '한국사' }
+    { key: 'history', label: '한국사' },
   )
 
   // 탐구 버튼
   if (grade === 1) {
     subjectButtons.push(
       { key: 'explore1', label: '통합사회' },
-      { key: 'explore2', label: '통합과학' }
+      { key: 'explore2', label: '통합과학' },
     )
   } else if (grade && grade >= 2) {
     if (explorationSubjects[0]) {

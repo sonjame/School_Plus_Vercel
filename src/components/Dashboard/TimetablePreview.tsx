@@ -1,13 +1,13 @@
-'use client';
-import { useState, useEffect } from 'react';
+'use client'
+import { useState, useEffect } from 'react'
 
 type ClassPeriod = {
-  day: string;
-  period: number;
-  subject: string;
-  teacher: string;
-  room: string;
-};
+  day: string
+  period: number
+  subject: string
+  teacher: string
+  room: string
+}
 
 const subjectColors: Record<string, string> = {
   국어: '#FFCDD2',
@@ -20,31 +20,62 @@ const subjectColors: Record<string, string> = {
   미술: '#DCEDC8',
   자율: '#FFF9C4',
   default: '#F5F5F5',
-};
+}
+
+function getSavedTerm(): { year: number; semester: '1학기' | '2학기' } {
+  const raw = localStorage.getItem('current_timetable_term')
+  if (!raw) {
+    const now = new Date()
+    const month = now.getMonth() + 1
+    return {
+      year: now.getFullYear(),
+      semester: month >= 3 && month <= 8 ? '1학기' : '2학기',
+    }
+  }
+  return JSON.parse(raw)
+}
 
 export default function TimetablePreview() {
-  const days = ['월', '화', '수', '목', '금'];
-  const todayIndex = new Date().getDay(); // 0(일)~6(토)
-  const [selectedDay, setSelectedDay] = useState(days[todayIndex - 1] || '월');
-  const [timetable, setTimetable] = useState<ClassPeriod[]>([]);
+  const days = ['월', '화', '수', '목', '금']
+  const todayIndex = new Date().getDay() // 0(일)~6(토)
+  const [selectedDay, setSelectedDay] = useState(days[todayIndex - 1] || '월')
+  const [timetable, setTimetable] = useState<ClassPeriod[]>([])
 
-  // ✅ LocalStorage에서 시간표 불러오기
+  /* ✅ 서버에서 시간표 불러오기 */
   useEffect(() => {
-    const saved = localStorage.getItem('timetable');
-    if (saved) {
+    const load = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setTimetable(parsed);
-      } catch (err) {
-        console.error('시간표 불러오기 오류:', err);
+        const term = getSavedTerm()
+        if (!term) return
+
+        const res = await fetch(
+          `/api/timetable?year=${term.year}&semester=${term.semester}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            },
+          }
+        )
+
+        if (!res.ok) return
+
+        const data = await res.json()
+        if (!Array.isArray(data)) return
+
+        setTimetable(data)
+      } catch (e) {
+        console.error('주간 시간표 로드 오류:', e)
+        setTimetable([])
       }
     }
-  }, []);
 
-  // ✅ 선택된 요일의 수업만 필터링
+    load()
+  }, [])
+
+  /* ✅ 선택된 요일 필터링 */
   const filtered = timetable
-    .filter((c) => c.day === selectedDay)
-    .sort((a, b) => a.period - b.period);
+    .filter((c) => c.day === selectedDay && c.subject?.trim())
+    .sort((a, b) => a.period - b.period)
 
   return (
     <section style={{ marginBottom: '35px' }}>
@@ -100,10 +131,11 @@ export default function TimetablePreview() {
           filtered.map((c, i) => {
             const colorKey = Object.keys(subjectColors).find((k) =>
               c.subject.includes(k)
-            );
+            )
             const bg = colorKey
               ? subjectColors[colorKey]
-              : subjectColors.default;
+              : subjectColors.default
+
             return (
               <div
                 key={i}
@@ -117,16 +149,16 @@ export default function TimetablePreview() {
                 <div style={{ fontWeight: 700 }}>{c.period}교시</div>
                 <div>{c.subject}</div>
                 <div style={{ fontSize: '13px', color: '#555' }}>
-                  {c.teacher}
+                  👨‍🏫 {c.teacher || '미입력'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#777' }}>
-                  {c.room}
+                  🏫 {c.room || '미지정'}
                 </div>
               </div>
-            );
+            )
           })
         )}
       </div>
     </section>
-  );
+  )
 }

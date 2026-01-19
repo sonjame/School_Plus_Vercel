@@ -7,15 +7,9 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [users, setUsers] = useState<any[]>([])
 
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
-
-  useEffect(() => {
-    const savedUsers = JSON.parse(localStorage.getItem('users') || '[]')
-    setUsers(savedUsers)
-  }, [])
 
   // ⭐ Enter 키로 로그인 실행
   useEffect(() => {
@@ -53,33 +47,51 @@ export default function LoginPage() {
     }, 1500)
   }
 
-  const login = () => {
-    const found = users.find(
-      (u) => u.username === username && u.password === password
-    )
-
-    if (!found) {
-      showAlert('아이디 또는 비밀번호가 올바르지 않습니다.')
+  const login = async () => {
+    if (!username || !password) {
+      showAlert('아이디와 비밀번호를 입력해주세요.')
       return
     }
 
-    const safeUser = {
-      username: found.username,
-      name: found.name,
-      email: found.email,
-      school: found.school,
-      grade: found.grade,
-      level: found.level,
-      eduCode: found.eduCode,
-      schoolCode: found.schoolCode,
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    })
+
+    let data: any = {}
+    try {
+      data = await res.json()
+    } catch {
+      data = {}
     }
 
-    localStorage.setItem('loggedInUser', JSON.stringify(safeUser))
-    localStorage.setItem('userSchool', safeUser.school)
+    if (!res.ok) {
+      showAlert(data.message || '아이디 또는 비밀번호가 올바르지 않습니다.')
+      return
+    }
 
-    if (safeUser.eduCode) localStorage.setItem('eduCode', safeUser.eduCode)
-    if (safeUser.schoolCode)
-      localStorage.setItem('schoolCode', safeUser.schoolCode)
+    // ✅ 로그인 성공
+    localStorage.setItem(
+      'loggedInUser',
+      JSON.stringify({
+        ...data.user,
+        token: data.accessToken, // ⭐⭐⭐ 핵심
+      }),
+    )
+
+    // accessToken 따로 쓰고 싶으면 유지해도 됨 (선택)
+    localStorage.setItem('accessToken', data.accessToken)
+
+    localStorage.setItem('userId', data.user.id.toString())
+    localStorage.setItem('userSchool', data.user.school)
+
+    if (data.user.eduCode) localStorage.setItem('eduCode', data.user.eduCode)
+    if (data.user.schoolCode)
+      localStorage.setItem('schoolCode', data.user.schoolCode)
 
     showAlert('로그인 성공!', () => {
       window.location.href = '/'

@@ -3,79 +3,31 @@
 import { useEffect, useState } from 'react'
 
 // ---------------------------
-//  Google Fonts + Icons 로딩
-// ---------------------------
-const loadGoogleResources = () => {
-  const font = document.createElement('link')
-  font.rel = 'stylesheet'
-  font.href =
-    'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap'
-
-  const icon = document.createElement('link')
-  icon.rel = 'stylesheet'
-  icon.href =
-    'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined'
-
-  document.head.appendChild(font)
-  document.head.appendChild(icon)
-}
-
-// ---------------------------
 //  급식 API 불러오기 함수 (단일 날짜 조회)
 // ---------------------------
-async function fetchMeal(date: string, eduCode: string, schoolCode: string) {
-  const API_KEY = process.env.NEXT_PUBLIC_NEIS_KEY
-  const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=${API_KEY}&Type=json&ATPT_OFCDC_SC_CODE=${eduCode}&SD_SCHUL_CODE=${schoolCode}&MLSV_YMD=${date}`
-
-  try {
-    const res = await fetch(url)
-    const data = await res.json()
-
-    if (!data.mealServiceDietInfo) return null
-
-    const rows = data.mealServiceDietInfo[1]?.row
-    if (!rows) return null
-
-    // ⭐⭐⭐ 중식만 필터링
-    const lunchRow = rows.find((r: any) => r.MMEAL_SC_NM === '중식')
-    if (!lunchRow) return null
-
-    const raw = lunchRow.DDISH_NM
-    if (!raw) return null
-
-    const lines: string[] = raw.split('<br/>')
-
-    const cleanedLines = lines
-      .map((line) =>
-        line
-          .replace(/[\u2460-\u2473]/g, '') // ①② 숫자 제거
-          .replace(/\(\s?[0-9.]+\s?\)/g, '') // (5.6) 칼로리 제거
-          .replace(/-\s*$/g, '') // 끝에 - 제거
-          .replace(/\s+/g, ' ')
-          .trim()
-      )
-      .filter((line) => line.length > 0)
-
-    return cleanedLines
-  } catch (e) {
-    console.error(`급식 불러오기 실패 (${date})`, e)
-    return null
-  }
-}
 
 function getWeekDates() {
   const today = new Date()
   const kr = new Date(today.getTime() + 9 * 60 * 60 * 1000)
 
-  // 📌 다음 주 월요일 계산
+  // 📌 오늘의 요일 (0=일)
   const day = kr.getDay()
-  const nextMonday = new Date(kr)
-  nextMonday.setDate(kr.getDate() - (day === 0 ? 6 : day - 1) + 7)
+
+  let start = new Date(kr)
+
+  if (day === 0) {
+    // 📌 오늘이 일요일이면 내일부터 시작
+    start.setDate(kr.getDate() + 1)
+  } else {
+    // 📌 오늘이 월~금이면 이번 주 월요일 기준 시작
+    start.setDate(kr.getDate() - (day - 1))
+  }
 
   const dates = []
+
   for (let i = 0; i < 5; i++) {
-    const d = new Date(nextMonday)
-    d.setDate(nextMonday.getDate() + i)
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
 
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -116,12 +68,13 @@ export default function WeeklyMealPage() {
 
     Promise.all(
       dates.map(async (d) => {
-        const meal = await fetchMeal(d.key, eduCode, schoolCode)
-        return { date: d.key, label: d.label, meal }
+        const res = await fetch(
+          `/api/meals?date=${d.key}&eduCode=${eduCode}&schoolCode=${schoolCode}`
+        )
+        const data = await res.json()
+        return { date: d.key, label: d.label, meal: data.meal }
       })
-    ).then((results) => {
-      setWeekMeals(results)
-    })
+    ).then(setWeekMeals)
   }, [ready, eduCode, schoolCode])
 
   return (

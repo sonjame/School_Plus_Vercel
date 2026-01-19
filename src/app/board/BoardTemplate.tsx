@@ -5,45 +5,74 @@ import { useEffect, useState } from 'react'
 
 interface Post {
   id: string
-  author: any // ← object 또는 string 둘 다 처리 가능
   title: string
   content: string
+  author: string
   likes: number
-  category: string
-  createdAt: number
-  image?: string
+  created_at: string
+  commentCount: number // ✅ 추가
 }
 
 export default function BoardTemplate({
   title,
   category,
-  storageKey,
 }: {
   title: string
   category: string
-  storageKey: string
 }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [sortType, setSortType] = useState<'latest' | 'likes'>('latest')
+
+  // 🔒 학년별 작성 권한 체크
+  const myGrade =
+    typeof window !== 'undefined' ? localStorage.getItem('userGrade') : null
+
+  const canWrite =
+    ['free', 'promo', 'club'].includes(category) || category === myGrade
 
   const getCommentCount = (id: string) => {
     const data = JSON.parse(localStorage.getItem(`comments_${id}`) || '[]')
     return data.length
   }
 
+  const parseDate = (value: string) => {
+    if (!value) return new Date(0)
+
+    // 이미 ISO 형식이면 그대로
+    if (value.includes('T')) {
+      return new Date(value)
+    }
+
+    // MySQL 형식 (YYYY-MM-DD HH:mm:ss)
+    return new Date(value.replace(' ', 'T'))
+  }
+
   useEffect(() => {
-    const raw = localStorage.getItem(storageKey)
-    const posts = raw ? JSON.parse(raw) : []
-    setPosts(posts)
-  }, [storageKey])
+    async function load() {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const res = await fetch(`/api/posts?category=${category}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setPosts(data)
+    }
+
+    load()
+  }, [category])
 
   /* ------------------ 🔍 검색 기능 수정 ------------------ */
   const filteredPosts = posts.filter((p) => {
     const term = searchTerm.toLowerCase()
 
-    const authorName =
-      typeof p.author === 'string' ? p.author : p.author?.username || ''
+    const authorName = p.author
 
     return (
       p.title.toLowerCase().includes(term) ||
@@ -54,7 +83,12 @@ export default function BoardTemplate({
 
   /* ------------------ 📌 정렬 ------------------ */
   const sorted = [...filteredPosts].sort((a, b) => {
-    if (sortType === 'latest') return b.createdAt - a.createdAt
+    if (sortType === 'latest') {
+      return (
+        parseDate(b.created_at).getTime() - parseDate(a.created_at).getTime()
+      )
+    }
+
     if (sortType === 'likes') return b.likes - a.likes
     return 0
   })
@@ -97,7 +131,6 @@ export default function BoardTemplate({
             border: '1.5px solid #ccc',
           }}
         />
-
         <select
           value={sortType}
           onChange={(e) => setSortType(e.target.value as 'latest' | 'likes')}
@@ -112,22 +145,41 @@ export default function BoardTemplate({
           <option value="likes">💙 좋아요순</option>
         </select>
 
-        <Link
-          href={`/board/write?category=${category}`}
-          style={{
-            height: 44,
-            padding: '0 18px',
-            background: '#4FC3F7',
-            color: 'white',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textDecoration: 'none',
-          }}
-        >
-          ✏ 글쓰기
-        </Link>
+        {canWrite ? (
+          <Link
+            href={`/board/write?category=${category}`}
+            style={{
+              height: 44,
+              padding: '0 18px',
+              background: '#4FC3F7',
+              color: 'white',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textDecoration: 'none',
+            }}
+          >
+            ✏ 글쓰기
+          </Link>
+        ) : (
+          <div
+            style={{
+              height: 44,
+              padding: '0 18px',
+              background: '#ECEFF1',
+              color: '#78909C',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'not-allowed',
+            }}
+          >
+            🔒 해당 학년만 작성 가능
+          </div>
+        )}
       </div>
 
       {/* 목록 */}
@@ -179,12 +231,12 @@ export default function BoardTemplate({
                 >
                   <span>
                     작성자: {authorName} ·{' '}
-                    {new Date(p.createdAt).toLocaleString()}
+                    {parseDate(p.created_at).toLocaleString()}
                   </span>
 
                   <span style={{ display: 'flex', gap: 10 }}>
                     <span>💙 {p.likes}</span>
-                    <span>💬 {getCommentCount(p.id)}</span>
+                    <span>💬 {p.commentCount}</span>
                   </span>
                 </div>
               </div>

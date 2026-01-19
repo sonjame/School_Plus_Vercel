@@ -1,334 +1,311 @@
 'use client'
 
-import { useState, useEffect, FormEvent, MouseEvent } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-type DayCell = {
-  day: number | null
-  key: string | null
-}
+/* ===============================
+   타입 정의
+================================ */
 
-type TimeMemo = {
-  start: string
-  end: string
-  text: string
-}
-
-type MemoMap = Record<string, TimeMemo[]>
-
-type Holiday = {
-  date: string // "YYYY-MM-DD"
-  name: string
-}
-
-type Period = {
-  id: number
-  label: string
-  start: string
-  end: string
-  color: string
-}
-
-type CalendarEvent = {
+type AcademicEvent = {
   date: string
   title: string
 }
 
-// 🎓 학사일정 타입
-type AcademicEvent = {
-  date: string // YYYY-MM-DD
-  title: string // 일정명
+type DBEvent = {
+  id: number
+  title: string
+  event_date: string
+  description?: string
+  start_time?: string
+  end_time?: string
+  color?: string
 }
 
-// 🔐 localStorage keys
-const STORAGE_KEYS = {
-  memos: 'calendar_memos',
-  colors: 'calendar_colors',
-  titles: 'calendar_titles',
-  contents: 'calendar_contents',
-  periods: 'calendar_periods',
-  events: 'calendarEvents',
+type AddMode = 'single' | 'range'
 
-  viewYear: 'calendar_view_year',
-  viewMonth: 'calendar_view_month',
-  selectedDate: 'calendar_selected_date',
-  contextDate: 'calendar_context_date',
+/* ===============================
+   유틸
+================================ */
+
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
-const COLOR_PRESETS = ['#DBEAFE', '#FFE4D5', '#DCFCE7', '#FEE2E2', '#EDE9FE']
-
-// 캘린더 이벤트 구성 함수
-function buildCalendarEvents(
-  dateNoteTitles: Record<string, string>,
-  dateNoteContents: Record<string, string[]>,
-  periods: Period[]
-): CalendarEvent[] {
-  const map: Record<string, string[]> = {}
-
-  for (const [date, title] of Object.entries(dateNoteTitles)) {
-    const t = title.trim()
-    if (!t) continue
-    if (!map[date]) map[date] = []
-    map[date].push(t)
-  }
-
-  for (const [date, list] of Object.entries(dateNoteContents)) {
-    for (const raw of list) {
-      const t = raw.trim()
-      if (!t) continue
-      if (!map[date]) map[date] = []
-      map[date].push(t)
-    }
-  }
-
-  for (const p of periods) {
-    const t = p.label.trim()
-    if (!t || !p.start) continue
-    if (!map[p.start]) map[p.start] = []
-    if (!map[p.start].includes(t)) map[p.start].push(t)
-  }
-
-  const events: CalendarEvent[] = []
-  for (const [date, titles] of Object.entries(map)) {
-    const uniq = Array.from(new Set(titles))
-    for (const t of uniq) events.push({ date, title: t })
-  }
-
-  return events
-}
-
-function getHolidayFromMap(
-  holidayMap: Record<string, Holiday>,
-  dateKey: string | null
-): Holiday | undefined {
-  if (!dateKey) return undefined
-  return holidayMap[dateKey]
-}
+/* ===============================
+   메인 컴포넌트
+================================ */
 
 export default function CalendarPage() {
+  const searchParams = useSearchParams()
+  const queryDate = searchParams.get('date')
+
   const today = new Date()
+  const todayKey = formatLocalDate(today)
+
+  /* ===============================
+     State
+  ================================ */
+
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [contextDate, setContextDate] = useState<string | null>(null)
 
-  const [memos, setMemos] = useState<MemoMap>({})
-  const [customColors, setCustomColors] = useState<Record<string, string>>({})
-  const [dateNoteTitles, setDateNoteTitles] = useState<Record<string, string>>(
-    {}
-  )
-  const [dateNoteContents, setDateNoteContents] = useState<
-    Record<string, string[]>
-  >({})
-  const [periods, setPeriods] = useState<Period[]>([])
-
-  const [holidayMap, setHolidayMap] = useState<Record<string, Holiday>>({})
-  const [holidayLoading, setHolidayLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
-
-  // 🎓 학사일정
+  const [userEvents, setUserEvents] = useState<Record<string, DBEvent[]>>({})
   const [academicEvents, setAcademicEvents] = useState<
     Record<string, AcademicEvent[]>
   >({})
 
-  // 📌 🔥 추가된 부분: 저장된 학교 코드 불러오기
-  const [eduCode, setEduCode] = useState<string | null>(null)
-  const [schoolCode, setSchoolCode] = useState<string | null>(null)
+  /** 🔥 일정 추가 모달 */
+  const [showModal, setShowModal] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [addMode, setAddMode] = useState<AddMode>('single')
 
-  // modal states
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalStartDate, setModalStartDate] = useState('')
-  const [modalEndDate, setModalEndDate] = useState('')
-  const [modalRangeType, setModalRangeType] = useState<'single' | 'range'>(
-    'single'
-  )
-  const [modalStartTime, setModalStartTime] = useState('')
-  const [modalEndTime, setModalEndTime] = useState('')
-  const [modalTitle, setModalTitle] = useState('')
-  const [modalDescription, setModalDescription] = useState('')
-  const [modalColor, setModalColor] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [rangeStart, setRangeStart] = useState('')
+  const [rangeEnd, setRangeEnd] = useState('')
 
-  const todayKey = `${today.getFullYear()}-${String(
-    today.getMonth() + 1
-  ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  //모달 삭제 확인 디자인//
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DBEvent | null>(null)
 
-  // 🔵 삭제 확인 모달 상태
-  const [confirmModal, setConfirmModal] = useState({
-    show: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    onCancel: () => {},
-  })
+  /* ===============================
+     인증
+  ================================ */
 
-  // 📌 🔥 학교코드 로드 추가
+  const [userId, setUserId] = useState<number | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+
   useEffect(() => {
-    const storedEdu = localStorage.getItem('eduCode')
-    const storedSchool = localStorage.getItem('schoolCode')
-
-    setEduCode(storedEdu ?? null)
-    setSchoolCode(storedSchool ?? null)
+    const raw = localStorage.getItem('userId')
+    if (raw) setUserId(Number(raw))
+    setAuthReady(true)
   }, [])
 
-  // -------- 로컬 저장 데이터 불러오기 --------
+  /* ===============================
+     Query Date
+  ================================ */
+
   useEffect(() => {
-    try {
-      const savedYear = localStorage.getItem(STORAGE_KEYS.viewYear)
-      const savedMonth = localStorage.getItem(STORAGE_KEYS.viewMonth)
+    if (!queryDate) return
+    const [y, m, d] = queryDate.split('-').map(Number)
+    if (!y || !m || !d) return
 
-      if (savedYear && !Number.isNaN(parseInt(savedYear, 10))) {
-        setYear(parseInt(savedYear, 10))
-      }
-      if (savedMonth && !Number.isNaN(parseInt(savedMonth, 10))) {
-        setMonth(parseInt(savedMonth, 10))
-      }
+    setYear(y)
+    setMonth(m - 1)
+    setSelectedDate(queryDate)
+    setContextDate(queryDate)
+  }, [queryDate])
 
-      const savedSelected = localStorage.getItem(STORAGE_KEYS.selectedDate)
-      const savedContext = localStorage.getItem(STORAGE_KEYS.contextDate)
-      if (savedSelected) setSelectedDate(savedSelected)
-      if (savedContext) setContextDate(savedContext)
+  /* ===============================
+     내 일정 로드
+  ================================ */
 
-      const savedMemos = localStorage.getItem(STORAGE_KEYS.memos)
-      const savedColors = localStorage.getItem(STORAGE_KEYS.colors)
-      const savedTitles = localStorage.getItem(STORAGE_KEYS.titles)
-      const savedContents = localStorage.getItem(STORAGE_KEYS.contents)
-      const savedPeriods = localStorage.getItem(STORAGE_KEYS.periods)
+  async function loadUserEvents(uid = userId) {
+    if (!uid) return
+    const res = await fetch(`/api/calendar-events?userId=${uid}`)
+    if (!res.ok) return
 
-      if (savedMemos) setMemos(JSON.parse(savedMemos))
-      if (savedColors) setCustomColors(JSON.parse(savedColors))
-      if (savedTitles) setDateNoteTitles(JSON.parse(savedTitles))
-      if (savedContents) setDateNoteContents(JSON.parse(savedContents))
-      if (savedPeriods) setPeriods(JSON.parse(savedPeriods))
-    } catch (err) {
-      console.warn('로드 오류: ', err)
-    } finally {
-      setLoaded(true)
-    }
-  }, [])
+    const rows: DBEvent[] = await res.json()
+    const map: Record<string, DBEvent[]> = {}
 
-  // -------- 데이터 변경 → 저장 + Home events --------
+    rows.forEach((ev) => {
+      const dateKey =
+        typeof ev.event_date === 'string'
+          ? ev.event_date.slice(0, 10)
+          : formatLocalDate(new Date(ev.event_date))
+
+      if (!map[dateKey]) map[dateKey] = []
+      map[dateKey].push({ ...ev, event_date: dateKey })
+    })
+
+    setUserEvents(map)
+  }
+
   useEffect(() => {
-    if (!loaded) return
-    try {
-      localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(memos))
-      localStorage.setItem(STORAGE_KEYS.colors, JSON.stringify(customColors))
-      localStorage.setItem(STORAGE_KEYS.titles, JSON.stringify(dateNoteTitles))
-      localStorage.setItem(
-        STORAGE_KEYS.contents,
-        JSON.stringify(dateNoteContents)
-      )
-      localStorage.setItem(STORAGE_KEYS.periods, JSON.stringify(periods))
+    if (userId) loadUserEvents()
+  }, [userId])
 
-      const evs = buildCalendarEvents(dateNoteTitles, dateNoteContents, periods)
-      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(evs))
-    } catch {
-      // ignore
-    }
-  }, [memos, customColors, dateNoteTitles, dateNoteContents, periods, loaded])
+  /* ===============================
+     학사일정
+  ================================ */
 
-  // ✅ 뷰 상태 저장 (연/월/선택된 날짜)
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.viewYear, String(year))
-      localStorage.setItem(STORAGE_KEYS.viewMonth, String(month))
+    if (!userId) return
 
-      if (selectedDate) {
-        localStorage.setItem(STORAGE_KEYS.selectedDate, selectedDate)
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.selectedDate)
-      }
+    const eduCode = localStorage.getItem('eduCode')
+    const schoolCode = localStorage.getItem('schoolCode')
+    if (!eduCode || !schoolCode) return
 
-      if (contextDate) {
-        localStorage.setItem(STORAGE_KEYS.contextDate, contextDate)
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.contextDate)
-      }
-    } catch (e) {
-      console.warn('뷰 상태 저장 오류:', e)
-    }
-  }, [year, month, selectedDate, contextDate])
-
-  // -------- 공휴일 Fetch --------
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        setHolidayLoading(true)
-        const res = await fetch(`/api/holidays?year=${year}`)
-        if (!res.ok) throw new Error('holiday error')
-        const data: Holiday[] = await res.json()
-        if (cancelled) return
-        const map: Record<string, Holiday> = {}
-        for (const h of data) map[h.date] = h
-        setHolidayMap(map)
-      } catch {
-        setHolidayMap({})
-      } finally {
-        if (!cancelled) setHolidayLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [year])
-
-  // 🎓 -------- 학사일정 Fetch --------
-  useEffect(() => {
     async function loadAcademic() {
-      // 🔥 학교코드가 없으면 호출 안함
-      if (!eduCode || !schoolCode) return
+      const res = await fetch(
+        `/api/academic-events?eduCode=${eduCode}&schoolCode=${schoolCode}&year=${year}&month=${
+          month + 1
+        }`
+      )
+      if (!res.ok) return
 
-      try {
-        const y = year
-        const m = String(month + 1).padStart(2, '0')
+      const data: AcademicEvent[] = await res.json()
+      const map: Record<string, AcademicEvent[]> = {}
 
-        const from = `${y}${m}01`
-        const to = `${y}${m}31`
+      data.forEach((ev) => {
+        if (!map[ev.date]) map[ev.date] = []
+        map[ev.date].push(ev)
+      })
 
-        // 🔥 학교코드 값 적용
-        const API_KEY = process.env.NEXT_PUBLIC_NEIS_KEY
-        const API_URL = `https://open.neis.go.kr/hub/SchoolSchedule?KEY=${API_KEY}&Type=json&ATPT_OFCDC_SC_CODE=${eduCode}&SD_SCHUL_CODE=${schoolCode}&AA_FROM_YMD=${from}&AA_TO_YMD=${to}`
-
-        const res = await fetch(API_URL)
-        if (!res.ok) throw new Error('학사일정 오류')
-
-        const json = await res.json()
-        const rows = json.SchoolSchedule?.[1]?.row || []
-
-        const mapped: AcademicEvent[] = rows.map((item: any): AcademicEvent => {
-          const ymd = item.AA_YMD
-          return {
-            date: `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`,
-            title: item.EVENT_NM,
-          }
-        })
-
-        const map: Record<string, AcademicEvent[]> = {}
-        mapped.forEach((ev) => {
-          if (!map[ev.date]) map[ev.date] = []
-          map[ev.date].push(ev)
-        })
-
-        setAcademicEvents(map)
-      } catch (err) {
-        console.error('학사일정 불러오기 실패:', err)
-        setAcademicEvents({})
-      }
+      setAcademicEvents(map)
     }
 
     loadAcademic()
-  }, [year, month, eduCode, schoolCode]) // 🔥 학교 값 바뀌면 다시 fetch
+  }, [userId, year, month])
 
-  // 📅 셀 생성
+  /* ===============================
+     일정 추가
+  ================================ */
+
+  async function addEvent() {
+    if (!userId || !newTitle.trim()) return
+
+    if (addMode === 'single') {
+      if (!newDate) return
+
+      await fetch('/api/calendar-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          title: newTitle,
+          description: newDesc,
+          start_time: newStartTime || null,
+          end_time: newEndTime || null,
+          color: newColor,
+          event_date: newDate,
+        }),
+      })
+    } else {
+      if (!rangeStart || !rangeEnd) return
+
+      const start = new Date(rangeStart)
+      const end = new Date(rangeEnd)
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        await fetch('/api/calendar-events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            title: newTitle,
+            description: newDesc,
+            start_time: newStartTime || null,
+            end_time: newEndTime || null,
+            color: newColor,
+            event_date: formatLocalDate(d),
+          }),
+        })
+      }
+    }
+
+    setShowModal(false)
+    loadUserEvents()
+  }
+
+  async function updateEvent() {
+    if (!userId || !editTarget || !newTitle.trim()) return
+
+    await fetch('/api/calendar-events', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editTarget.id, // ✅ 핵심
+        userId,
+        title: newTitle,
+        description: newDesc,
+        start_time: newStartTime || null,
+        end_time: newEndTime || null,
+        color: newColor,
+        event_date: newDate,
+      }),
+    })
+
+    setShowEditModal(false)
+    setEditTarget(null)
+    loadUserEvents()
+  }
+
+  async function deleteEvent(ev: DBEvent) {
+    if (!userId) return
+
+    const ok = confirm('이 일정을 삭제할까요?')
+    if (!ok) return
+
+    const res = await fetch(
+      `/api/calendar-events?id=${ev.id}&userId=${userId}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!res.ok) {
+      alert('삭제 실패')
+      return
+    }
+
+    setShowEditModal(false)
+    setEditTarget(null)
+    loadUserEvents()
+  }
+
+  async function confirmDelete() {
+    if (!userId || !deleteTarget) return
+
+    const res = await fetch(
+      `/api/calendar-events?id=${deleteTarget.id}&userId=${userId}`,
+      { method: 'DELETE' }
+    )
+
+    if (!res.ok) {
+      alert('삭제 실패')
+      return
+    }
+
+    setShowDeleteModal(false)
+    setDeleteTarget(null)
+    loadUserEvents()
+  }
+
+  const [newDate, setNewDate] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [newStartTime, setNewStartTime] = useState('')
+  const [newEndTime, setNewEndTime] = useState('')
+  const [newColor, setNewColor] = useState('#4f46e5')
+
+  /* ===============================
+     수정 기능
+  ================================ */
+  const [editTarget, setEditTarget] = useState<DBEvent | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+
+  /* ===============================
+     인증 가드
+  ================================ */
+
+  if (!authReady) return null
+  if (!userId) return <div>로그인이 필요합니다.</div>
+
+  /* ===============================
+     달력 계산
+  ================================ */
+
   const firstDay = new Date(year, month, 1).getDay()
   const lastDate = new Date(year, month + 1, 0).getDate()
 
-  const cells: DayCell[] = []
-  for (let i = 0; i < firstDay; i++) {
-    cells.push({ day: null, key: null })
-  }
+  const cells: { day: number | null; key: string | null }[] = []
+
+  for (let i = 0; i < firstDay; i++) cells.push({ day: null, key: null })
   for (let d = 1; d <= lastDate; d++) {
     const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(
       d
@@ -336,1360 +313,839 @@ export default function CalendarPage() {
     cells.push({ day: d, key })
   }
 
-  // ✅ 날짜 클릭 시: 모달 오픈
-  const openScheduleModal = (dateKey: string) => {
-    setSelectedDate(dateKey)
-    setContextDate(dateKey)
-
-    setModalStartDate(dateKey)
-    setModalEndDate(dateKey)
-    setModalRangeType('single')
-
-    // 🔥 기존 값 불러오지 않고 모두 초기화
-    setModalTitle('')
-    setModalStartTime('')
-    setModalEndTime('')
-    setModalDescription('')
-    setModalColor('')
-
-    // 수정모드 아님
-    setEditingIndex(null)
-
-    setIsModalOpen(true)
+  const changeMonth = (diff: number) => {
+    const newDate = new Date(year, month + diff, 1)
+    setYear(newDate.getFullYear())
+    setMonth(newDate.getMonth())
   }
 
-  const handleRightClickDay = (
-    e: MouseEvent<HTMLButtonElement>,
-    key: string | null
-  ) => {
-    e.preventDefault()
-    if (!key) return
-    openScheduleModal(key)
-  }
+  /* ===============================
+     색깔 버튼
+  ================================ */
 
-  const handleModalClose = () => {
-    setIsModalOpen(false)
-    setEditingIndex(null)
-  }
+  const COLOR_PALETTE = [
+    '#4f46e5', // indigo
+    '#0ea5e9', // sky
+    '#10b981', // emerald
+    '#22c55e', // green
+    '#eab308', // yellow
+    '#f97316', // orange
+    '#ef4444', // red
+    '#ec4899', // pink
+    '#8b5cf6', // violet
+    '#64748b', // slate
+  ]
 
-  // 🔧 이전달 / 다음달
-  const handlePrevMonth = () => {
-    let newYear = year
-    let newMonth = month - 1
-    if (newMonth < 0) {
-      newMonth = 11
-      newYear = year - 1
-    }
-    setYear(newYear)
-    setMonth(newMonth)
-    setSelectedDate(null)
-    setContextDate(null)
-  }
-
-  const handleNextMonth = () => {
-    let newYear = year
-    let newMonth = month + 1
-    if (newMonth > 11) {
-      newMonth = 0
-      newYear = year + 1
-    }
-    setYear(newYear)
-    setMonth(newMonth)
-    setSelectedDate(null)
-    setContextDate(null)
-  }
-
-  // ✏️ 기존 일정 "수정" 버튼 / 리스트 아이템 클릭 시
-  const handleEditExistingSchedule = (index: number) => {
-    const dateKey = selectedDate
-    if (!dateKey) return
-
-    const titleList = dateNoteContents[dateKey] || []
-    const memoList = memos[dateKey] || []
-
-    setEditingIndex(index)
-    setModalTitle(titleList[index] || '')
-    setModalDescription(memoList[index]?.text || '')
-    setModalStartTime(memoList[index]?.start || '')
-    setModalEndTime(memoList[index]?.end || '')
-  }
-
-  // 🗑 기존 일정 하나 삭제
-  const handleDeleteScheduleItem = (index: number) => {
-    const dateKey = selectedDate
-    if (!dateKey) return
-
-    // 제목 리스트 삭제
-    setDateNoteContents((prev) => {
-      const list = prev[dateKey] || []
-      const newList = list.filter((_, i) => i !== index)
-      const next = { ...prev }
-      if (newList.length === 0) delete next[dateKey]
-      else next[dateKey] = newList
-      return next
-    })
-
-    // 대표 제목 재계산
-    setDateNoteTitles((prev) => {
-      const newContents =
-        dateNoteContents[dateKey]?.filter((_, i) => i !== index) || []
-      const next = { ...prev }
-      next[dateKey] = newContents[0] || ''
-      return next
-    })
-
-    // 메모 삭제
-    setMemos((prev) => {
-      const list = prev[dateKey] || []
-      const newList = list.filter((_, i) => i !== index)
-      const next = { ...prev }
-      if (newList.length === 0) delete next[dateKey]
-      else next[dateKey] = newList
-      return next
-    })
-
-    setEditingIndex(null)
-  }
-
-  // ✅ single / range 처리 + 설명/시간/색상 저장
-  const handleModalSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!modalStartDate) return
-    if (!modalTitle.trim()) return
-
-    const dateKey = modalStartDate
-
-    // 🔵 제목 리스트 저장
-    setDateNoteContents((prev) => {
-      const next = { ...prev }
-      const list = next[dateKey] ? [...next[dateKey]] : []
-
-      if (editingIndex !== null) {
-        list[editingIndex] = modalTitle.trim()
-      } else {
-        list.push(modalTitle.trim())
-      }
-
-      next[dateKey] = list
-      return next
-    })
-
-    // 🔥 대표 제목 최신 업데이트 (이 부분이 가장 중요)
-    setDateNoteTitles((prev) => {
-      const next = { ...prev }
-
-      // 기존 리스트
-      const oldList = dateNoteContents[dateKey] || []
-
-      // 최신 리스트 생성
-      let updatedList = [...oldList]
-
-      if (editingIndex !== null) {
-        updatedList[editingIndex] = modalTitle.trim()
-      } else {
-        updatedList.push(modalTitle.trim())
-      }
-
-      // 첫 번째 제목을 대표 제목으로 설정
-      next[dateKey] = updatedList[0] || ''
-
-      return next
-    })
-
-    // 🟡 설명·시간 저장
-    setMemos((prev) => {
-      const next = { ...prev }
-      const list = next[dateKey] ? [...next[dateKey]] : []
-      const memo = {
-        start: modalStartTime || '',
-        end: modalEndTime || '',
-        text: modalDescription || '',
-      }
-
-      if (editingIndex !== null) list[editingIndex] = memo
-      else list.push(memo)
-
-      next[dateKey] = list
-      return next
-    })
-
-    setIsModalOpen(false)
-    setEditingIndex(null)
-  }
-
-  const handleDeleteScheduleForDate = () => {
-    const dateKey = modalStartDate || selectedDate
-    if (!dateKey) return
-
-    setConfirmModal({
-      show: true,
-      title: '일정 삭제',
-      message: '이 날짜에 저장된 모든 일정을 삭제할까요?',
-      onConfirm: () => {
-        setDateNoteTitles((prev) => {
-          const next = { ...prev }
-          delete next[dateKey]
-          return next
-        })
-
-        setDateNoteContents((prev) => {
-          const next = { ...prev }
-          delete next[dateKey]
-          return next
-        })
-
-        setMemos((prev) => {
-          const next = { ...prev }
-          delete next[dateKey]
-          return next
-        })
-
-        setCustomColors((prev) => {
-          const next = { ...prev }
-          delete next[dateKey]
-          return next
-        })
-
-        setPeriods((prev) =>
-          prev.filter((p) => !(p.start <= dateKey && dateKey <= p.end))
-        )
-
-        setEditingIndex(null)
-        setIsModalOpen(false)
-
-        // 🔹 모달 닫기
-        setConfirmModal((p) => ({ ...p, show: false }))
-      },
-      onCancel: () => {
-        setConfirmModal((p) => ({ ...p, show: false }))
-      },
-    })
-  }
-
-  const cellsWithRender = cells
-
-  useEffect(() => {
-    localStorage.setItem('academicEvents', JSON.stringify(academicEvents))
-  }, [academicEvents])
+  /* ===============================
+     JSX
+  ================================ */
 
   return (
     <div className="page-wrapper">
-      <main className="main-section">
-        <div className="calendar-column">
-          <div className="card">
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
-              캘린더
-            </h2>
-            <p style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
-              오늘: {todayKey}
-            </p>
-            {holidayLoading && (
-              <p style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                공휴일 불러오는 중...
-              </p>
-            )}
+      <div className="main-layout">
+        <div className="calendar-area">
+          <div className="month-header">
+            <button className="nav-btn" onClick={() => changeMonth(-1)}>
+              ◀
+            </button>
+            <div className="month-title">
+              {year}년 {month + 1}월
+            </div>
+            <button className="nav-btn" onClick={() => changeMonth(1)}>
+              ▶
+            </button>
           </div>
 
-          <div className="card calendar-card">
-            <div className="calendar-header-row">
-              <button
-                className="month-nav-btn"
-                type="button"
-                onClick={handlePrevMonth}
-              >
-                ◀
-              </button>
-              <h3 className="calendar-title">
-                {year}년 {month + 1}월
-              </h3>
-              <button
-                className="month-nav-btn"
-                type="button"
-                onClick={handleNextMonth}
-              >
-                ▶
-              </button>
-            </div>
+          <div className="weekday-row">
+            <div className="w sun">일</div>
+            <div className="w">월</div>
+            <div className="w">화</div>
+            <div className="w">수</div>
+            <div className="w">목</div>
+            <div className="w">금</div>
+            <div className="w sat">토</div>
+          </div>
 
-            <div className="calendar-weekdays">
-              <div className="weekday sun">일</div>
-              <div className="weekday">월</div>
-              <div className="weekday">화</div>
-              <div className="weekday">수</div>
-              <div className="weekday">목</div>
-              <div className="weekday">금</div>
-              <div className="weekday sat">토</div>
-            </div>
+          <div className="grid-calendar">
+            {cells.map((cell, idx) => {
+              if (!cell.day) return <div key={idx} className="cell empty" />
 
-            {/* 📌 달력 셀 렌더링 */}
-            <div className="calendar-grid">
-              {cellsWithRender.map((cell, index) => {
-                if (cell.day === null) {
-                  return <div key={index} className="day-cell empty" />
-                }
+              const isToday = cell.key === todayKey
+              const isSelected = cell.key === selectedDate
+              const hasUserEvent = !!userEvents[cell.key || '']
+              const academicList = academicEvents[cell.key || ''] || []
 
-                const weekdayIndex = index % 7
-                const isSun = weekdayIndex === 0
-                const isSat = weekdayIndex === 6
-
-                const holidayInfo = getHolidayFromMap(holidayMap, cell.key)
-                const isHoliday = !!holidayInfo
-
-                const isSelected = selectedDate === cell.key
-                const isToday = cell.key === todayKey
-
-                const customColor = cell.key
-                  ? customColors[cell.key]
-                  : undefined
-
-                const periodsForDay = cell.key
-                  ? periods.filter(
-                      (p) =>
-                        p.start <= (cell.key as string) &&
-                        (cell.key as string) <= p.end
-                    )
-                  : []
-                const firstPeriodForDay = periodsForDay[0]
-                const isInPeriod = periodsForDay.length > 0
-
-                let dayStyle:
-                  | { background?: string; borderColor?: string }
-                  | undefined
-
-                if (customColor) {
-                  dayStyle = !isSelected
-                    ? {
-                        background: customColor,
-                        borderColor: customColor,
-                      }
-                    : { background: customColor }
-                }
-
-                const hasTimeMemo =
-                  !!cell.key && !!memos[cell.key] && memos[cell.key].length > 0
-
-                const hasDateNote =
-                  !!cell.key &&
-                  ((dateNoteTitles[cell.key] &&
-                    dateNoteTitles[cell.key].trim() !== '') ||
-                    (dateNoteContents[cell.key] &&
-                      dateNoteContents[cell.key].length > 0))
-
-                const hasAnyNote = hasTimeMemo || hasDateNote
-
-                const dateTitle =
-                  cell.key && dateNoteTitles[cell.key]
-                    ? dateNoteTitles[cell.key].trim()
-                    : ''
-
-                const scheduleCount =
-                  (cell.key && dateNoteContents[cell.key]?.length) || 0
-
-                // 🎓 학사일정
-                const academicList =
-                  cell.key && academicEvents[cell.key]
-                    ? academicEvents[cell.key]
-                    : []
-
-                const dayClassNames = [
-                  'day-cell',
-                  isSun && 'sun',
-                  isSat && 'sat',
-                  isHoliday && 'holiday',
-                  isToday && 'today',
-                  isSelected && 'selected',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
-
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    className={dayClassNames}
-                    style={dayStyle}
-                    onClick={() => {
-                      if (cell.key) openScheduleModal(cell.key)
-                    }}
-                    onContextMenu={(e) =>
-                      handleRightClickDay(
-                        e as unknown as MouseEvent<HTMLButtonElement>,
-                        cell.key
-                      )
-                    }
-                  >
-                    <div
-                      style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        paddingTop: 6,
-                        paddingInline: 4,
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      {isToday && <span className="today-badge">오늘</span>}
-
-                      <span className="day-number">{cell.day}</span>
-
-                      {/* 공휴일 이름 */}
-                      {holidayInfo && (
-                        <div className="holiday-cell-name">
-                          {holidayInfo.name}
-                        </div>
-                      )}
-
-                      {/* 사용자 지정 제목 */}
-                      {dateTitle && (
-                        <div className="day-title">
-                          {dateTitle}
-                          {scheduleCount > 1 && (
-                            <span style={{ fontSize: 9, marginLeft: 2 }}>
-                              외 {scheduleCount - 1}개
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 🎓 학사일정 태그 */}
-                      {academicList.length > 0 && (
-                        <div className="academic-tag">
-                          {academicList[0].title}
-                          {academicList.length > 1 && (
-                            <span style={{ fontSize: 9, marginLeft: 2 }}>
-                              외 {academicList.length - 1}개
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 기간 태그 */}
-                      {firstPeriodForDay && (
-                        <div className="period-tag">
-                          <span className="period-tag-label">
-                            {firstPeriodForDay.label}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* 메모 점 표시 */}
-                      {hasAnyNote && <span className="memo-dot" />}
-
-                      {/* 기간 라인 */}
-                      {isInPeriod && firstPeriodForDay && (
-                        <div
-                          className="period-line"
-                          style={{ background: firstPeriodForDay.color }}
-                        />
-                      )}
+              return (
+                <div
+                  key={cell.key}
+                  className={`cell ${isSelected ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedDate(cell.key)
+                    setContextDate(cell.key)
+                  }}
+                >
+                  <div className="cell-date">{cell.day}</div>
+                  {isToday && <div className="today-badge">오늘</div>}
+                  {hasUserEvent && <div className="dot" />}
+                  {academicList.map((ev, i) => (
+                    <div key={i} className="cell-academic">
+                      {ev.title}
                     </div>
-                  </button>
-                )
-              })}
-            </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
         </div>
-      </main>
 
-      {/* 🟢 새 일정 추가 / 수정 모달 */}
-      {isModalOpen && (
-        <div className="modal-backdrop" onClick={handleModalClose}>
-          <div
-            className="modal-panel"
-            onClick={(e) => {
-              e.stopPropagation()
-            }}
-          >
-            <div className="modal-header">
-              <span className="modal-title">
-                {editingIndex === null ? '새 일정 추가' : '기존 일정 수정'}
-              </span>
+        {/* 오른쪽 패널 */}
+        <div className="right-panel">
+          {contextDate ? (
+            <>
+              <div className="rp-date">{contextDate}</div>
+
               <button
-                type="button"
-                className="modal-close-btn"
-                onClick={handleModalClose}
+                className="add-btn"
+                onClick={() => {
+                  setAddMode('single')
+
+                  setNewDate(contextDate!)
+                  setRangeStart(contextDate!)
+                  setRangeEnd(contextDate!)
+
+                  setNewTitle('')
+                  setNewDesc('')
+                  setNewStartTime('')
+                  setNewEndTime('')
+                  setNewColor('#4f46e5')
+
+                  setShowModal(true)
+                }}
               >
-                ×
+                + 일정 추가
+              </button>
+
+              <div className="rp-section-title">내 일정</div>
+              {userEvents[contextDate]?.length ? (
+                userEvents[contextDate].map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="event-card"
+                    style={{ borderLeftColor: ev.color || '#4f46e5' }}
+                  >
+                    <div className="event-header">
+                      <div className="event-title">{ev.title}</div>
+
+                      <div className="event-actions">
+                        <button
+                          className="edit-btn"
+                          onClick={() => {
+                            setEditTarget(ev)
+                            setNewDate(ev.event_date)
+                            setNewTitle(ev.title)
+                            setNewDesc(ev.description || '')
+                            setNewStartTime(ev.start_time || '')
+                            setNewEndTime(ev.end_time || '')
+                            setNewColor(ev.color || '#4f46e5')
+                            setShowEditModal(true)
+                          }}
+                        >
+                          수정
+                        </button>
+
+                        <button
+                          className="edit-btn delete"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteTarget(ev)
+                            setShowDeleteModal(true)
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+
+                    {ev.start_time && (
+                      <div className="event-time">
+                        ⏰ {ev.start_time} ~ {ev.end_time}
+                      </div>
+                    )}
+
+                    {ev.description && (
+                      <div className="event-desc">{ev.description}</div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="rp-none">일정 없음</div>
+              )}
+
+              <div className="rp-section-title">학사일정</div>
+              {academicEvents[contextDate]?.length ? (
+                academicEvents[contextDate].map((ev, i) => (
+                  <div key={i} className="rp-card academic">
+                    <div className="rp-card-title">{ev.title}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rp-none">학사일정 없음</div>
+              )}
+            </>
+          ) : (
+            <div className="rp-empty">날짜를 선택하세요</div>
+          )}
+        </div>
+      </div>
+
+      {/* =========================
+            일정 추가 모달
+         ========================= */}
+      {showModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>일정 추가</h3>
+            {/* 🔘 오늘 / 기간 선택 */}
+            <div className="mode-toggle">
+              <button
+                className={addMode === 'single' ? 'active' : ''}
+                onClick={() => setAddMode('single')}
+              >
+                오늘
+              </button>
+              <button
+                className={addMode === 'range' ? 'active' : ''}
+                onClick={() => setAddMode('range')}
+              >
+                기간
               </button>
             </div>
 
-            <form className="modal-body" onSubmit={handleModalSubmit}>
-              {/* 시작일 */}
-              <div className="modal-field">
-                <label className="modal-label">시작일</label>
+            {addMode === 'single' ? (
+              <input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+              />
+            ) : (
+              <div className="range-row">
                 <input
                   type="date"
-                  className="modal-input"
-                  value={modalStartDate}
-                  onChange={(e) => setModalStartDate(e.target.value)}
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(e.target.value)}
                 />
-              </div>
-
-              {/* 기간 */}
-              <div className="modal-field">
-                <label className="modal-label">기간 설정</label>
-                <div className="modal-radio-row">
-                  <label className="modal-radio">
-                    <input
-                      type="radio"
-                      checked={modalRangeType === 'single'}
-                      onChange={() => setModalRangeType('single')}
-                    />
-                    <span>하루</span>
-                  </label>
-                  <label className="modal-radio">
-                    <input
-                      type="radio"
-                      checked={modalRangeType === 'range'}
-                      onChange={() => setModalRangeType('range')}
-                    />
-                    <span>기간 설정</span>
-                  </label>
-                </div>
-
-                {modalRangeType === 'range' && (
-                  <input
-                    type="date"
-                    className="modal-input modal-range-end"
-                    value={modalEndDate}
-                    onChange={(e) => setModalEndDate(e.target.value)}
-                  />
-                )}
-              </div>
-
-              {/* 시간 */}
-              <div className="modal-field">
-                <label className="modal-label">시간 (선택)</label>
-                <div className="modal-time-row">
-                  <input
-                    type="time"
-                    className="modal-input modal-time-input"
-                    value={modalStartTime}
-                    onChange={(e) => setModalStartTime(e.target.value)}
-                  />
-                  <span className="modal-time-separator">~</span>
-                  <input
-                    type="time"
-                    className="modal-input modal-time-input"
-                    value={modalEndTime}
-                    onChange={(e) => setModalEndTime(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* 셀 색상 */}
-              <div className="modal-field">
-                <label className="modal-label">셀 색상 (선택)</label>
-                <div className="modal-color-row">
-                  <div className="color-palette">
-                    {COLOR_PRESETS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={
-                          'color-swatch' +
-                          (modalColor === color ? ' selected' : '')
-                        }
-                        style={{ background: color }}
-                        onClick={() => setModalColor(color)}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="modal-color-reset-btn"
-                    onClick={() => setModalColor('')}
-                  >
-                    기본으로
-                  </button>
-                </div>
-              </div>
-
-              {/* 제목 */}
-              <div className="modal-field">
-                <label className="modal-label">제목 (날짜 요약)</label>
+                <span>~</span>
                 <input
-                  type="text"
-                  className="modal-input"
-                  placeholder="예: 시험 기간, 수행평가"
-                  value={modalTitle}
-                  onChange={(e) => setModalTitle(e.target.value)}
+                  type="date"
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(e.target.value)}
                 />
               </div>
+            )}
 
-              {/* 설명 */}
-              <div className="modal-field">
-                <label className="modal-label">설명</label>
-                <textarea
-                  className="modal-textarea"
-                  placeholder="일정 상세 설명 입력"
-                  value={modalDescription}
-                  onChange={(e) => setModalDescription(e.target.value)}
-                />
+            <input
+              placeholder="일정 제목"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+            <textarea
+              placeholder="내용"
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+            />
+            <div className="time-row">
+              <input
+                type="time"
+                value={newStartTime}
+                onChange={(e) => setNewStartTime(e.target.value)}
+              />
+              <span>~</span>
+              <input
+                type="time"
+                value={newEndTime}
+                onChange={(e) => setNewEndTime(e.target.value)}
+              />
+            </div>
+            <div className="color-row">
+              <span>색상</span>
+              <div className="color-palette">
+                {COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    className={`color-btn ${
+                      newColor === color ? 'selected' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setNewColor(color)}
+                  />
+                ))}
               </div>
-
-              {/* 🎓 이 날짜의 학사일정 표시 (읽기 전용) */}
-              {(modalStartDate || selectedDate) &&
-                (() => {
-                  const dateKey = modalStartDate || selectedDate || ''
-                  if (!dateKey) return null
-                  const list = academicEvents[dateKey] || []
-                  if (!list.length) return null
-
-                  return (
-                    <div className="modal-field">
-                      <label className="modal-label">
-                        학사일정 (조회 전용)
-                      </label>
-                      <div className="academic-list">
-                        {list.map((ev, idx) => (
-                          <div key={idx} className="academic-item">
-                            <span className="academic-dot">●</span>
-                            <span className="academic-title">{ev.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-              {/* 기존 일정 리스트 */}
-              {selectedDate &&
-                (() => {
-                  const dateKey = selectedDate
-                  const memoList = memos[dateKey] || []
-                  const descList = dateNoteContents[dateKey] || []
-                  const maxLen = Math.max(memoList.length, descList.length)
-
-                  if (maxLen === 0) return null
-
-                  return (
-                    <div className="modal-field">
-                      <label className="modal-label">
-                        이 날짜에 저장된 일정
-                      </label>
-                      <div className="schedule-list">
-                        {Array.from({ length: maxLen }).map((_, i) => {
-                          const memo = memoList[i]
-                          const title = dateNoteTitles[dateKey] || ''
-
-                          const desc =
-                            descList[i] && descList[i].trim()
-                              ? descList[i]
-                              : memo?.text && memo.text.trim()
-                              ? memo.text
-                              : title // 🔥 제목 fallback
-
-                          const timeLabel =
-                            memo && (memo.start || memo.end)
-                              ? `${memo.start || ''} ~ ${memo.end || ''}`
-                              : '시간 없음'
-
-                          return (
-                            <div
-                              key={i}
-                              className="schedule-list-item"
-                              onClick={() => handleEditExistingSchedule(i)}
-                            >
-                              <div className="schedule-list-main">
-                                <span className="schedule-time">
-                                  {timeLabel}
-                                </span>
-                                <span className="schedule-desc">{desc}</span>
-                              </div>
-                              <div className="schedule-list-actions">
-                                <button
-                                  type="button"
-                                  className="schedule-edit-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEditExistingSchedule(i)
-                                  }}
-                                >
-                                  수정
-                                </button>
-                                <button
-                                  type="button"
-                                  className="schedule-delete-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteScheduleItem(i)
-                                  }}
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-              <button type="submit" className="modal-submit-btn">
-                {editingIndex === null ? '일정 추가' : '일정 수정 저장'}
-              </button>
-
-              <button
-                type="button"
-                className="modal-delete-btn"
-                onClick={handleDeleteScheduleForDate}
-              >
-                이 날짜의 일정 전체 삭제
-              </button>
-            </form>
+            </div>
+            <div className="modal-actions">
+              {/* ✅ 추가 모달은 이게 맞음 */}
+              <button onClick={() => setShowModal(false)}>취소</button>
+              <button onClick={addEvent}>저장</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 📌 일정 삭제 Confirm Modal */}
-      {confirmModal.show && (
-        <div className="modal-backdrop" onClick={() => confirmModal.onCancel()}>
-          <div
-            className="modal-panel"
-            style={{
-              maxWidth: '340px',
-              border: '2px solid #2563eb',
-              paddingBottom: '18px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header" style={{ background: '#eff6ff' }}>
-              <span className="modal-title">{confirmModal.title}</span>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => confirmModal.onCancel()}
-              >
-                ×
-              </button>
+      {/* =========================
+            일정 수정 모달
+         ========================= */}
+      {showEditModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>일정 수정</h3>
+
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+            />
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+
+            <textarea
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+            />
+
+            <div className="time-row">
+              <input
+                type="time"
+                value={newStartTime}
+                onChange={(e) => setNewStartTime(e.target.value)}
+              />
+              <span>~</span>
+              <input
+                type="time"
+                value={newEndTime}
+                onChange={(e) => setNewEndTime(e.target.value)}
+              />
             </div>
 
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '18px 14px 6px',
-                fontSize: '13px',
-                color: '#374151',
-                whiteSpace: 'pre-line',
-              }}
-            >
-              {confirmModal.message}
+            <div className="color-row">
+              <span>색상</span>
+              <div className="color-palette">
+                {COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    className={`color-btn ${
+                      newColor === color ? 'selected' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setNewColor(color)}
+                  />
+                ))}
+              </div>
             </div>
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '10px',
-                marginTop: '10px',
-              }}
-            >
-              <button
-                onClick={confirmModal.onConfirm}
-                style={{
-                  background: '#2563eb',
-                  color: '#fff',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  border: 'none',
-                }}
-              >
-                삭제
-              </button>
+            <div className="modal-actions">
+              <button onClick={() => setShowEditModal(false)}>취소</button>
+              <button onClick={updateEvent}>저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {showDeleteModal && deleteTarget && (
+        <div className="modal-backdrop">
+          <div className="delete-modal">
+            <h3 className="delete-title">일정 삭제</h3>
+
+            <p className="delete-message">
+              <strong>{deleteTarget.title}</strong> 일정을 삭제할까요?
+              <br />
+              삭제하면 복구할 수 없습니다.
+            </p>
+
+            <div className="delete-actions">
               <button
-                onClick={confirmModal.onCancel}
-                style={{
-                  background: '#9ca3af',
-                  color: '#fff',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  border: 'none',
+                className="btn-cancel"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeleteTarget(null)
                 }}
               >
                 취소
               </button>
+              <button className="btn-delete" onClick={confirmDelete}>
+                삭제
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ⬇ 스타일 ⬇ */}
+      {/* ========================= */}
+      {/*          스타일           */}
+      {/* ========================= */}
       <style jsx>{`
         .page-wrapper {
           width: 100%;
           min-height: 100vh;
           display: flex;
-          flex-direction: column;
-          background: #f5f7fb;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-            sans-serif;
-        }
-
-        .main-section {
-          flex: 1;
-          display: flex;
-          align-items: flex-start;
           justify-content: center;
-          padding-top: 80px;
-          padding-bottom: 40px;
-          box-sizing: border-box;
-          width: 100%;
+          background: #f5f7fb;
         }
 
-        .calendar-column {
-          width: 100%;
-          max-width: 900px;
+        .main-layout {
+          width: 1120px;
           display: flex;
-          flex-direction: column;
-          gap: 18px;
-          margin: 0 auto;
+          gap: 28px;
+          padding: 64px 20px;
         }
 
-        .card {
-          width: 100%;
-          border: 1px solid #dedede;
-          border-radius: 14px;
-          padding: 18px 20px;
-          background: #ffffff;
-          box-sizing: border-box;
+        .calendar-area,
+        .right-panel {
+          background: #fff;
+          border-radius: 16px;
+          padding: 16px;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.07);
         }
 
-        .calendar-card {
-          padding-top: 16px;
+        .calendar-area {
+          flex: 1;
         }
 
-        .calendar-header-row {
+        .right-panel {
+          width: 260px;
+        }
+
+        .month-header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          margin-bottom: 12px;
+          align-items: center;
+          margin-bottom: 10px;
         }
 
-        .calendar-title {
-          margin: 0;
-          font-size: 15px;
-          font-weight: 600;
-        }
-
-        .month-nav-btn {
+        .nav-btn {
           border: none;
-          background: #f2f2f2;
+          background: #f3f4f6;
           border-radius: 999px;
           padding: 6px 12px;
-          font-size: 12px;
           cursor: pointer;
         }
 
-        .month-nav-btn:hover {
-          background: #e5e5e5;
-        }
-
-        .calendar-weekdays {
+        .weekday-row,
+        .grid-calendar {
           display: grid;
           grid-template-columns: repeat(7, 1fr);
-          text-align: center;
-          font-weight: 600;
+        }
+
+        .weekday-row {
           font-size: 12px;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
 
-        .weekday {
-          padding: 4px 0;
+        .grid-calendar {
+          gap: 10px;
         }
 
-        .weekday.sun {
-          color: #e53935;
-        }
-
-        .weekday.sat {
-          color: #1e88e5;
-        }
-
-        .calendar-grid {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 14px;
-        }
-
-        .day-cell {
-          height: 80px;
+        .cell {
+          min-height: 90px;
+          border: 1px solid #e5e7eb;
           border-radius: 12px;
-          border: 1px solid #dedede;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
+          padding: 6px;
           cursor: pointer;
-          padding: 0;
-          box-sizing: border-box;
           position: relative;
-          overflow: hidden;
         }
 
-        .day-cell.sun,
-        .day-cell.holiday {
-          color: #e53935;
-          background: rgba(255, 0, 0, 0.04);
-          border-color: rgba(255, 0, 0, 0.1);
-        }
-
-        .day-cell.sat {
-          color: #1e88e5;
-          background: rgba(30, 136, 229, 0.04);
-          border-color: rgba(30, 136, 229, 0.1);
-        }
-
-        .day-cell.today:not(.selected) {
-          border-color: #111827;
-          border-width: 2px;
-        }
-
-        .day-cell.selected {
-          border: 2px solid #000000;
-        }
-
-        .day-cell.empty {
+        .cell.empty {
           border: none;
-          background: transparent;
-          cursor: default;
         }
 
-        .day-number {
-          font-size: 16px;
-          font-weight: 500;
+        .cell.selected {
+          border: 2px solid #4f46e5;
         }
 
-        .today-badge {
-          position: absolute;
-          top: 4px;
-          right: 6px;
-          font-size: 9px;
-          padding: 1px 4px;
-          border-radius: 999px;
-          background: #111827;
-          color: #ffffff;
-        }
-
-        .holiday-cell-name {
-          margin-top: 2px;
-          font-size: 9px;
-          line-height: 1.2;
-          color: #c62828;
+        .cell-date {
+          font-size: 14px;
           font-weight: 600;
-          text-align: center;
-          width: 100%;
+        }
+
+        .cell-academic {
+          margin-top: 2px;
+          font-size: 10px;
+          padding: 2px 4px;
+          background: #eff6ff;
+          border-radius: 6px;
+          color: #1d4ed8;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
-        .day-title {
-          margin-top: 4px;
-          font-size: 9px;
-          line-height: 1.2;
-          color: #555555;
-          text-align: center;
-          width: 100%;
-          max-height: 24px;
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-        }
-
-        .memo-dot {
+        .dot {
           position: absolute;
           bottom: 6px;
           left: 50%;
           transform: translateX(-50%);
           width: 6px;
           height: 6px;
-          background: #27a9ff;
           border-radius: 50%;
+          background: #0ea5e9;
         }
 
-        .period-tag {
-          margin-top: 2px;
-          font-size: 9px;
-          line-height: 1.2;
-          color: #856404;
-          background: rgba(255, 243, 205, 0.95);
-          border-radius: 999px;
-          padding: 1px 6px;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          border: 1px solid #ffeeba;
-        }
-
-        .period-line {
+        .today-badge {
           position: absolute;
-          bottom: 3px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 70%;
-          height: 3px;
-          border-radius: 999px;
+          top: 6px;
+          right: 6px;
+          background: #111827;
+          color: #fff;
+          font-size: 10px;
+          padding: 2px 4px;
+          border-radius: 6px;
         }
 
-        /* 📌 학사일정 스타일 (캘린더 셀) */
-        .academic-tag {
-          margin-top: 2px;
-          font-size: 9px;
-          line-height: 1.2;
-          padding: 1px 6px;
-          border-radius: 999px;
-          background: rgba(187, 222, 251, 0.8);
-          color: #0d47a1;
-          border: 1px solid #90caf9;
-          max-width: 100%;
-          overflow: hidden;
-          white-space: nowrap;
-          text-overflow: ellipsis;
+        .rp-section-title {
+          margin-top: 10px;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .rp-card.academic {
+          background: #eff6ff;
+          border-radius: 10px;
+          padding: 8px;
+          margin-top: 6px;
+        }
+
+        .rp-card-title {
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .rp-none,
+        .rp-empty {
+          margin-top: 8px;
+          font-size: 13px;
+          color: #9ca3af;
+        }
+
+        .rp-date {
+          font-size: 15px;
+          font-weight: 600;
+        }
+
+        .add-btn {
+          margin: 10px 0;
+          width: 100%;
+          border: none;
+          background: #4f46e5;
+          color: #fff;
+          padding: 8px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 13px;
         }
 
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.35);
+          background: rgba(0, 0, 0, 0.4);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
         }
 
-        .modal-panel {
-          width: 380px;
-          max-width: 92%;
-          background: #ffffff;
+        .modal {
+          background: #fff;
           border-radius: 12px;
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
-          overflow: hidden;
+          padding: 16px;
+          width: 400px;
+          height: 450px;
         }
 
-        .modal-header {
-          padding: 10px 14px;
-          border-bottom: 1px solid #e5e7eb;
+        .modal input {
+          width: 100%;
+          padding: 8px;
+          margin-top: 10px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .modal textarea {
+          width: 100%;
+          min-height: 44px;
+          padding: 8px;
+          margin-top: 8px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          font-size: 13px;
+          resize: none;
+        }
+
+        .time-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
+        }
+
+        .color-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: #f9fafb;
+          margin-top: 8px;
         }
 
-        .modal-title {
-          font-size: 14px;
+        .event-card {
+          background: #ffffff;
+          border-radius: 12px;
+          padding: 10px 12px;
+          margin-top: 8px;
+          border-left: 5px solid #4f46e5;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .event-title {
+          font-size: 13px;
           font-weight: 600;
           color: #111827;
         }
 
-        .modal-close-btn {
-          border: none;
-          background: transparent;
-          font-size: 18px;
-          line-height: 1;
-          cursor: pointer;
+        .event-time {
+          font-size: 11px;
           color: #6b7280;
         }
 
-        .modal-close-btn:hover {
-          color: #111827;
-        }
-
-        .modal-body {
-          padding: 14px 16px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          background: #ffffff;
-        }
-
-        .modal-field {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .modal-label {
+        .event-desc {
           font-size: 12px;
-          font-weight: 500;
           color: #374151;
+          line-height: 1.4;
         }
 
-        .modal-input {
-          border-radius: 6px;
-          border: 1px solid #d1d5db;
-          padding: 7px 9px;
-          font-size: 12px;
-          outline: none;
-          background: #ffffff;
-        }
-
-        .modal-input:focus {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
-        }
-
-        .modal-range-end {
-          margin-top: 4px;
-        }
-
-        .modal-radio-row {
+        .event-header {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 10px;
-          margin-top: 2px;
-          flex-wrap: wrap;
         }
 
-        .modal-radio {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 12px;
-          color: #4b5563;
+        .edit-btn {
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 14px;
+          color: #6b7280;
         }
 
-        .modal-radio input {
-          accent-color: #2563eb;
-        }
-
-        .modal-textarea {
-          border-radius: 6px;
-          border: 1px solid #d1d5db;
-          padding: 8px 9px;
-          font-size: 12px;
-          min-height: 70px;
-          resize: none;
-          outline: none;
-          background: #ffffff;
-        }
-
-        .modal-textarea:focus {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
-        }
-
-        .modal-time-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .modal-time-input {
-          flex: 1;
-        }
-
-        .modal-time-separator {
-          font-size: 12px;
-          color: #4b5563;
-        }
-
-        .modal-color-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+        .edit-btn:hover {
+          color: #111827;
         }
 
         .color-palette {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .color-btn {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          cursor: pointer;
+        }
+
+        .color-btn.selected {
+          border-color: #111827;
+          box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+        }
+
+        /* 🔥 모달 입력 정렬 고정 (핵심) */
+        .modal input,
+        .modal textarea {
+          box-sizing: border-box;
+          text-align: left;
+        }
+
+        /* 🔥 date / time 내부 텍스트 왼쪽 정렬 */
+        .modal input[type='date']::-webkit-datetime-edit,
+        .modal input[type='time']::-webkit-datetime-edit {
+          text-align: left;
+        }
+
+        /* 🔥 아이콘 때문에 더 밀려 보이는 것 방지 */
+        .modal input[type='date'],
+        .modal input[type='time'] {
+          padding-right: 10px;
+        }
+
+        .event-actions {
+          display: flex;
+          gap: 6px; /* 버튼 간격 */
+          align-items: center;
+        }
+
+        .edit-btn.delete {
+          color: #ef4444;
+        }
+
+        .edit-btn.delete:hover {
+          color: #b91c1c;
+        }
+        .mode-toggle {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .mode-toggle button {
+          flex: 1;
+          padding: 6px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          background: #f9fafb;
+          cursor: pointer;
+          font-size: 13px;
+        }
+
+        .mode-toggle button.active {
+          background: #4f46e5;
+          color: #fff;
+          border-color: #4f46e5;
+        }
+
+        .range-row {
           display: flex;
           align-items: center;
           gap: 6px;
         }
 
-        .color-swatch {
-          width: 22px;
-          height: 22px;
-          border-radius: 999px;
-          border: 2px solid transparent;
-          padding: 0;
-          cursor: pointer;
+        /* 🔥 삭제 확인 모달 */
+        .delete-modal {
+          background: #ffffff;
+          border-radius: 14px;
+          padding: 20px;
+          width: 360px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          animation: pop 0.15s ease-out;
         }
 
-        .color-swatch.selected {
-          border-color: #111827;
+        .delete-title {
+          font-size: 16px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          color: #111827;
         }
 
-        .modal-color-reset-btn {
+        .delete-message {
+          font-size: 13px;
+          color: #374151;
+          line-height: 1.5;
+        }
+
+        .delete-message strong {
+          color: #111827;
+        }
+
+        .delete-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .btn-cancel {
           border: none;
-          border-radius: 6px;
-          padding: 6px 10px;
-          font-size: 11px;
-          cursor: pointer;
           background: #f3f4f6;
           color: #374151;
-          white-space: nowrap;
-        }
-
-        .modal-color-reset-btn:hover {
-          background: #e5e7eb;
-        }
-
-        .schedule-list {
+          padding: 8px 12px;
           border-radius: 8px;
-          border: 1px solid #e5e7eb;
-          padding: 6px 8px;
-          max-height: 150px;
-          overflow-y: auto;
-          background: #f9fafb;
-        }
-
-        .schedule-list-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-          padding: 4px 0;
-          border-bottom: 1px solid #e5e7eb;
           cursor: pointer;
+          font-size: 13px;
         }
 
-        .schedule-list-item:last-child {
-          border-bottom: none;
-        }
-
-        .schedule-list-main {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          flex: 1;
-          min-width: 0;
-        }
-
-        .schedule-time {
-          font-size: 11px;
-          color: #6b7280;
-        }
-
-        .schedule-desc {
-          font-size: 12px;
-          color: #111827;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .schedule-list-actions {
-          display: flex;
-          gap: 4px;
-        }
-
-        .schedule-edit-btn,
-        .schedule-delete-btn {
-          border-radius: 6px;
+        .btn-delete {
           border: none;
-          padding: 4px 8px;
-          font-size: 11px;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .schedule-edit-btn {
-          background: #e0f2fe;
-          color: #0369a1;
-        }
-
-        .schedule-edit-btn:hover {
-          background: #bae6fd;
-        }
-
-        .schedule-delete-btn {
-          background: #fee2e2;
-          color: #b91c1c;
-        }
-
-        .schedule-delete-btn:hover {
-          background: #fecaca;
-        }
-
-        .modal-submit-btn {
-          margin-top: 6px;
-          border: none;
-          width: 100%;
+          background: #ef4444;
+          color: #ffffff;
+          padding: 8px 14px;
           border-radius: 8px;
-          padding: 9px 12px;
+          cursor: pointer;
           font-size: 13px;
           font-weight: 600;
-          color: #ffffff;
-          cursor: pointer;
-          background: #2563eb;
         }
 
-        .modal-submit-btn:hover {
-          background: #1d4ed8;
+        .btn-delete:hover {
+          background: #dc2626;
         }
 
-        .modal-delete-btn {
-          margin-top: 4px;
-          border: none;
-          width: 100%;
-          border-radius: 8px;
-          padding: 8px 12px;
-          font-size: 12px;
-          font-weight: 500;
-          color: #b91c1c;
-          cursor: pointer;
-          background: #fee2e2;
+        @keyframes pop {
+          from {
+            transform: scale(0.96);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
 
-        .modal-delete-btn:hover {
-          background: #fecaca;
-        }
-
-        /* 🎓 모달 내 학사일정 리스트 */
-        .academic-list {
-          border-radius: 8px;
-          border: 1px solid #dbeafe;
-          padding: 6px 8px;
-          background: #eff6ff;
-          max-height: 120px;
-          overflow-y: auto;
-        }
-
-        .academic-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 2px 0;
-          font-size: 12px;
-          color: #1d4ed8;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .academic-dot {
-          font-size: 10px;
-          color: #1d4ed8;
-        }
-
-        .academic-title {
-          flex: 1;
-          min-width: 0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
+        /* ===============================
+   📱 Mobile Responsive
+================================ */
 
         @media (max-width: 768px) {
-          .main-section {
-            padding-top: 40px;
-            padding-bottom: 24px;
+          .main-layout {
+            flex-direction: column;
+            width: 100%;
+            padding: 16px;
+            gap: 16px;
           }
 
-          .calendar-column {
-            max-width: 100%;
-            padding: 0 12px;
+          .calendar-area,
+          .right-panel {
+            width: 100%;
+            padding: 12px;
+            border-radius: 14px;
+          }
+
+          /* ===== 🔥 모달 덮어쓰기 (핵심) ===== */
+          .modal {
+            width: 100%;
+            height: auto;
+            max-height: 75vh; /* 🔥 90 → 75 */
+            border-radius: 16px 16px 0 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            overflow-y: auto;
+            padding: 12px 14px 20px; /* 🔥 padding 축소 */
+          }
+          .modal-backdrop {
+            align-items: flex-end;
+          }
+
+          /* ===== 기타 모바일 조정 ===== */
+          .cell {
+            min-height: 70px;
+            padding: 4px;
+          }
+
+          .cell-date {
+            font-size: 12px;
+          }
+
+          .add-btn {
+            padding: 10px;
+            font-size: 14px;
           }
         }
       `}</style>

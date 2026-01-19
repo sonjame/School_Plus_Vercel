@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const API_KEY = '32cbd596f1b64e7abc94e1eb85ca5a06'
 
@@ -21,8 +22,6 @@ export default function SignupPage() {
   const [eduCode, setEduCode] = useState('')
   const [level, setLevel] = useState('')
   const [grade, setGrade] = useState('1학년')
-
-  const [users, setUsers] = useState<any[]>([])
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -34,34 +33,91 @@ export default function SignupPage() {
   // ⭐ 아이디 중복체크 관련
   const [idAvailable, setIdAvailable] = useState<boolean | null>(null)
 
+  const [verifiedEmail, setVerifiedEmail] = useState('')
+
+  useEffect(() => {
+    const email = searchParams.get('email')
+    if (email) {
+      setVerifiedEmail(email)
+    }
+  }, [searchParams])
+
+  // 🔐 비밀번호 검증 함수 (여기에 추가)
+  const validatePassword = (pw: string) => {
+    const minLength = pw.length >= 6
+    const hasLetter = /[a-zA-Z]/.test(pw)
+    const hasNumber = /[0-9]/.test(pw)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pw)
+
+    return {
+      valid: minLength && hasLetter && hasNumber && hasSpecial,
+      minLength,
+      hasLetter,
+      hasNumber,
+      hasSpecial,
+    }
+  }
+
+  // 🔐 아이디 검증 함수
+  const validateUsername = (id: string) => {
+    const regex = /^(?=.*[a-z])(?=.*[0-9])[a-z0-9]{5,20}$/
+    return regex.test(id)
+  }
+
+  // 🔎 비밀번호 조건 체크 결과
+  const passwordCheck = validatePassword(password)
+
+  // 🔎 아이디 조건 체크 결과
+  const usernameCheck = {
+    length: username.length >= 5,
+    hasLetter: /[a-z]/.test(username),
+    hasNumber: /[0-9]/.test(username),
+    valid: validateUsername(username),
+  }
+
   // 소셜 정보 로드
   useEffect(() => {
     const socialName = searchParams.get('name')
-    const socialEmail = searchParams.get('email')
-    const socialId = searchParams.get('id')
+    const socialEmail = searchParams.get('social_email')
 
-    if (socialName && socialEmail && socialId) {
+    const socialId = searchParams.get('id') || searchParams.get('social_id')
+
+    if (socialName && socialId) {
       localStorage.setItem(
         'socialUser',
         JSON.stringify({
           id: socialId,
           name: socialName,
-          email: socialEmail,
+          email: socialEmail || null, // 이메일 없어도 OK
         })
       )
     }
   }, [searchParams])
 
-  // 기존 유저 불러오기
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('users') || '[]')
-    setUsers(saved)
-  }, [])
-
   // 인증 여부 확인
   useEffect(() => {
-    const v = searchParams.get('verified')
-    setVerified(v === '1')
+    // 🔴 이미 가입된 경우 → 회원가입 로직 타면 안 됨
+    if (searchParams.get('already') === '1') return
+
+    const verifiedParam = searchParams.get('verified')
+    const provider = searchParams.get('provider')
+
+    if (verifiedParam === '1' || provider === 'kakao') {
+      setVerified(true)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (searchParams.get('already') === '1') {
+      setModalMessage('이미 카카오로 가입된 계정입니다.\n로그인해주세요.')
+      setShowModal(true)
+
+      // 1.5초 뒤 로그인 페이지로 이동
+      setTimeout(() => {
+        setShowModal(false)
+        window.location.href = '/auth/login'
+      }, 1500)
+    }
   }, [searchParams])
 
   // 공통 alert
@@ -72,9 +128,14 @@ export default function SignupPage() {
   }
 
   // 인증
-  const handleKakaoAuth = () => (window.location.href = '/api/auth/kakao')
+  const handleKakaoAuth = () =>
+    (window.location.href = '/api/auth/kakao?mode=signup')
+
   const handleGoogleAuth = () => (window.location.href = '/api/auth/google')
-  const handleEmailAuth = () => (window.location.href = '/auth/email')
+  const handleEmailAuth = () => {
+    localStorage.removeItem('socialUser') // 🔥 핵심
+    window.location.href = '/auth/email'
+  }
 
   // ⭐ 학교 검색
   const searchSchool = async (keyword: string) => {
@@ -113,27 +174,58 @@ export default function SignupPage() {
   }
 
   // ⭐ 아이디 중복확인
-  const checkDuplicateId = () => {
+  const checkDuplicateId = async () => {
     if (!username.trim()) {
       showAlert('아이디를 입력해주세요.')
       return
     }
 
-    const exists = users.some((u) => u.username === username)
+    try {
+      const res = await fetch(`/api/auth/check-id?username=${username}`)
 
-    if (exists) {
-      setIdAvailable(false)
-      showAlert('이미 사용 중인 아이디입니다.')
-    } else {
-      setIdAvailable(true)
-      showAlert('사용 가능한 아이디입니다!')
+      if (!res.ok) {
+        showAlert('아이디 중복 확인 중 서버 오류가 발생했습니다.')
+        return
+      }
+
+      const text = await res.text()
+      if (!text) {
+        showAlert('서버 응답이 없습니다.')
+        return
+      }
+
+      const data = JSON.parse(text)
+
+      if (data.available) {
+        setIdAvailable(true)
+        showAlert('사용 가능한 아이디입니다!')
+      } else {
+        setIdAvailable(false)
+        showAlert('이미 사용 중인 아이디입니다.')
+      }
+    } catch (err) {
+      console.error(err)
+      showAlert('아이디 중복 확인 중 오류가 발생했습니다.')
     }
   }
 
   // 제출 전 체크
   const handleSubmit = () => {
-    if (!realName || !username || !password || !password2 || !school) {
+    if (!realName || !username || !school) {
       showAlert('모든 정보를 입력해주세요.')
+      return
+    }
+
+    // 🔥 여기 추가
+    if (!validateUsername(username)) {
+      showAlert(
+        '아이디는 5~20자의 영문 소문자와 숫자를 섞어서 입력해야 합니다.'
+      )
+      return
+    }
+
+    if (!verified) {
+      showAlert('이메일 또는 소셜 인증을 먼저 해주세요.')
       return
     }
 
@@ -153,36 +245,52 @@ export default function SignupPage() {
       return
     }
 
+    if (!passwordCheck.valid) {
+      showAlert('비밀번호는 6자 이상, 영문/숫자/특수문자를 포함해야 합니다.')
+      return
+    }
+
     setShowConfirm(true)
   }
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
     const social = JSON.parse(localStorage.getItem('socialUser') || '{}')
 
-    const newUser = {
+    const body = {
       username,
       password,
       name: realName,
-      email: social.email || '',
-      social_id: social.id || null,
+      email: verifiedEmail || null,
+      social_id: social.id || null, // ⭐⭐⭐ 이 줄 추가 (핵심)
       school,
       schoolCode,
       eduCode,
       level,
       grade,
-      verified_student: false,
     }
 
-    const updated = [...users, newUser]
-    localStorage.setItem('users', JSON.stringify(updated))
+    // 🔑 일반 회원만 비밀번호 포함
+    if (!social.id) {
+      body.password = password
+    }
 
-    // 🔥 급식 / 학사일정에서 사용할 데이터 저장
-    localStorage.setItem('userSchool', school)
-    localStorage.setItem('eduCode', eduCode)
-    localStorage.setItem('schoolCode', schoolCode)
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
 
-    showAlert('회원가입 완료!')
-    setTimeout(() => (window.location.href = '/auth/login'), 1500)
+    if (res.ok) {
+      showAlert('회원가입 완료!')
+      localStorage.removeItem('socialUser')
+      setTimeout(() => {
+        window.location.href = '/auth/login'
+      }, 1500)
+    } else {
+      const err = await res.json()
+      console.error(err)
+      showAlert(err.message || '회원가입 실패')
+    }
   }
 
   // 스타일
@@ -203,6 +311,21 @@ export default function SignupPage() {
     outlineColor: '#4FC3F7',
     boxSizing: 'border-box',
   }
+
+  const KakaoIcon = ({ size = 22 }: { size?: number }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12 3C6.477 3 2 6.373 2 10.534c0 2.675 1.91 5.033 4.82 6.38l-1.05 3.91c-.1.38.33.68.67.47l4.56-3.05c.33.03.67.05 1 .05 5.523 0 10-3.373 10-7.536C22 6.373 17.523 3 12 3z"
+        fill="#3C1E1E"
+      />
+    </svg>
+  )
 
   return (
     <>
@@ -236,18 +359,16 @@ export default function SignupPage() {
             </p>
 
             <button onClick={handleKakaoAuth} className="auth-btn kakao">
-              <img
-                src="https://upload.wikimedia.org/wikipedia/commons/e/e3/KakaoTalk_logo.svg"
-                alt="kakao"
-                className="auth-icon"
-              />
+              <KakaoIcon size={22} />
               카카오로 계속하기
             </button>
 
             <button onClick={handleGoogleAuth} className="auth-btn google">
-              <img
+              <Image
                 src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                 alt="google"
+                width={22}
+                height={22}
                 className="auth-icon"
               />
               Google로 계속하기
@@ -274,6 +395,20 @@ export default function SignupPage() {
               📝 회원가입
             </h2>
 
+            {verifiedEmail && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: '#2E7D32',
+                  marginBottom: '10px',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                }}
+              >
+                📧 인증된 이메일: {verifiedEmail}
+              </p>
+            )}
+
             {/* 실명 */}
             <input
               style={inputStyle}
@@ -289,17 +424,31 @@ export default function SignupPage() {
                 placeholder="아이디를 입력하세요"
                 value={username}
                 onChange={(e) => {
-                  setUsername(e.target.value)
-                  setIdAvailable(null)
+                  const value = e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, '')
+                  setUsername(value)
+                  setIdAvailable(null) // 아이디 바뀌면 중복확인 무효
                 }}
               />
+
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginTop: '4px',
+                }}
+              >
+                ※ 아이디는 <strong>영문 소문자(a–z)</strong>와{' '}
+                <strong>숫자(0–9)</strong>만 입력할 수 있습니다.
+              </p>
 
               <button
                 onClick={checkDuplicateId}
                 style={{
                   position: 'absolute',
                   right: '8px',
-                  top: '50%',
+                  top: '35%',
                   transform: 'translateY(-50%)',
                   padding: '8px 10px',
                   background: '#4FC3F7',
@@ -314,6 +463,46 @@ export default function SignupPage() {
                 중복확인
               </button>
             </div>
+
+            {/* 🔐 아이디 조건 안내 */}
+            {username.length > 0 && (
+              <ul
+                style={{
+                  fontSize: '12px',
+                  marginTop: '6px',
+                  paddingLeft: '18px',
+                }}
+              >
+                <li
+                  style={{
+                    color: usernameCheck.length ? '#2E7D32' : '#D32F2F',
+                  }}
+                >
+                  5자 이상
+                </li>
+                <li
+                  style={{
+                    color: usernameCheck.hasLetter ? '#2E7D32' : '#D32F2F',
+                  }}
+                >
+                  영문/숫자 포함
+                </li>
+              </ul>
+            )}
+
+            {/* ✅ 아이디 조건 만족 메시지 */}
+            {username.length > 0 && usernameCheck.valid && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#2E7D32',
+                  fontWeight: 600,
+                }}
+              >
+                ✅ 아이디 조건을 만족합니다.
+              </p>
+            )}
 
             {/* 중복확인 결과 */}
             {idAvailable === true && (
@@ -354,6 +543,53 @@ export default function SignupPage() {
                 {showPassword ? '🙈' : '👁️'}
               </span>
             </div>
+
+            {/* 🔐 비밀번호 조건 안내 */}
+            {password.length > 0 && (
+              <ul
+                style={{
+                  fontSize: '12px',
+                  marginTop: '6px',
+                  paddingLeft: '18px',
+                }}
+              >
+                <li
+                  style={{
+                    color: passwordCheck.minLength ? '#2E7D32' : '#D32F2F',
+                  }}
+                >
+                  6자 이상
+                </li>
+                <li
+                  style={{
+                    color: passwordCheck.hasLetter ? '#2E7D32' : '#D32F2F',
+                  }}
+                >
+                  영문/숫자 포함
+                </li>
+                <li
+                  style={{
+                    color: passwordCheck.hasSpecial ? '#2E7D32' : '#D32F2F',
+                  }}
+                >
+                  {'특수문자 포함(!@#$%^&*(),.?":{}|<>)'}
+                </li>
+              </ul>
+            )}
+
+            {/* ✅ 비밀번호 조건 만족 메시지 */}
+            {password.length > 0 && passwordCheck.valid && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#2E7D32',
+                  fontWeight: 600,
+                }}
+              >
+                ✅ 비밀번호 조건을 만족합니다.
+              </p>
+            )}
 
             <input
               type="password"

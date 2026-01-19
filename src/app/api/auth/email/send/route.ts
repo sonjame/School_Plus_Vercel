@@ -1,31 +1,35 @@
-import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { NextResponse } from 'next/server'
+import nodemailer from 'nodemailer'
+import { emailStore } from '@/src/lib/emailStore'
 
-export const runtime = "nodejs"; // nodemailer는 edge에서 안됨
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-    const { email } = await req.json();
+  const { email } = await req.json()
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+  if (!email) {
+    return NextResponse.json({ success: false })
+  }
 
-    // Gmail SMTP
-    const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.EMAIL_USER!,
-            pass: process.env.EMAIL_PASS!,
-        },
-    });
+  const code = Math.floor(100000 + Math.random() * 900000).toString()
 
-    await transporter.sendMail({
-        from: process.env.EMAIL_USER!,
-        to: email,
-        subject: "학교 커뮤니티 앱 이메일 인증코드",
-        text: `인증코드: ${code}`,
-    });
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER!,
+      pass: process.env.EMAIL_PASS!,
+    },
+  })
 
-    // 코드 저장 (임시)
-    globalThis.emailVerifyCode = code;
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER!,
+    to: email,
+    subject: '학교 커뮤니티 앱 이메일 인증코드',
+    text: `인증코드: ${code}`,
+  })
 
-    return NextResponse.json({ success: true });
+  // ✅ 이메일별 코드 저장
+  emailStore.set(email, code)
+
+  return NextResponse.json({ success: true })
 }

@@ -18,6 +18,7 @@ interface Post {
 
 // ⬇️ startTime(시간) 필드 포함
 interface HomeCalendarItem {
+  date: string
   dateLabel: string
   event: string
   ddayLabel: string
@@ -27,11 +28,29 @@ interface HomeCalendarItem {
   startTime?: string // "HH:MM"
 }
 
+type DBEvent = {
+  id: number
+  title: string
+  event_date: string
+  start_time?: string
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<string | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [today, setToday] = useState<string>('')
   const [calendar, setCalendar] = useState<HomeCalendarItem[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+
+  const CATEGORY_TABS = [
+    { key: 'all', label: '전체' },
+    { key: 'free', label: '자유게시판' },
+    { key: 'promo', label: '홍보게시판' },
+    { key: 'club', label: '동아리게시판' },
+    { key: 'grade1', label: '1학년게시판' },
+    { key: 'grade2', label: '2학년게시판' },
+    { key: 'grade3', label: '3학년게시판' },
+  ]
 
   // 🔵 추가된 부분: 추천도서 표시 여부
   const [showRecommend, setShowRecommend] = useState(false)
@@ -43,30 +62,44 @@ export default function HomePage() {
     /* ==========================================
        🔥 A 방식: 모든 게시판 데이터 합치기
     ========================================== */
-    const boardKeys = [
-      'board_free',
-      'board_promo',
-      'board_club',
-      'board_grade1',
-      'board_grade2',
-      'board_grade3',
-    ]
+    async function loadPopularPosts() {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
 
-    let allPosts: Post[] = []
+      const categories = ['free', 'promo', 'club', 'grade1', 'grade2', 'grade3']
+      let merged: Post[] = []
 
-    boardKeys.forEach((key) => {
-      const list = JSON.parse(localStorage.getItem(key) || '[]')
-      allPosts = [...allPosts, ...list]
-    })
+      for (const cat of categories) {
+        const res = await fetch(`/api/posts?category=${cat}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
 
-    // 최신순 정렬
-    allPosts.sort((a, b) => b.createdAt - a.createdAt)
-    setPosts(allPosts)
+        if (!res.ok) continue
+
+        const posts: Post[] = await res.json()
+
+        // 👍 각 카테고리에서 좋아요 기준 상위 1~5개만
+        const top = posts
+          .sort((a, b) => (b.likes || 0) - (a.likes || 0))
+          .slice(0, 5)
+
+        merged.push(...top)
+      }
+
+      // 전체에서 다시 인기순 정렬
+      merged.sort((a, b) => (b.likes || 0) - (a.likes || 0))
+
+      // 홈에는 최대 3~5개만
+      setPosts(merged)
+    }
+    loadPopularPosts()
 
     /* ==========================================
        📆 오늘 요일
     ========================================== */
-    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+    const dayNames = ['월', '화', '수', '목', '금']
     const now = new Date()
     setToday(`${dayNames[now.getDay()]}요일`)
 
@@ -74,104 +107,126 @@ export default function HomePage() {
        📅 홈 캘린더 일정 불러오기
        👉 이번 주(월~일) 안 + 오늘 이후 일정만
     ========================================== */
-    try {
-      /* 🔹 기존 일정 읽기 */
-      const rawCalendar =
-        localStorage.getItem('calendarEvents') ||
-        localStorage.getItem('calendar_events')
+    async function loadHomeCalendar() {
+      try {
+        const userId = localStorage.getItem('userId')
+        if (!userId) return
 
-      /* 🔹 학사일정 읽기 */
-      const rawAcademic = localStorage.getItem('academicEvents')
+        const eduCode = localStorage.getItem('eduCode')
+        const schoolCode = localStorage.getItem('schoolCode')
 
-      let events: { date: string; title: string; startTime?: string }[] = []
+        const today = new Date()
+        const msPerDay = 1000 * 60 * 60 * 24
 
-      // calendarEvents 병합
-      if (rawCalendar) {
-        const parsed = JSON.parse(rawCalendar)
-        if (Array.isArray(parsed)) {
-          events = [...parsed]
+        const todayZero = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+        ).getTime()
+
+        const weekday = today.getDay()
+        const diffToMonday = (weekday + 6) % 7
+        const weekStart = todayZero - diffToMonday * msPerDay
+        const weekEnd = weekStart + 6 * msPerDay
+
+        const dayNames = ['월', '화', '수', '목', '금']
+        let list: HomeCalendarItem[] = []
+
+        /* ======================
+       🔹 내 일정
+    ====================== */
+        const res = await fetch(
+          `/api/calendar-events?userId=${userId}`,
+          { credentials: 'include' }, // 🔥 중요
+        )
+
+        if (res.ok) {
+          const rows: DBEvent[] = await res.json()
+
+          rows.forEach((ev) => {
+            const dateKey = ev.event_date.slice(0, 10)
+            const [y, m, d] = dateKey.split('-').map(Number)
+            const dateZero = new Date(y, m - 1, d).getTime()
+
+            if (dateZero < todayZero) return
+            if (dateZero < weekStart || dateZero > weekEnd) return
+
+            const diffDays = Math.floor((dateZero - todayZero) / msPerDay)
+            const weekdayIndex = new Date(y, m - 1, d).getDay()
+
+            list.push({
+              date: dateKey,
+              dateLabel: `${m}월 ${d}일 (${dayNames[weekdayIndex]})`,
+              event: ev.title,
+              ddayLabel: diffDays === 0 ? 'D-Day' : `D-${diffDays}`,
+              diffDays,
+              weekdayIndex,
+              weekdayLabel: dayNames[weekdayIndex],
+              startTime: ev.start_time,
+            })
+          })
         }
-      }
 
-      // academicEvents 병합 (📌 학사일정은 dictionary 구조라서 flatten 해야 함)
-      if (rawAcademic) {
-        const schoolMap = JSON.parse(rawAcademic) // { "2025-05-01": [ {title}, ... ] }
+        /* ======================
+       🔹 학사일정
+    ====================== */
+        if (eduCode && schoolCode) {
+          const acaRes = await fetch(
+            `/api/academic-events?eduCode=${eduCode}&schoolCode=${schoolCode}&year=${today.getFullYear()}&month=${today.getMonth() + 1}`,
+          )
 
-        Object.keys(schoolMap).forEach((date) => {
-          const dayEvents = schoolMap[date]
-          if (Array.isArray(dayEvents)) {
-            dayEvents.forEach((ev) =>
-              events.push({
-                date,
-                title: ev.title,
-                startTime: ev.startTime,
+          if (acaRes.ok) {
+            const aca = await acaRes.json()
+
+            aca.forEach((ev: any) => {
+              const [y, m, d] = ev.date.split('-').map(Number)
+              const dateZero = new Date(y, m - 1, d).getTime()
+
+              if (dateZero < todayZero) return
+              if (dateZero < weekStart || dateZero > weekEnd) return
+
+              const diffDays = Math.floor((dateZero - todayZero) / msPerDay)
+              const weekdayIndex = new Date(y, m - 1, d).getDay()
+
+              list.push({
+                date: ev.date,
+                dateLabel: `${m}월 ${d}일 (${dayNames[weekdayIndex]})`,
+                event: ev.title,
+                ddayLabel: diffDays === 0 ? 'D-Day' : `D-${diffDays}`,
+                diffDays,
+                weekdayIndex,
+                weekdayLabel: dayNames[weekdayIndex],
               })
-            )
+            })
           }
-        })
+        }
+
+        list.sort((a, b) =>
+          a.diffDays === b.diffDays
+            ? timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+            : a.diffDays - b.diffDays,
+        )
+
+        setCalendar(list)
+      } catch (err) {
+        console.error('홈 캘린더 로드 실패:', err)
+        setCalendar([])
       }
-
-      const todayDate = new Date()
-      const msPerDay = 1000 * 60 * 60 * 24
-
-      const todayZero = new Date(
-        todayDate.getFullYear(),
-        todayDate.getMonth(),
-        todayDate.getDate()
-      ).getTime()
-
-      const todayWeekday = todayDate.getDay()
-      const diffToMonday = (todayWeekday + 6) % 7
-      const weekStartZero = todayZero - diffToMonday * msPerDay
-      const weekEndZero = weekStartZero + 6 * msPerDay
-
-      const upcoming: HomeCalendarItem[] = []
-      const dayNames2 = ['일', '월', '화', '수', '목', '금', '토']
-
-      for (const ev of events) {
-        if (!ev || !ev.date || !ev.title) continue
-
-        const parts = ev.date.split('-').map(Number)
-        if (parts.length !== 3) continue
-        const [y, m, d] = parts
-        if (!y || !m || !d) continue
-
-        const dateObj = new Date(y, m - 1, d)
-        const dateZero = new Date(y, m - 1, d).getTime()
-        if (Number.isNaN(dateZero)) continue
-
-        if (dateZero < todayZero) continue
-        if (dateZero < weekStartZero || dateZero > weekEndZero) continue
-
-        const diffDays = Math.floor((dateZero - todayZero) / msPerDay)
-        const weekdayIndex = dateObj.getDay()
-        const weekdayLabel = dayNames2[weekdayIndex]
-
-        upcoming.push({
-          dateLabel: `${m}월 ${d}일 (${weekdayLabel})`,
-          event: ev.title,
-          ddayLabel: diffDays === 0 ? 'D-Day' : `D-${diffDays}`,
-          diffDays,
-          weekdayIndex,
-          weekdayLabel,
-          startTime: ev.startTime,
-        })
-      }
-
-      upcoming.sort((a, b) => a.diffDays - b.diffDays)
-      setCalendar(upcoming)
-    } catch (e) {
-      console.warn('홈 화면 일정 로드 오류:', e)
-      setCalendar([])
     }
+    loadHomeCalendar()
   }, [])
 
   /* ==========================================
      🔥 인기 게시물 3개
   ========================================== */
-  const popularPosts = [...posts]
-    .sort((a, b) => (b.likes || 0) - (a.likes || 0))
-    .slice(0, 3)
+  const popularPosts = [...posts].sort(
+    (a, b) => (b.likes || 0) - (a.likes || 0),
+  )
+
+  const filteredPopularPosts =
+    selectedCategory === 'all'
+      ? popularPosts
+      : popularPosts.filter((p) => p.category === selectedCategory)
 
   /* ==========================================
      📆 오늘 & 이번주 일정 분리
@@ -187,11 +242,8 @@ export default function HomePage() {
   }
 
   const sortedTodayItems = [...todayItems].sort(
-    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime),
   )
-
-  const visibleTodayItems = sortedTodayItems.slice(0, 3)
-  const extraTodayCount = Math.max(sortedTodayItems.length - 3, 0)
 
   const sortedWeekItems = [...weekItems].sort((a, b) => {
     if (a.diffDays === b.diffDays) {
@@ -199,9 +251,6 @@ export default function HomePage() {
     }
     return a.diffDays - b.diffDays
   })
-
-  const visibleWeekItems = sortedWeekItems.slice(0, 3)
-  const extraWeekCount = Math.max(sortedWeekItems.length - 3, 0)
 
   return (
     <div
@@ -224,7 +273,7 @@ export default function HomePage() {
           textAlign: 'center',
         }}
       >
-        💙 학교 커뮤니티 메인 💙
+        School Plus
       </h2>
 
       <p
@@ -293,65 +342,61 @@ export default function HomePage() {
           <>
             <div
               style={{
-                display: 'grid',
+                display: 'flex',
                 gap: '12px',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                overflowX: sortedTodayItems.length > 3 ? 'auto' : 'visible',
+                paddingBottom: '6px',
               }}
             >
-              {visibleTodayItems.map((item, idx) => (
-                <div
+              {sortedTodayItems.map((item, idx) => (
+                <Link
                   key={idx}
+                  href={`/calendar?date=${item.date}`}
                   style={{
-                    backgroundColor: '#E1F5FE',
-                    borderRadius: '14px',
-                    padding: '14px 16px',
-                    fontSize: 'clamp(13px, 2.2vw, 15px)',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    flex: '0 0 325px', // 🔥 카드 고정 폭
                   }}
                 >
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 6,
+                      backgroundColor: '#E1F5FE',
+                      borderRadius: '14px',
+                      padding: '14px 16px',
+                      cursor: 'pointer',
                     }}
                   >
-                    <strong style={{ color: '#0277BD' }}>
-                      {item.dateLabel}
-                    </strong>
-                    <span
+                    <div
                       style={{
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        color: '#c62828',
-                        padding: '3px 10px',
-                        borderRadius: '999px',
-                        background: '#ffebee',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 6,
                       }}
                     >
-                      {item.ddayLabel}
-                    </span>
+                      <strong style={{ color: '#0277BD' }}>
+                        {item.dateLabel}
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#c62828',
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          background: '#ffebee',
+                        }}
+                      >
+                        {item.ddayLabel}
+                      </span>
+                    </div>
+                    <p style={{ marginTop: '2px', color: '#555' }}>
+                      {item.event}
+                    </p>
                   </div>
-                  <p style={{ marginTop: '2px', color: '#555' }}>
-                    {item.event}
-                  </p>
-                </div>
+                </Link>
               ))}
             </div>
-
-            {extraTodayCount > 0 && (
-              <div
-                style={{
-                  marginTop: '8px',
-                  textAlign: 'right',
-                  fontSize: '13px',
-                  color: '#555',
-                  fontWeight: 600,
-                }}
-              >
-                + 외 {extraTodayCount}개
-              </div>
-            )}
           </>
         )}
       </section>
@@ -368,7 +413,7 @@ export default function HomePage() {
             marginBottom: '14px',
           }}
         >
-          📅 일정
+          📅 이번 주 일정
         </h3>
 
         {sortedWeekItems.length === 0 ? (
@@ -379,65 +424,61 @@ export default function HomePage() {
           <>
             <div
               style={{
-                display: 'grid',
+                display: 'flex',
                 gap: '12px',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                overflowX: sortedWeekItems.length > 3 ? 'auto' : 'visible',
+                paddingBottom: '6px',
               }}
             >
-              {visibleWeekItems.map((item, idx) => (
-                <div
+              {sortedWeekItems.map((item, idx) => (
+                <Link
                   key={idx}
+                  href={`/calendar?date=${item.date}`}
                   style={{
-                    backgroundColor: '#E1F5FE',
-                    borderRadius: '14px',
-                    padding: '14px 16px',
-                    fontSize: 'clamp(13px, 2.2vw, 15px)',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    flex: '0 0 325px', // 🔥 카드 고정 폭
                   }}
                 >
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 6,
+                      backgroundColor: '#E1F5FE',
+                      borderRadius: '14px',
+                      padding: '14px 16px',
+                      cursor: 'pointer',
                     }}
                   >
-                    <strong style={{ color: '#0277BD' }}>
-                      {item.dateLabel}
-                    </strong>
-                    <span
+                    <div
                       style={{
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        color: '#c62828',
-                        padding: '3px 10px',
-                        borderRadius: '999px',
-                        background: '#ffebee',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 6,
                       }}
                     >
-                      {item.ddayLabel}
-                    </span>
+                      <strong style={{ color: '#0277BD' }}>
+                        {item.dateLabel}
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#c62828',
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          background: '#ffebee',
+                        }}
+                      >
+                        {item.ddayLabel}
+                      </span>
+                    </div>
+                    <p style={{ marginTop: '2px', color: '#555' }}>
+                      {item.event}
+                    </p>
                   </div>
-                  <p style={{ marginTop: '2px', color: '#555' }}>
-                    {item.event}
-                  </p>
-                </div>
+                </Link>
               ))}
             </div>
-
-            {extraWeekCount > 0 && (
-              <div
-                style={{
-                  marginTop: '8px',
-                  textAlign: 'right',
-                  fontSize: '13px',
-                  color: '#555',
-                  fontWeight: 600,
-                }}
-              >
-                + 외 {extraWeekCount}개
-              </div>
-            )}
           </>
         )}
       </section>
@@ -478,152 +519,240 @@ export default function HomePage() {
           🔥 인기 게시물
         </h3>
 
+        {/* 🔘 게시판 선택 버튼 */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'wrap',
+            marginBottom: '14px',
+          }}
+        >
+          {CATEGORY_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setSelectedCategory(tab.key)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '999px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 600,
+                background:
+                  selectedCategory === tab.key ? '#4FC3F7' : '#E1F5FE',
+                color: selectedCategory === tab.key ? 'white' : '#0277BD',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {popularPosts.length === 0 ? (
           <p style={{ color: '#888' }}>아직 게시글이 없습니다.</p>
         ) : (
-          popularPosts.map((p) => {
-            const categoryNames: Record<string, string> = {
-              free: '자유',
-              promo: '홍보',
-              club: '동아리',
-              grade1: '1학년',
-              grade2: '2학년',
-              grade3: '3학년',
-            }
+          <div
+            style={{
+              maxHeight: '420px', // 🔥 카드 3개 정도 높이
+              overflowY: filteredPopularPosts.length > 3 ? 'auto' : 'visible',
+              paddingRight: '6px',
+            }}
+          >
+            {filteredPopularPosts.map((p) => {
+              const categoryNames: Record<string, string> = {
+                free: '자유',
+                promo: '홍보',
+                club: '동아리',
+                grade1: '1학년',
+                grade2: '2학년',
+                grade3: '3학년',
+              }
 
-            return (
-              <Link
-                href={`/board/post/${p.id}`}
-                key={p.id}
-                style={{ textDecoration: 'none', color: 'inherit' }}
-              >
-                <div
-                  style={{
-                    backgroundColor: 'white',
-                    border: '2px solid #E1F5FE',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    marginBottom: '14px',
-                    transition: '0.2s',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = '#E1F5FE')
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = 'white')
-                  }
+              return (
+                <Link
+                  href={`/board/post/${p.id}`}
+                  key={p.id}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
                 >
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '4px 10px',
-                      backgroundColor: '#4FC3F7',
-                      color: 'white',
-                      borderRadius: '6px',
-                      fontSize: 'clamp(11px, 2vw, 13px)',
-                      fontWeight: 600,
-                      marginBottom: '8px',
-                    }}
-                  >
-                    {categoryNames[p.category || ''] || '기타'}
-                  </span>
-
-                  <h4
-                    style={{
-                      fontSize: 'clamp(14px, 3vw, 17px)',
-                      fontWeight: 600,
-                      color: '#333',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    {p.title}
-                  </h4>
-
-                  <p
-                    style={{
-                      fontSize: 'clamp(12px, 2.3vw, 14px)',
-                      color: '#555',
-                      overflow: 'hidden',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      whiteSpace: 'normal',
-                    }}
-                  >
-                    {p.content}
-                  </p>
-
                   <div
                     style={{
-                      fontSize: 'clamp(11px, 2vw, 13px)',
-                      color: '#777',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginTop: '8px',
+                      backgroundColor: 'white',
+                      border: '2px solid #E1F5FE',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      marginBottom: '14px',
+                      transition: '0.2s',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
                     }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = '#E1F5FE')
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = 'white')
+                    }
                   >
-                    <span>작성자: {p.author}</span>
-                    <span>💙 {p.likes || 0}</span>
+                    {/* ⬇️ 기존 카드 내용 그대로 */}
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        backgroundColor: '#4FC3F7',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: 'clamp(11px, 2vw, 13px)',
+                        fontWeight: 600,
+                        marginBottom: '8px',
+                      }}
+                    >
+                      {categoryNames[p.category || ''] || '기타'}
+                    </span>
+
+                    <h4
+                      style={{
+                        fontSize: 'clamp(14px, 3vw, 17px)',
+                        fontWeight: 600,
+                        color: '#333',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {p.title}
+                    </h4>
+
+                    <p
+                      style={{
+                        fontSize: 'clamp(12px, 2.3vw, 14px)',
+                        color: '#555',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {p.content}
+                    </p>
+
+                    <div
+                      style={{
+                        fontSize: 'clamp(11px, 2vw, 13px)',
+                        color: '#777',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginTop: '8px',
+                      }}
+                    >
+                      <span>작성자: {p.author}</span>
+                      <span>💙 {p.likes || 0}</span>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            )
-          })
+                </Link>
+              )
+            })}
+          </div>
         )}
       </section>
     </div>
   )
 }
 
+function getSavedTerm(): { year: number; semester: '1학기' | '2학기' } {
+  const raw = localStorage.getItem('current_timetable_term')
+  if (!raw) {
+    const month = new Date().getMonth() + 1
+    return {
+      year: new Date().getFullYear(),
+      semester: month >= 3 && month <= 8 ? '1학기' : '2학기',
+    }
+  }
+  return JSON.parse(raw)
+}
+
 /* ======================================================
    📘 TodayTimetable (오늘 시간표)
 ====================================================== */
-function TodayTimetable({ today }: { today: string }) {
-  const [todayList, setTodayList] = useState<any[] | null>(null)
 
-  const subjectColors: Record<string, string> = {
-    국어: '#FFCDD2',
-    수학: '#BBDEFB',
-    영어: '#C8E6C9',
-    과학: '#D1C4E9',
-    사회: '#FFE0B2',
-    체육: '#B3E5FC',
-    음악: '#F8BBD0',
-    미술: '#DCEDC8',
-    자율: '#FFF9C4',
-    default: '#F5F5F5',
-  }
+const SUBJECT_COLORS: Record<string, string> = {
+  국어: '#FFCDD2',
+  수학: '#BBDEFB',
+  영어: '#C8E6C9',
+  통합과학: '#D1C4E9',
+  과학탐구실험: '#D1C4E9',
+  통합사회: '#FFE0B2',
+  체육: '#B3E5FC',
+  음악: '#F8BBD0',
+  미술: '#DCEDC8',
+  자율학습: '#FFF9C4',
+  한국사: '#E0E0E0',
+}
+
+const generatePastelColor = () =>
+  `hsl(${Math.floor(Math.random() * 360)}, 70%, 85%)`
+
+const getSubjectColor = (subject: string) => {
+  if (SUBJECT_COLORS[subject]) return SUBJECT_COLORS[subject]
+
+  const saved = localStorage.getItem(`subject-color-${subject}`)
+  if (saved) return saved
+
+  const newColor = generatePastelColor()
+  localStorage.setItem(`subject-color-${subject}`, newColor)
+  return newColor
+}
+
+function TodayTimetable({ today }: { today: string }) {
+  const [todayList, setTodayList] = useState<any[]>([])
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('timetable')
-      if (!saved) return setTodayList([])
+    const load = async () => {
+      try {
+        const stored = localStorage.getItem('loggedInUser')
+        if (!stored) return
 
-      const all = JSON.parse(saved)
-      if (!Array.isArray(all)) return setTodayList([])
+        const user = JSON.parse(stored)
 
-      const short = today.replace('요일', '')
+        const termRaw = localStorage.getItem('current_timetable_term')
+        if (!termRaw) return
 
-      const todayData = all
-        .filter((c: any) => c && c.day === short && c.subject?.trim())
-        .sort((a: any, b: any) => a.period - b.period)
+        const { year, semester } = JSON.parse(termRaw)
 
-      setTodayList(todayData)
-    } catch {
-      setTodayList([])
+        const res = await fetch(
+          `/api/timetable?year=${year}&semester=${semester}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            },
+          },
+        )
+
+        if (!res.ok) return
+
+        const data = await res.json()
+        if (!Array.isArray(data)) return
+
+        const todayShort = today.replace('요일', '') // 월/화/수...
+
+        const filtered = data
+          .filter((c) => c.day === todayShort && c.subject && c.subject.trim())
+          .sort((a, b) => a.period - b.period)
+
+        setTodayList(filtered)
+      } catch (e) {
+        console.error('오늘 시간표 로드 실패', e)
+        setTodayList([])
+      }
     }
+
+    load()
   }, [today])
 
-  if (!todayList || todayList.length === 0) {
+  if (todayList.length === 0) {
     return (
       <p
         style={{
           color: '#777',
           background: '#E1F5FE',
-          padding: 'clamp(12px, 3vw, 16px)',
+          padding: '16px',
           borderRadius: '12px',
-          fontSize: 'clamp(12px, 3vw, 15px)',
         }}
       >
         오늘은 등록된 수업이 없습니다.
@@ -634,66 +763,33 @@ function TodayTimetable({ today }: { today: string }) {
   return (
     <div
       style={{
-        backgroundColor: '#F3F9FF',
-        borderRadius: '14px',
-        padding: 'clamp(12px, 3vw, 20px)',
+        backgroundColor: '#E1F5FE',
+        borderRadius: '12px',
+        padding: '16px',
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: 'clamp(10px, 2vw, 16px)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '10px',
       }}
     >
       {todayList.map((c, i) => {
-        const colorKey =
-          Object.keys(subjectColors).find((k) => c.subject.includes(k)) ||
-          'default'
-
+        const bg = getSubjectColor(c.subject)
         return (
           <div
             key={i}
             style={{
-              backgroundColor: subjectColors[colorKey],
-              borderRadius: '12px',
-              padding: 'clamp(12px, 3vw, 16px)',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-              border: '1px solid rgba(0,0,0,0.05)',
+              background: bg, // ✅ 여기만 변경
+              borderRadius: '8px',
+              padding: '12px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
           >
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 'clamp(13px, 3vw, 16px)',
-                marginBottom: '4px',
-              }}
-            >
-              {c.period}교시
-            </div>
-
-            <div
-              style={{
-                fontSize: 'clamp(14px, 3vw, 17px)',
-                fontWeight: 600,
-                color: '#111',
-              }}
-            >
-              {c.subject}
-            </div>
-
-            <div
-              style={{
-                fontSize: 'clamp(12px, 2.2vw, 14px)',
-                marginTop: '4px',
-              }}
-            >
+            <div style={{ fontWeight: 700 }}>{c.period}교시</div>
+            <div>{c.subject}</div>
+            <div style={{ fontSize: '13px', color: '#555' }}>
               👨‍🏫 {c.teacher || '미입력'}
             </div>
-
-            <div
-              style={{
-                fontSize: 'clamp(12px, 2.2vw, 14px)',
-                marginTop: '2px',
-              }}
-            >
-              🏫 {c.room || '교실 미지정'}
+            <div style={{ fontSize: '12px', color: '#777' }}>
+              🏫 {c.room || '미지정'}
             </div>
           </div>
         )

@@ -7,25 +7,12 @@ interface UserData {
   password?: string
   school: string
   grade: string
+  entryYear: number
   name?: string
   pw?: string
   userPassword?: string
   eduCode?: string
   schoolCode?: string
-}
-
-/** 🔥 users 배열에서 사용하는 타입 정의 */
-interface UserRecord {
-  username: string // 필수 값
-  id?: string
-  userId?: string
-  school?: string
-  eduCode?: string
-  schoolCode?: string
-  password?: string
-  pw?: string
-  userPassword?: string
-  [key: string]: unknown
 }
 
 /** 🔥 학교 검색 결과 row 타입 지정 */
@@ -96,6 +83,60 @@ export default function MyInfoPagePreview() {
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')
 
+  // 🔐 재로그인 안내 모달
+  const [showReloginModal, setShowReloginModal] = useState(false)
+  const [reloginReason, setReloginReason] = useState<
+    'password' | 'school' | null
+  >(null)
+
+  // 🔥 강제 로그아웃 함수
+  const forceLogout = () => {
+    localStorage.removeItem('loggedInUser')
+    localStorage.removeItem('eduCode')
+    localStorage.removeItem('schoolCode')
+    localStorage.removeItem('school')
+
+    window.location.href = '/auth/login'
+  }
+
+  // 🎓 현재 학년 계산
+  const getCurrentGrade = (entryYear: number) => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+
+    // 한국 기준: 3월에 학년 올라감
+    const academicYear = month >= 3 ? year : year - 1
+
+    const grade = academicYear - entryYear + 1
+
+    if (grade < 1) return '입학 전'
+    if (grade > 3) return '졸업'
+
+    return `${grade}학년`
+  }
+
+  // 🔐 비밀번호 검증 함수 (회원가입과 동일)
+  const validatePassword = (pw: string) => {
+    const minLength = pw.length >= 6
+    const hasLetter = /[a-zA-Z]/.test(pw)
+    const hasNumber = /[0-9]/.test(pw)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pw)
+
+    return {
+      valid: minLength && hasLetter && hasNumber && hasSpecial,
+      minLength,
+      hasLetter,
+      hasNumber,
+      hasSpecial,
+    }
+  }
+
+  // 🔎 새 비밀번호 조건 체크 결과
+  const passwordCheck = validatePassword(newPw)
+
+  const [showNewPw, setShowNewPw] = useState(false)
+
   const [showSchoolForm, setShowSchoolForm] = useState(false)
   const [schoolKeyword, setSchoolKeyword] = useState('')
 
@@ -106,10 +147,14 @@ export default function MyInfoPagePreview() {
 
   const [selectedSchool, setSelectedSchool] = useState<string | null>(null)
   const [selectedSchoolRow, setSelectedSchoolRow] = useState<SchoolRow | null>(
-    null
+    null,
   )
 
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // 🔥 회원탈퇴 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletePw, setDeletePw] = useState('')
 
   useEffect(() => {
     const stored = localStorage.getItem('loggedInUser')
@@ -118,10 +163,19 @@ export default function MyInfoPagePreview() {
     try {
       const parsed = JSON.parse(stored)
 
+      const extractEntryYear = (grade: string) => {
+        const match = grade.match(/\d+/)
+        if (!match) return new Date().getFullYear()
+        const gradeNumber = Number(match[0])
+        const currentYear = new Date().getFullYear()
+        return currentYear - (gradeNumber - 1)
+      }
+
       const normalized: UserData = {
         username: parsed.username,
         school: parsed.school,
         grade: parsed.grade,
+        entryYear: parsed.entryYear ?? extractEntryYear(parsed.grade),
         name: parsed.name,
         eduCode: parsed.eduCode,
         schoolCode: parsed.schoolCode,
@@ -140,55 +194,56 @@ export default function MyInfoPagePreview() {
   useEffect(() => {
     if (!user) return
 
-    const toStore = { ...user }
-    if (user.password) {
-      toStore.password = user.password
-      if ('pw' in toStore) toStore.pw = user.password
-      if ('userPassword' in toStore) toStore.userPassword = user.password
-    }
+    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
 
-    localStorage.setItem('loggedInUser', JSON.stringify(toStore))
+    localStorage.setItem(
+      'loggedInUser',
+      JSON.stringify({
+        ...prev, // 🔥 기존 token 유지
+        ...user,
+        token: prev.token, // 🔥 핵심
+      }),
+    )
   }, [user])
 
-  const handlePasswordChange = () => {
-    if (!user) return
-
-    const storedPassword =
-      user.password ?? user.pw ?? user.userPassword ?? undefined
-
-    if (!currentPw || !newPw || !newPw2)
-      return alert('모든 비밀번호 항목을 입력해주세요.')
-    if (newPw !== newPw2) return alert('새 비밀번호가 서로 일치하지 않습니다.')
-    if (storedPassword && currentPw !== storedPassword)
-      return alert('현재 비밀번호가 일치하지 않습니다.')
-
-    const updated: UserData = { ...user, password: newPw }
-    if ('pw' in user) updated.pw = newPw
-    if ('userPassword' in user) updated.userPassword = newPw
-
-    setUser(updated)
-
-    const usersRaw = localStorage.getItem('users')
-    if (usersRaw) {
-      try {
-        const users: UserRecord[] = JSON.parse(usersRaw)
-
-        const newUsers = users.map((u) =>
-          u.username === user.username
-            ? { ...u, password: newPw, pw: newPw, userPassword: newPw }
-            : u
-        )
-
-        localStorage.setItem('users', JSON.stringify(newUsers))
-      } catch {}
+  const handlePasswordChange = async () => {
+    if (!currentPw || !newPw || !newPw2) {
+      alert('모든 비밀번호를 입력해주세요.')
+      return
     }
 
-    setCurrentPw('')
-    setNewPw('')
-    setNewPw2('')
-    setShowPwForm(false)
+    if (!passwordCheck.valid) {
+      alert('비밀번호는 6자 이상이며 영문, 숫자, 특수문자를 포함해야 합니다.')
+      return
+    }
 
-    alert('비밀번호가 변경되었습니다.')
+    if (newPw !== newPw2) {
+      alert('새 비밀번호가 서로 다릅니다.')
+      return
+    }
+
+    const res = await fetch('/api/user/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: user.username,
+        currentPw,
+        newPw,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.message)
+      return
+    }
+
+    setShowPwForm(false)
+    setShowPwConfirmModal(false)
+
+    setReloginReason('password')
+    setShowReloginModal(true)
   }
 
   /** 🔹 학교 검색 */
@@ -213,7 +268,7 @@ export default function MyInfoPagePreview() {
       }
 
       const url = `https://open.neis.go.kr/hub/schoolInfo?KEY=${API_KEY}&Type=json&pIndex=1&pSize=20&SCHUL_NM=${encodeURIComponent(
-        trimmed
+        trimmed,
       )}`
 
       const res = await fetch(url)
@@ -223,7 +278,7 @@ export default function MyInfoPagePreview() {
         const rows: SchoolRow[] = data.schoolInfo[1].row
 
         const filtered = rows.filter((s) =>
-          String(s.SCHUL_NM || '').includes(trimmed)
+          String(s.SCHUL_NM || '').includes(trimmed),
         )
 
         setSearchResults(filtered)
@@ -242,59 +297,97 @@ export default function MyInfoPagePreview() {
     setSelectedSchool(schoolRow.SCHUL_NM)
     setSelectedSchoolRow(schoolRow)
     setSchoolMessage(
-      `'${schoolRow.SCHUL_NM}'(으)로 변경하려면 아래 확인을 누르세요.`
+      `'${schoolRow.SCHUL_NM}'(으)로 변경하려면 아래 확인을 누르세요.`,
     )
   }
 
-  const handleConfirmSchoolChange = () => {
+  const handleConfirmSchoolChange = async () => {
     if (!user || !selectedSchoolRow) return
 
-    const updated: UserData = {
+    const res = await fetch('/api/user/change-school', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: user.username,
+        school: selectedSchoolRow.SCHUL_NM,
+        eduCode: selectedSchoolRow.ATPT_OFCDC_SC_CODE,
+        schoolCode: selectedSchoolRow.SD_SCHUL_CODE,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.message)
+      return
+    }
+
+    const updatedUser = {
       ...user,
-      school: selectedSchoolRow.SCHUL_NM,
-      eduCode: selectedSchoolRow.ATPT_OFCDC_SC_CODE,
-      schoolCode: selectedSchoolRow.SD_SCHUL_CODE,
+      school: data.school,
+      eduCode: data.eduCode,
+      schoolCode: data.schoolCode,
     }
 
-    setUser(updated)
+    // 🔥 기존 loggedInUser 가져오기
+    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
 
-    localStorage.setItem('loggedInUser', JSON.stringify(updated))
-    localStorage.setItem('eduCode', updated.eduCode!)
-    localStorage.setItem('schoolCode', updated.schoolCode!)
-    localStorage.setItem('school', updated.school)
+    setUser(updatedUser)
 
-    const usersRaw = localStorage.getItem('users')
-    if (usersRaw) {
-      try {
-        const users: UserRecord[] = JSON.parse(usersRaw)
+    // 🔥 token 절대 유지
+    localStorage.setItem(
+      'loggedInUser',
+      JSON.stringify({
+        ...prev,
+        ...updatedUser,
+        token: prev.token,
+      }),
+    )
 
-        const newUsers = users.map((u: UserRecord) =>
-          u.username === user.username
-            ? {
-                ...u,
-                school: updated.school,
-                eduCode: updated.eduCode,
-                schoolCode: updated.schoolCode,
-              }
-            : u
-        )
-
-        localStorage.setItem('users', JSON.stringify(newUsers))
-      } catch {}
-    }
-
-    window.dispatchEvent(new Event('storage'))
-
-    setSchoolMessage(`'${updated.school}'(으)로 학교가 변경되었습니다.`)
     setShowConfirmModal(false)
     setShowSchoolForm(false)
-    setSearchResults([])
-    setSchoolKeyword('')
-    setSelectedSchool(null)
-    setSelectedSchoolRow(null)
+
+    setReloginReason('school')
+    setShowReloginModal(true)
   }
 
   const handleCancelSchoolChange = () => setShowConfirmModal(false)
+
+  const handleDeleteAccount = async () => {
+    if (!user) return
+
+    if (!deletePw) {
+      alert('비밀번호를 입력해주세요.')
+      return
+    }
+
+    const res = await fetch('/api/user/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: user.username,
+        password: deletePw,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.message)
+      return
+    }
+
+    // ✅ 로컬 정보 제거
+    localStorage.removeItem('loggedInUser')
+    localStorage.removeItem('eduCode')
+    localStorage.removeItem('schoolCode')
+    localStorage.removeItem('school')
+
+    alert('회원탈퇴가 완료되었습니다.')
+
+    // 로그인 페이지로 이동
+    window.location.href = '/auth/login'
+  }
 
   if (!user) {
     return (
@@ -545,7 +638,7 @@ export default function MyInfoPagePreview() {
           )}
         </div>
 
-        <Field label="학년" value={user.grade} />
+        <Field label="학년" value={getCurrentGrade(user.entryYear)} />
 
         {/* 비밀번호 변경 */}
         <div style={{ marginTop: 30, textAlign: 'center' }}>
@@ -597,20 +690,83 @@ export default function MyInfoPagePreview() {
                 onChange={(e) => setCurrentPw(e.target.value)}
                 style={pwInputStyle}
               />
-              <input
-                type="password"
-                placeholder="새 비밀번호"
-                value={newPw}
-                onChange={(e) => setNewPw(e.target.value)}
-                style={pwInputStyle}
-              />
-              <input
-                type="password"
-                placeholder="새 비밀번호 확인"
-                value={newPw2}
-                onChange={(e) => setNewPw2(e.target.value)}
-                style={pwInputStyle}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPw ? 'text' : 'password'}
+                  placeholder="새 비밀번호"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  style={{ ...pwInputStyle, paddingRight: 40 }}
+                />
+
+                {/* 🔐 비밀번호 조건 안내 (회원가입과 동일) */}
+                {newPw.length > 0 && (
+                  <ul style={{ fontSize: 12, paddingLeft: 18 }}>
+                    <li
+                      style={{
+                        color: passwordCheck.minLength ? '#2E7D32' : '#D32F2F',
+                      }}
+                    >
+                      6자 이상
+                    </li>
+                    <li
+                      style={{
+                        color: passwordCheck.hasLetter ? '#2E7D32' : '#D32F2F',
+                      }}
+                    >
+                      영문/숫자 포함
+                    </li>
+                    <li
+                      style={{
+                        color: passwordCheck.hasSpecial ? '#2E7D32' : '#D32F2F',
+                      }}
+                    >
+                      특수문자 포함 (!@#$%^&*)
+                    </li>
+                  </ul>
+                )}
+
+                {newPw.length > 0 && passwordCheck.valid && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: '#2E7D32',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✅ 비밀번호 조건을 만족합니다.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw((prev) => !prev)}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    color: '#6366f1',
+                    fontWeight: 600,
+                  }}
+                >
+                  {showNewPw ? '숨김' : '보기'}
+                </button>
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPw ? 'text' : 'password'}
+                  placeholder="새 비밀번호 확인"
+                  value={newPw2}
+                  onChange={(e) => setNewPw2(e.target.value)}
+                  style={{ ...pwInputStyle, paddingRight: 40 }}
+                />
+              </div>
 
               <button
                 type="submit"
@@ -630,6 +786,26 @@ export default function MyInfoPagePreview() {
               </button>
             </form>
           )}
+        </div>
+
+        {/* 🔥 회원탈퇴 버튼 */}
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            style={{
+              padding: '10px 30px',
+              background: '#ef4444',
+              color: 'white',
+              borderRadius: 10,
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            회원탈퇴
+          </button>
         </div>
 
         {/* 비번 변경 모달 */}
@@ -751,6 +927,147 @@ export default function MyInfoPagePreview() {
                   아니오
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🔥 회원탈퇴 확인 모달 */}
+        {showDeleteModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.35)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 9999,
+            }}
+          >
+            <div
+              style={{
+                background: 'white',
+                borderRadius: 12,
+                padding: 20,
+                width: '90%',
+                maxWidth: 360,
+              }}
+            >
+              <p style={{ textAlign: 'center', marginBottom: 12 }}>
+                정말 회원탈퇴를 진행하시겠습니까?
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: '#ef4444',
+                  textAlign: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                탈퇴 시 모든 정보는 삭제되며 복구할 수 없습니다.
+              </p>
+
+              <input
+                type="password"
+                placeholder="비밀번호 입력"
+                value={deletePw}
+                onChange={(e) => setDeletePw(e.target.value)}
+                style={pwInputStyle}
+              />
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginTop: 14,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: '#ef4444',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  탈퇴
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeletePw('')
+                  }}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 999,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showReloginModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.35)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 9999,
+            }}
+          >
+            <div
+              style={{
+                background: 'white',
+                borderRadius: 12,
+                padding: 22,
+                width: '90%',
+                maxWidth: 360,
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>
+                {reloginReason === 'password'
+                  ? '비밀번호가 변경되었습니다.'
+                  : '학교 정보가 변경되었습니다.'}
+              </p>
+
+              <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>
+                보안을 위해 로그아웃됩니다.
+                <br />
+                다시 로그인해주세요.
+              </p>
+
+              <button
+                type="button"
+                onClick={forceLogout}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#6366f1',
+                  color: 'white',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                확인
+              </button>
             </div>
           </div>
         )}

@@ -20,23 +20,109 @@ export default function LibrarySearch() {
   const end = pageGroup * GROUP_SIZE
   const visiblePages = PAGES.slice(start - 1, end)
 
+  const [recentKeywords, setRecentKeywords] = useState<any[]>([])
+
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const getToken = () => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return null
+    try {
+      return JSON.parse(stored).token
+    } catch {
+      return null
+    }
+  }
+
+  const dropdownItems = query.trim()
+    ? suggestions.map((t) => ({ type: 'suggest', value: t }))
+    : recentKeywords.map((k) => ({ type: 'history', ...k }))
+
   const handleSearch = async () => {
     if (!query.trim()) return
     setLoading(true)
 
-    // 🔵 검색하면 화면 맨 위로
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
+    // 🔍 1️⃣ 책 검색 (항상 실행)
     const res = await fetch(`/api/aladin/search?q=${query}&page=${page}`)
     const data = await res.json()
-
     setSearchBooks(data.item || [])
+
+    // 🔥 2️⃣ 검색 기록 저장 (로그인한 경우만)
+    const token = getToken()
+    if (token) {
+      const saveRes = await fetch('/api/search-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ keyword: query }),
+      })
+
+      // 🔁 최근 검색어 다시 불러오기
+      if (saveRes.ok) {
+        const historyRes = await fetch('/api/search-history', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (historyRes.ok) {
+          setRecentKeywords(await historyRes.json())
+        }
+      }
+    }
+
     setLoading(false)
   }
 
   useEffect(() => {
     if (query.trim() !== '') handleSearch()
   }, [page])
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/aladin/search?q=${query}&page=1`)
+      if (!res.ok) return
+
+      const data = await res.json()
+
+      const titles = data.item?.slice(0, 5).map((book: any) => book.title) || []
+
+      setSuggestions(titles)
+      setShowSuggestions(true)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      const token = getToken()
+      if (!token) return // 🔥 이 한 줄이 핵심
+
+      const res = await fetch('/api/search-history', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (res.ok) {
+        setRecentKeywords(await res.json())
+      }
+    }
+
+    loadHistory()
+  }, [])
 
   return (
     <>
@@ -48,7 +134,7 @@ export default function LibrarySearch() {
 
         {/* 검색창 */}
         <div className="search-area">
-          <div className="search-box">
+          <div className="search-box" style={{ position: 'relative' }}>
             <span className="material-symbols-rounded icon">search</span>
 
             <input
@@ -56,17 +142,125 @@ export default function LibrarySearch() {
               placeholder="검색어를 입력하세요"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                if (recentKeywords.length > 0 || suggestions.length > 0) {
+                  setShowSuggestions(true)
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 150)
+              }}
             />
 
             <button
               onClick={() => {
                 handleSearch()
-                window.scrollTo({ top: 0, behavior: 'smooth' }) // 검색 후 맨 위
+                window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               className="search-button"
             >
               검색
             </button>
+
+            {/* 🔍 연관검색어 */}
+            {showSuggestions && dropdownItems.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: '#fff',
+                  border: '1px solid #ddd',
+                  borderRadius: 12,
+                  marginTop: 6,
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                  zIndex: 20,
+                }}
+              >
+                {/* 🔥 검색기록 전체 삭제 (검색어 입력 안 했을 때만) */}
+                {!query.trim() && recentKeywords.length > 0 && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      fontSize: 13,
+                      color: '#2563eb',
+                      textAlign: 'right',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #eee',
+                    }}
+                    onMouseDown={async () => {
+                      if (!confirm('최근 검색어를 모두 삭제할까요?')) return
+
+                      await fetch('/api/search-history', {
+                        method: 'DELETE',
+                        headers: {
+                          Authorization: `Bearer ${getToken()}`,
+                        },
+                      })
+
+                      setRecentKeywords([])
+                      setShowSuggestions(false)
+                    }}
+                  >
+                    전체 삭제
+                  </div>
+                )}
+
+                {/* 🔍 검색기록 / 연관검색어 목록 */}
+                {dropdownItems.map((item, idx) => (
+                  <div
+                    key={item.type === 'history' ? item.id : idx}
+                    style={{
+                      padding: '10px 14px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #eee',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                    onMouseDown={() => {
+                      const keyword =
+                        item.type === 'history' ? item.keyword : item.value
+
+                      setQuery(keyword)
+                      setPage(1)
+                      setShowSuggestions(false)
+                      handleSearch()
+                    }}
+                  >
+                    <span>
+                      {item.type === 'history' ? '🕘' : '📘'}{' '}
+                      {item.type === 'history' ? item.keyword : item.value}
+                    </span>
+
+                    {/* ❌ 단일 삭제 (검색기록만) */}
+                    {item.type === 'history' && (
+                      <span
+                        style={{ color: '#aaa', cursor: 'pointer' }}
+                        onMouseDown={async (e) => {
+                          e.stopPropagation()
+                          await fetch('/api/search-history', {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${getToken()}`,
+                            },
+                            body: JSON.stringify({ id: item.id }),
+                          })
+
+                          setRecentKeywords(
+                            recentKeywords.filter((v) => v.id !== item.id),
+                          )
+                        }}
+                      >
+                        ✕
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

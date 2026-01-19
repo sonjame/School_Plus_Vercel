@@ -219,39 +219,67 @@ export default function RootLayout({
               if (!isPC) setDropOpen((prev) => !prev)
             }}
           >
-            <MenuItem icon="📋" label="게시판" href="/board" />
-
-            {dropOpen && (
+            {/* ================================ */}
+            {/*        게시판 드롭다운 메뉴        */}
+            {/* ================================ */}
+            <div
+              style={{ position: 'relative' }}
+              onMouseEnter={() => isPC && setDropOpen(true)} // PC: hover → open
+              onMouseLeave={() => isPC && setDropOpen(false)} // PC: leave → close
+            >
+              {/* 게시판 버튼 — 페이지 이동 없음 */}
               <div
                 style={{
-                  position: 'absolute',
-                  top: '48px',
-                  left: '0',
-                  width: '180px',
-                  background: 'white',
-                  borderRadius: '10px',
-                  padding: '10px 0',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                   display: 'flex',
-                  flexDirection: 'column',
-                  zIndex: 9999,
-                  animation: 'fadein 0.2s',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.25)',
+                  color: 'white',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  cursor: 'pointer',
                 }}
               >
-                {dropdownItem('/board', '📚 전체 게시판')}
-                {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
-                {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                <span style={{ fontSize: '18px' }}>📋</span>
+                게시판
               </div>
-            )}
+
+              {/* ▼ 드롭다운 박스 */}
+              {dropOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '48px',
+                    left: '0',
+                    width: '180px',
+                    background: 'white',
+                    borderRadius: '10px',
+                    padding: '10px 0',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    zIndex: 9999,
+                    animation: 'fadein 0.2s',
+                  }}
+                >
+                  {dropdownItem('/board', '📚 전체 게시판')}
+                  {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
+                  {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                </div>
+              )}
+            </div>
           </div>
 
           <MenuItem icon="📅" label="일정" href="/calendar" />
           <MenuItem icon="⏰" label="시간표" href="/timetable" />
           <MenuItem icon="📊" label="모의고사" href="/scores" />
           <MenuItem icon="📊" label="내신점수" href="/grade" />
-          <MenuItem icon="🏫" label="학교인증" href="/school_certification" />
           <MenuItem icon="🍚" label="급식표" href="/meal" />
           <MenuItem icon="📚" label="도서관" href="/Library" />
+          <MenuItem icon="🏫" label="학교인증" href="/school_certification" />
 
           {/* 로그인/로그아웃 */}
           <div style={{ marginTop: 'auto' }}>

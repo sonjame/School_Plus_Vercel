@@ -10,6 +10,66 @@ interface ClassItem {
   room: string
 }
 
+/* ===== 과목 평가 타입 ===== */
+interface SubjectReview {
+  id: number
+  rating: number
+  reason: string
+  createdAt: string
+  teacher: string
+  userId: number
+}
+
+// 평가 목록 불러오기
+const fetchSubjectReviews = async (
+  year: number,
+  semester: '1학기' | '2학기',
+  school: string
+) => {
+  const res = await fetch(
+    `/api/subject-review?year=${year}&semester=${semester}&school=${encodeURIComponent(
+      school
+    )}`,
+    {
+      cache: 'no-store',
+    }
+  )
+
+  if (!res.ok) return {}
+  return res.json()
+}
+
+// 평가 저장
+const postSubjectReview = async (payload: {
+  year: number
+  semester: '1학기' | '2학기'
+  subject: string
+  teacher: string
+  rating: number
+  reason: string
+  userId: number
+  school: string // 🔥 추가
+}) => {
+  await fetch('/api/subject-review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+}
+
+// 평가 삭제
+const deleteSubjectReviewAPI = async (payload: {
+  id: number
+  userId: number
+}) => {
+  await fetch('/api/subject-review', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
 const DEFAULT_SUBJECTS = [
   '국어',
   '수학',
@@ -51,14 +111,32 @@ const getSubjectColor = (subject: string) => {
 }
 
 const DAYS = ['월', '화', '수', '목', '금']
-const PERIODS = Array.from({ length: 12 }, (_, i) => i + 1)
+const PERIODS = Array.from({ length: 10 }, (_, i) => i + 1)
 
 export default function TimetablePage() {
+  const [myUserId, setMyUserId] = useState<number | null>(null)
+  const [mySchool, setMySchool] = useState<string | null>(null)
+
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [edit, setEdit] = useState<ClassItem | null>(null)
 
   const [addOpen, setAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+
+  const CURRENT_YEAR = new Date().getFullYear()
+
+  const YEARS = Array.from(
+    { length: 3 + 1 + 1 }, // 과거3 + 현재1 + 미래1
+    (_, i) => CURRENT_YEAR - 3 + i
+  )
+
+  const [term, setTerm] = useState<{
+    year: number
+    semester: '1학기' | '2학기'
+  }>({
+    year: CURRENT_YEAR,
+    semester: '1학기',
+  })
 
   const [addForm, setAddForm] = useState({
     day: '월',
@@ -73,41 +151,53 @@ export default function TimetablePage() {
 
   /* ----------------- 초기 로드 ----------------- */
   useEffect(() => {
+    if (!myUserId) return
+
+    fetch(`/api/timetable?year=${term.year}&semester=${term.semester}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        // 🔥 방어: 배열 아닐 경우 대비
+        setClasses(Array.isArray(data) ? data : [])
+      })
+  }, [term, myUserId])
+
+  /* 🔥 선택한 연도/학기 Home에서도 쓰기 위해 저장 */
+  useEffect(() => {
+    localStorage.setItem('current_timetable_term', JSON.stringify(term))
+  }, [term])
+
+  useEffect(() => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
     try {
-      const params = new URLSearchParams(window.location.search)
-      const encoded = params.get('data')
-
-      if (encoded) {
-        try {
-          const decoded = decodeURIComponent(atob(encoded))
-          const parsed = JSON.parse(decoded)
-          setClasses(parsed)
-          localStorage.setItem('timetable', JSON.stringify(parsed))
-          return
-        } catch (e) {
-          console.error('URL 파싱 오류', e)
-        }
+      const user = JSON.parse(stored)
+      if (user?.id) {
+        setMyUserId(user.id)
+        setMySchool(user.school)
       }
-
-      const saved = localStorage.getItem('timetable')
-      if (saved) setClasses(JSON.parse(saved))
-    } catch {
-      setClasses([])
-    }
+    } catch {}
   }, [])
 
-  const save = (next: ClassItem[]) => {
+  const save = async (next: ClassItem[]) => {
     setClasses(next)
-    localStorage.setItem('timetable', JSON.stringify(next))
 
-    // 🔥 과목만 수집해서 중복 제거 후 저장 → GradePage에서 사용됨
-    const subjectList = [
-      ...new Set(
-        next.map((c) => c.subject).filter((s) => s && s.trim() !== '')
-      ),
-    ]
-
-    localStorage.setItem('my_timetable_subjects', JSON.stringify(subjectList))
+    await fetch('/api/timetable', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({
+        year: term.year,
+        semester: term.semester,
+        classes: next,
+      }),
+    })
   }
 
   /* ----------------- URL 생성 함수 ----------------- */
@@ -252,12 +342,77 @@ export default function TimetablePage() {
     setAddOpen(false)
   }
 
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [reviewSubject, setReviewSubject] = useState<string | null>(null)
+  const [reviewTeacher, setReviewTeacher] = useState<string | null>(null)
+  const [rating, setRating] = useState(0)
+  const [reason, setReason] = useState('')
+  const [reviewListOpen, setReviewListOpen] = useState(false)
+
+  const isMyReview = (r: SubjectReview) => r.userId === myUserId
+
+  const [subjectReviews, setSubjectReviews] = useState<
+    Record<string, SubjectReview[]>
+  >({})
+
+  useEffect(() => {
+    if (!mySchool) return
+    fetchSubjectReviews(term.year, term.semester, mySchool).then(
+      setSubjectReviews
+    )
+  }, [term, mySchool])
+
+  const registeredSubjectTeachers = Array.from(
+    new Set(
+      (Array.isArray(classes) ? classes : [])
+        .filter((c) => c.subject && c.teacher)
+        .map((c) => `${c.subject}|${c.teacher}`)
+    )
+  )
+  const makeReviewKey = (subject: string, teacher: string) =>
+    `${subject}|${teacher}`
+
+  const getAverageRating = (subject: string, teacher: string) => {
+    const key = makeReviewKey(subject, teacher)
+    const reviews = subjectReviews[key]
+    if (!reviews || reviews.length === 0) return null
+
+    const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+
+    return avg.toFixed(1)
+  }
+
   /* ==========================================================
         화면 출력
   ========================================================== */
   return (
     <div style={wrap}>
       <h2 style={title}>🕑 시간표 관리</h2>
+
+      <div style={termWrapper}>
+        <div style={termCard}>
+          <span style={termLabel}>학기 선택</span>
+
+          <select
+            style={termSelect}
+            value={`${term.year}-${term.semester}`}
+            onChange={(e) => {
+              const [y, s] = e.target.value.split('-')
+              if (s === '1학기' || s === '2학기') {
+                setTerm({ year: Number(y), semester: s })
+              }
+            }}
+          >
+            {YEARS.map((y) =>
+              ['1학기', '2학기'].map((s) => (
+                <option key={`${y}-${s}`} value={`${y}-${s}`}>
+                  {y}년 · {s}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      </div>
 
       <div style={toolbar}>
         <button style={btn('#4FC3F7')} onClick={() => setAddOpen(true)}>
@@ -356,6 +511,73 @@ export default function TimetablePage() {
             ))}
           </tbody>
         </table>
+
+        {/* ===== 과목 평가 영역 ===== */}
+        <div style={{ marginTop: 30 }}>
+          <h3 style={{ fontWeight: 700, marginBottom: 12 }}>⭐ 과목 평가</h3>
+
+          {registeredSubjectTeachers.length === 0 && (
+            <div style={{ color: '#999' }}>아직 등록된 과목이 없습니다.</div>
+          )}
+
+          {registeredSubjectTeachers.map((key) => {
+            const [subject, teacher] = key.split('|')
+            const avg = getAverageRating(subject, teacher)
+
+            return (
+              <div
+                key={key}
+                style={{
+                  padding: 14,
+                  border: '1px solid #E0E0E0',
+                  borderRadius: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: 8,
+                  }}
+                >
+                  <strong>
+                    {subject} ({teacher})
+                  </strong>
+                  <span style={{ color: '#666' }}>
+                    {avg ? `⭐ ${avg}` : '평가 없음'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={btn('#CFD8DC')}
+                    onClick={() => {
+                      setReviewSubject(subject)
+                      setReviewTeacher(teacher)
+                      setReviewListOpen(true)
+                    }}
+                  >
+                    👀 평가 보기
+                  </button>
+
+                  <button
+                    style={btn('#4FC3F7')}
+                    onClick={() => {
+                      setReviewSubject(subject)
+                      setReviewTeacher(teacher)
+                      setRating(0)
+                      setReason('')
+                      setReviewModalOpen(true)
+                    }}
+                  >
+                    ✍️ 평가 하기
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ----------------- 내보내기 옵션 모달 ----------------- */}
@@ -574,6 +796,205 @@ export default function TimetablePage() {
           </div>
         </Modal>
       )}
+
+      {reviewModalOpen && (
+        <Modal title="과목 평가" onClose={() => setReviewModalOpen(false)}>
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            {reviewSubject} ({reviewTeacher})
+          </div>
+
+          {/* 별점 */}
+          <div style={{ textAlign: 'center', fontSize: 28 }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <span
+                key={n}
+                style={{
+                  cursor: 'pointer',
+                  color: n <= rating ? '#FFD54F' : '#CCC',
+                }}
+                onClick={() => setRating(n)}
+              >
+                ★
+              </span>
+            ))}
+          </div>
+
+          <textarea
+            placeholder="평가 이유를 적어주세요 (익명)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            style={{
+              width: '100%',
+              height: 80,
+              borderRadius: 8,
+              padding: 10,
+              border: '1px solid #CCC',
+              fontFamily: "'Roboto', sans-serif",
+              boxSizing: 'border-box', // 🔥 중요
+              resize: 'none',
+            }}
+          />
+
+          <button
+            style={btn('#4FC3F7')}
+            onClick={async () => {
+              if (!reviewSubject || rating === 0)
+                return alert('별점을 선택하세요')
+
+              if (!mySchool) {
+                alert('학교 정보가 없습니다.')
+                return
+              }
+
+              await postSubjectReview({
+                year: term.year,
+                semester: term.semester,
+                subject: reviewSubject,
+                teacher: reviewTeacher!,
+                rating,
+                reason,
+                userId: myUserId ?? 0,
+                school: mySchool, // ✅ 이제 string
+              })
+
+              const updated = await fetchSubjectReviews(
+                term.year,
+                term.semester,
+                mySchool // ✅ 반드시 전달
+              )
+              setSubjectReviews(updated)
+
+              setSubjectReviews(updated)
+
+              setReviewModalOpen(false)
+            }}
+          >
+            평가 등록
+          </button>
+        </Modal>
+      )}
+
+      {reviewListOpen && reviewSubject && reviewTeacher && (
+        <Modal title="과목 평가 목록" onClose={() => setReviewListOpen(false)}>
+          {(() => {
+            const key = makeReviewKey(reviewSubject, reviewTeacher)
+            const reviews = subjectReviews[key] ?? []
+
+            if (reviews.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', color: '#999' }}>
+                  아직 등록된 평가가 없습니다.
+                </div>
+              )
+            }
+
+            return (
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+              >
+                {reviews.map((r) => (
+                  <div
+                    key={r.createdAt}
+                    style={{
+                      border: '1px solid #E0E0E0',
+                      borderRadius: 8,
+                      padding: 10,
+                    }}
+                  >
+                    {/* 별점 */}
+                    <div style={{ color: '#FFD54F', fontSize: 18 }}>
+                      {'★'.repeat(r.rating)}
+                      {'☆'.repeat(5 - r.rating)}
+                    </div>
+
+                    {/* 내용 */}
+                    <div style={{ fontSize: 14, marginTop: 4 }}>
+                      {r.reason || (
+                        <span style={{ color: '#999' }}>내용 없음</span>
+                      )}
+                    </div>
+
+                    {isMyReview(r) && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 6,
+                          justifyContent: 'flex-end',
+                        }}
+                      >
+                        <button
+                          style={btn('#4FC3F7')}
+                          onClick={async () => {
+                            // 1️⃣ 평가 목록 닫기
+                            setReviewListOpen(false)
+
+                            // 2️⃣ 수정할 데이터 세팅
+                            setRating(r.rating)
+                            setReason(r.reason)
+                            setReviewSubject(reviewSubject)
+                            setReviewTeacher(reviewTeacher)
+
+                            // 3️⃣ 기존 리뷰 삭제
+                            await deleteSubjectReviewAPI({
+                              id: r.id, // 🔥 이게 핵심
+                              userId: myUserId!, // 🔥 로그인 유저
+                            })
+
+                            // 4️⃣ 최신 목록 다시 로드
+                            if (!mySchool) return
+
+                            const updated = await fetchSubjectReviews(
+                              term.year,
+                              term.semester,
+                              mySchool
+                            )
+
+                            setSubjectReviews(updated)
+
+                            // 5️⃣ 평가 모달 열기
+                            setReviewModalOpen(true)
+                          }}
+                        >
+                          수정
+                        </button>
+
+                        <button
+                          style={btn('#E57373')}
+                          onClick={async () => {
+                            await deleteSubjectReviewAPI({
+                              id: r.id,
+                              userId: myUserId!,
+                            })
+
+                            if (!mySchool) return
+
+                            const updated = await fetchSubjectReviews(
+                              term.year,
+                              term.semester,
+                              mySchool
+                            )
+
+                            setSubjectReviews(updated)
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </Modal>
+      )}
     </div>
   )
 }
@@ -619,7 +1040,13 @@ function Modal({
   )
 }
 
-function Row({ label, children }: { label: string; children: any }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <label style={labelCss}>{label}</label>
@@ -724,6 +1151,7 @@ const inputCss: React.CSSProperties = {
 
 const btn = (color: string): React.CSSProperties => ({
   background: color,
+  alignItems: 'center',
   color: 'white',
   border: 'none',
   borderRadius: 6,
@@ -732,3 +1160,42 @@ const btn = (color: string): React.CSSProperties => ({
   fontWeight: 600,
   fontSize: 'clamp(10px, 1.6vw, 16px)',
 })
+
+const termWrapper: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  marginBottom: 16,
+  fontFamily: "'Roboto', sans-serif",
+}
+
+const termCard: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '10px 14px',
+  background: '#F5F7FA',
+  borderRadius: 999,
+  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+}
+
+const termLabel: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 500,
+  color: '#555',
+}
+
+const termSelect: React.CSSProperties = {
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  border: 'none',
+  outline: 'none',
+  background: '#FFFFFF',
+  padding: '6px 14px',
+  borderRadius: 999,
+  fontSize: 14,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: "'Roboto', sans-serif",
+  boxShadow: 'inset 0 0 0 1px #DDD',
+}

@@ -72,33 +72,49 @@ export default function EditPostPage() {
      게시글 로드
   ------------------------------ */
   useEffect(() => {
-    let foundPost: any = null
-    let foundKey = ''
-
-    for (const key of boardKeys) {
-      const list = JSON.parse(localStorage.getItem(key) || '[]')
-      const match = list.find((p: any) => String(p.id) === String(postId))
-      if (match) {
-        foundPost = match
-        foundKey = key
-        break
+    async function loadPost() {
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        showAlert('로그인이 필요합니다.', () => router.push('/login'))
+        return
       }
-    }
 
-    if (foundPost) {
-      setPost(foundPost)
-      setStorageKey(foundKey)
-      setTitle(foundPost.title)
-      setContent(foundPost.content || '')
-      setImage(foundPost.image || '')
+      const res = await fetch(`/api/posts/${postId}`)
 
-      /* 🔥 투표 정보 로드 */
-      if (foundPost.vote?.enabled) {
+      if (!res.ok) {
+        showAlert('수정 권한이 없습니다.', () => router.back())
+        return
+      }
+
+      const data = await res.json()
+
+      setPost(data)
+      setTitle(data.title)
+      setContent(data.content)
+
+      /* 🔥 기존 투표 데이터 복원 */
+      if (data.vote?.enabled) {
         setVoteEnabled(true)
-        setVoteOptions(foundPost.vote.options.map((o: any) => o.text))
-        setVoteEndAt(foundPost.vote.endAt || '')
+
+        setVoteOptions(
+          Array.isArray(data.vote.options)
+            ? data.vote.options.map((o: any) => o.text)
+            : []
+        )
+
+        setVoteEndAt(
+          data.vote.endAt
+            ? data.vote.endAt.slice(0, 16) // datetime-local 형식
+            : ''
+        )
+      } else {
+        setVoteEnabled(false)
+        setVoteOptions([])
+        setVoteEndAt('')
       }
     }
+
+    loadPost()
   }, [postId])
 
   /* textarea 자동 높이 조절 */
@@ -122,83 +138,42 @@ export default function EditPostPage() {
   /* ------------------------------
      저장하기
   ------------------------------ */
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim() || !content.trim()) {
       showAlert('제목과 내용을 모두 입력하세요.')
       return
     }
 
-    if (!storageKey) {
-      showAlert('게시판 정보를 찾을 수 없습니다.')
+    const userId = localStorage.getItem('userId')
+    if (!userId) {
+      showAlert('로그인이 필요합니다.')
       return
     }
 
-    showConfirm('정말 수정하시겠습니까?', () => {
-      /* 게시판별 저장 */
-      const boardList = JSON.parse(localStorage.getItem(storageKey) || '[]')
+    showConfirm('정말 수정하시겠습니까?', async () => {
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify({
+          title,
+          content,
+          vote: voteEnabled
+            ? {
+                enabled: true,
+                options: voteOptions,
+                endAt: voteEndAt,
+              }
+            : { enabled: false },
+        }),
+      })
 
-      const updatedBoard = boardList.map((p: any) =>
-        String(p.id) === String(postId)
-          ? {
-              ...p,
-              title,
-              content,
-              image,
-              vote: voteEnabled
-                ? {
-                    enabled: true,
-                    options: voteOptions.map((text, idx) => {
-                      // 기존 옵션 데이터 찾아오기
-                      const oldOpt =
-                        p.vote?.options?.find((o: any) => o.text === text) || {}
-
-                      return {
-                        optionId: oldOpt.optionId ?? crypto.randomUUID(),
-                        text,
-                        votes: oldOpt.votes ?? 0,
-                        voters: oldOpt.voters ?? [],
-                      }
-                    }),
-                    endAt: voteEndAt,
-                  }
-                : { enabled: false },
-            }
-          : p
-      )
-
-      localStorage.setItem(storageKey, JSON.stringify(updatedBoard))
-
-      /* posts_all 저장 */
-      const all = JSON.parse(localStorage.getItem('posts_all') || '[]')
-      const updatedAll = all.map((p: any) =>
-        String(p.id) === String(postId)
-          ? {
-              ...p,
-              title,
-              content,
-              image,
-              vote: voteEnabled
-                ? {
-                    enabled: true,
-                    options: voteOptions.map((text) => {
-                      const oldOpt =
-                        p.vote?.options?.find((o: any) => o.text === text) || {}
-
-                      return {
-                        optionId: oldOpt.optionId ?? crypto.randomUUID(),
-                        text,
-                        votes: oldOpt.votes ?? 0,
-                        voters: oldOpt.voters ?? [],
-                      }
-                    }),
-                    endAt: voteEndAt,
-                  }
-                : { enabled: false },
-            }
-          : p
-      )
-
-      localStorage.setItem('posts_all', JSON.stringify(updatedAll))
+      if (!res.ok) {
+        showAlert('수정 실패 또는 권한이 없습니다.')
+        return
+      }
 
       showAlert('수정되었습니다!', () => {
         router.push(`/board/post/${postId}`)
