@@ -2,12 +2,22 @@ import { NextResponse } from 'next/server'
 import { db } from '@/src/lib/db' // mysql2/promise pool
 import fetch from 'node-fetch'
 
+type NeisSchoolScheduleResponse = {
+  SchoolSchedule?: Array<{
+    head?: unknown[]
+    row?: Array<{
+      AA_YMD: string
+      EVENT_NM: string
+    }>
+  }>
+}
+
 export async function GET(req: Request) {
   if (!process.env.NEIS_API_KEY) {
     console.error('❌ NEIS_API_KEY missing')
     return NextResponse.json(
       { message: 'NEIS_API_KEY missing' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 
@@ -37,7 +47,7 @@ export async function GET(req: Request) {
       AND school_code = ?
      AND event_date BETWEEN ? AND ?
     `,
-    [eduCode, schoolCode, from, to]
+    [eduCode, schoolCode, from, to],
   )
 
   if ((rows as any[]).length > 0) {
@@ -58,7 +68,8 @@ export async function GET(req: Request) {
     `&AA_TO_YMD=${neisTo}`
 
   const res = await fetch(url)
-  const json = await res.json()
+  const json = (await res.json()) as NeisSchoolScheduleResponse
+
   const rowsFromNeis = json?.SchoolSchedule?.[1]?.row ?? []
 
   if (rowsFromNeis.length === 0) return NextResponse.json([])
@@ -77,7 +88,7 @@ export async function GET(req: Request) {
       (edu_code, school_code, event_date, title)
     VALUES ?
     `,
-    [values]
+    [values],
   )
 
   // 4️⃣ 반환

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   if (rows.length === 0) {
     return NextResponse.json(
       { message: '아이디 또는 비밀번호가 올바르지 않습니다.' },
-      { status: 401 }
+      { status: 401 },
     )
   }
 
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (!isMatch) {
     return NextResponse.json(
       { message: '아이디 또는 비밀번호가 올바르지 않습니다.' },
-      { status: 401 }
+      { status: 401 },
     )
   }
 
@@ -34,12 +34,29 @@ export async function POST(req: Request) {
       school_code: user.school_code, // ⭐️ 반드시 추가
     },
     process.env.JWT_SECRET as string,
-    { expiresIn: '7d' }
+    { expiresIn: '1h' },
+  )
+
+  const refreshToken = jwt.sign(
+    {
+      id: user.id,
+    },
+    process.env.JWT_REFRESH_SECRET as string,
+    { expiresIn: '30d' },
+  )
+
+  await db.query(
+    `
+  INSERT INTO refresh_tokens (user_id, token, expires_at)
+  VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))
+  `,
+    [user.id, refreshToken],
   )
 
   return NextResponse.json({
     ok: true,
-    accessToken, // 🔥 반드시 내려줘야 함
+    accessToken,
+    refreshToken,
     user: {
       id: user.id,
       username: user.username,
