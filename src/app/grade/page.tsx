@@ -566,7 +566,9 @@ export default function GradePage() {
                     fill="#2563eb"
                     maxBarSize={32}
                     label={{
-                      formatter: (v: number) => v.toFixed(1),
+                      formatter: (v) =>
+                        typeof v === 'number' ? v.toFixed(1) : v,
+
                       position: 'top',
                     }}
                   />
