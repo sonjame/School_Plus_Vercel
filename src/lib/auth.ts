@@ -59,17 +59,14 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, account, profile }) {
-      // credentials 로그인
       if (user && account?.provider === 'credentials') {
         token.id = String(user.id)
       }
 
-      // 카카오 로그인
       if (account?.provider === 'kakao') {
         token.kakaoId = (profile as any)?.id
       }
 
-      // 구글 로그인
       if (account?.provider === 'google') {
         token.googleId = (profile as any)?.sub
       }
@@ -82,6 +79,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = String(token.id)
       }
       return session
+    },
+
+    // ✅ 이거 추가!!!
+    async redirect({ url, baseUrl }) {
+      // 회원가입 페이지로 보내고 싶다면
+      return `${baseUrl}/signup`
     },
   },
 }
