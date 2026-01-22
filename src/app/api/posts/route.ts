@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.NEXTAUTH_SECRET!)
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
 
     const schoolCode = decoded.school_code
 
@@ -63,10 +63,9 @@ export async function POST(req: Request) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.NEXTAUTH_SECRET!)
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
 
-    const userId = Number(decoded.sub)
-
+    const userId = decoded.id
     const schoolCode = decoded.school_code
 
     const { title, content, category, images, vote } = await req.json()
