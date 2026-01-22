@@ -187,8 +187,7 @@ export default function BoardTemplate({
         <p style={{ color: '#666', textAlign: 'center' }}>게시글이 없습니다.</p>
       ) : (
         sorted.map((p) => {
-          const authorName =
-            typeof p.author === 'string' ? p.author : p.author?.username
+          const authorName = p.author
 
           return (
             <Link
