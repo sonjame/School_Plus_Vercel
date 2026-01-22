@@ -2,7 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import KakaoProvider from 'next-auth/providers/kakao'
 import GoogleProvider from 'next-auth/providers/google'
-import { db } from './db'
+import db from './db'
 import bcrypt from 'bcrypt'
 
 export const authOptions: NextAuthOptions = {
@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
 
         const [rows]: any = await db.query(
           'SELECT * FROM users WHERE username = ?',
-          [credentials.username]
+          [credentials.username],
         )
 
         const user = rows[0]
@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
 
         const isValid = await bcrypt.compare(
           credentials.password,
-          user.password
+          user.password,
         )
 
         if (!isValid) return null
