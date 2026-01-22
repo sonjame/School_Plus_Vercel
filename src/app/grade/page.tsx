@@ -31,7 +31,7 @@ const EXAM_TO_SEMESTER = {
 }
 
 type SubjectsByExam = Record<string, string[]>
-type ScoresByExam = Record<string, Record<string, number>>
+type ScoresByExam = Record<string, Record<string, number | undefined>>
 
 export default function GradePage() {
   const CURRENT_YEAR = new Date().getFullYear()
