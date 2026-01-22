@@ -31,7 +31,11 @@ export async function GET(req: Request) {
     u.name AS author,
     p.likes,
     COUNT(DISTINCT c.id) AS commentCount,
-    DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') AS created_at
+    DATE_FORMAT(
+  CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+  '%Y-%m-%d %H:%i:%s'
+) AS created_at
+
   FROM posts p
   JOIN users u ON p.user_id = u.id
   LEFT JOIN post_comments c ON p.id = c.post_id

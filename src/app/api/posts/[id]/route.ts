@@ -35,7 +35,11 @@ export async function GET(
         p.content,
         p.category,
         p.likes,
-        p.created_at,
+        DATE_FORMAT(
+  CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+  '%Y-%m-%d %H:%i:%s'
+) AS created_at,
+
         p.user_id,
         COALESCE(u.name, '알 수 없음') AS author
       FROM posts p
@@ -56,7 +60,14 @@ export async function GET(
        투표 메타
     ------------------------- */
     const [[voteMeta]]: any = await db.query(
-      `SELECT end_at FROM post_votes WHERE post_id = ?`,
+      `SELECT
+  DATE_FORMAT(
+    CONVERT_TZ(end_at, '+00:00', '+09:00'),
+    '%Y-%m-%d %H:%i:%s'
+  ) AS end_at
+FROM post_votes
+WHERE post_id = ?
+`,
       [postId],
     )
 
