@@ -802,4 +802,4 @@ const styles = {
     background: '#2563eb',
     color: '#fff',
   },
-}
+} as const
