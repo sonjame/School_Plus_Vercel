@@ -66,19 +66,20 @@ export const authOptions: NextAuthOptions = {
 
       // 카카오 로그인
       if (account?.provider === 'kakao') {
-        token.kakaoId = profile?.id
+        token.kakaoId = (profile as any)?.id
       }
 
       // 구글 로그인
       if (account?.provider === 'google') {
-        token.googleId = profile?.sub
+        token.googleId = (profile as any)?.sub
       }
 
       return token
     },
+
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as number
+      if (session.user && token.id) {
+        session.user.id = String(token.id)
       }
       return session
     },
