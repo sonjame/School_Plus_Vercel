@@ -349,13 +349,14 @@ export default function GradePage() {
   const scores = scoresByExam[selectedExam] || {}
 
   /* ================= 평균 ================= */
+  const scoreValues = Object.values(scores).filter(
+    (v): v is number => typeof v === 'number',
+  )
+
   const avg =
-    Object.values(scores).length === 0
+    scoreValues.length === 0
       ? '-'
-      : (
-          Object.values(scores).reduce((a, b) => a + b, 0) /
-          Object.values(scores).length
-        ).toFixed(1)
+      : (scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length).toFixed(1)
 
   /* ================= 그래프 데이터 ================= */
   const chartData = EXAMS.map((exam) => {
