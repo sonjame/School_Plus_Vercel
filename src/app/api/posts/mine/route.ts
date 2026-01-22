@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function GET(req: Request) {
   try {
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       WHERE p.user_id = ?
       ORDER BY p.created_at DESC
       `,
-      [userId]
+      [userId],
     )
 
     return NextResponse.json(rows)

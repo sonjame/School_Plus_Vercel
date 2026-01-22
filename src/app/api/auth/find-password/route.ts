@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import bcrypt from 'bcrypt'
 import nodemailer from 'nodemailer'
 
@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     if (!username || !email) {
       return NextResponse.json(
         { message: '아이디와 이메일을 입력하세요.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
         AND email = ?
         AND provider IN ('email', 'google')
       `,
-      [username, email]
+      [username, email],
     )
 
     if (rows.length === 0) {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
           message:
             '아이디 또는 이메일이 일치하지 않거나 비밀번호 재설정이 불가능한 계정입니다.',
         },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       SET password = ?
       WHERE id = ?
       `,
-      [hashed, rows[0].id]
+      [hashed, rows[0].id],
     )
 
     // ✅ 이메일 발송
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     console.error(err)
     return NextResponse.json(
       { message: '서버 내부 오류가 발생했습니다.' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

@@ -53,10 +53,20 @@ export default function WritePage() {
     const myGrade = localStorage.getItem('userGrade')
 
     const isGradeBoard = ['grade1', 'grade2', 'grade3'].includes(category)
-    const canWrite = !isGradeBoard || category === myGrade
+    const isGraduateBoard = category === 'graduate'
+
+    let canWrite = true
+
+    if (isGradeBoard) {
+      canWrite = category === myGrade
+    }
+
+    if (isGraduateBoard) {
+      canWrite = myGrade === '졸업생' || myGrade === 'graduate'
+    }
 
     if (!canWrite) {
-      showAlert('해당 학년 게시판에는 글을 작성할 수 없습니다.', () => {
+      showAlert('해당 게시판에는 글을 작성할 수 없습니다.', () => {
         window.location.href = `/board/${category}`
       })
     }
@@ -171,13 +181,15 @@ export default function WritePage() {
           {/* 카테고리 */}
           <label style={label}>카테고리</label>
           <div style={{ ...inputBox, background: '#ECEFF1', fontWeight: 600 }}>
-            {category === 'free'
-              ? '자유게시판'
-              : category === 'promo'
-                ? '홍보게시판'
-                : category === 'club'
-                  ? '동아리게시판'
-                  : `${category.replace('grade', '')}학년 게시판`}
+            {category === 'graduate'
+              ? '🎓 졸업생 게시판'
+              : category === 'free'
+                ? '자유게시판'
+                : category === 'promo'
+                  ? '홍보게시판'
+                  : category === 'club'
+                    ? '동아리게시판'
+                    : `${category.replace('grade', '')}학년 게시판`}
           </div>
 
           {/* 제목 */}

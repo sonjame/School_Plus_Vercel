@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 
 /* 댓글 목록 */
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -24,24 +24,30 @@ export async function GET(
 
     const [rows]: any = await db.query(
       `
-      SELECT
-        c.id,
-        c.content,
-        c.author,
-        c.parent,
-        c.user_id,
-        c.created_at,
+  SELECT
+    c.id,
+    c.content,
+    c.author,
+    c.parent_id,
+    c.user_id,
+    c.created_at,
 
-        COUNT(cl.id) AS likes,
-        MAX(cl.user_id = ?) AS likedByMe
+    COUNT(cl.id) AS likes,
+    MAX(cl.user_id = ?) AS likedByMe
 
-      FROM post_comments c
-      LEFT JOIN comment_likes cl ON c.id = cl.comment_id
-      WHERE c.post_id = ?
-      GROUP BY c.id
-      ORDER BY c.created_at ASC
-      `,
-      [myUserId ?? -1, postId]
+  FROM post_comments c
+  LEFT JOIN comment_likes cl ON c.id = cl.comment_id
+  WHERE c.post_id = ?
+  GROUP BY
+    c.id,
+    c.content,
+    c.author,
+    c.parent_id,
+    c.user_id,
+    c.created_at
+  ORDER BY c.created_at ASC
+  `,
+      [myUserId ?? -1, postId],
     )
 
     return NextResponse.json(
@@ -49,12 +55,12 @@ export async function GET(
         id: c.id,
         content: c.content,
         author: c.author,
-        parent: c.parent,
+        parent: c.parent_id, // 🔥 여기서 변환
         user_id: c.user_id,
         created_at: c.created_at,
         likes: Number(c.likes),
         likedByMe: !!c.likedByMe,
-      }))
+      })),
     )
   } catch (e) {
     console.error('❌ GET comments error', e)
@@ -65,7 +71,7 @@ export async function GET(
 /* 댓글 작성 */
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -84,7 +90,7 @@ export async function POST(
     const token = authHeader.replace('Bearer ', '')
     const decoded: any = require('jsonwebtoken').verify(
       token,
-      process.env.JWT_SECRET!
+      process.env.JWT_SECRET!,
     )
 
     const userId = decoded.id
@@ -92,7 +98,7 @@ export async function POST(
     /* 🔥 유저 실명 조회 */
     const [[user]]: any = await db.query(
       `SELECT name FROM users WHERE id = ?`,
-      [userId]
+      [userId],
     )
 
     if (!user) {
@@ -104,11 +110,11 @@ export async function POST(
 
     await db.query(
       `
-      INSERT INTO post_comments
-        (id, post_id, user_id, author, content, parent)
-      VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      [id, postId, userId, author, content, parent ?? null]
+  INSERT INTO post_comments
+    (id, post_id, user_id, author, content, parent_id)
+  VALUES (?, ?, ?, ?, ?, ?)
+  `,
+      [id, postId, userId, author, content, parent ?? null],
     )
 
     return NextResponse.json({

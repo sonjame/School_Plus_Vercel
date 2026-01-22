@@ -1,6 +1,6 @@
 // /api/auth/find-password/kakao/check
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function POST(req: Request) {
   const { username } = await req.json()

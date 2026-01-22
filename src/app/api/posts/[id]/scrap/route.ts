@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 /* =========================
@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken'
 ========================= */
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -23,7 +23,7 @@ export async function GET(
 
     const [[exist]]: any = await db.query(
       `SELECT id FROM post_scraps WHERE post_id = ? AND user_id = ?`,
-      [postId, userId]
+      [postId, userId],
     )
 
     return NextResponse.json({ scrapped: !!exist })
@@ -38,7 +38,7 @@ export async function GET(
 ========================= */
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -54,13 +54,13 @@ export async function POST(
 
     const [[exist]]: any = await db.query(
       `SELECT id FROM post_scraps WHERE post_id = ? AND user_id = ?`,
-      [postId, userId]
+      [postId, userId],
     )
 
     if (exist) {
       await db.query(
         `DELETE FROM post_scraps WHERE post_id = ? AND user_id = ?`,
-        [postId, userId]
+        [postId, userId],
       )
       return NextResponse.json({ scrapped: false })
     }

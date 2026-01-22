@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function POST(req: Request) {
   const { username, currentPw, newPw } = await req.json()
@@ -8,20 +8,20 @@ export async function POST(req: Request) {
   if (!username || !currentPw || !newPw) {
     return NextResponse.json(
       { message: '요청 값이 올바르지 않습니다.' },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
   // 1️⃣ 사용자 조회
   const [rows]: any = await db.query(
     'SELECT password FROM users WHERE username = ?',
-    [username]
+    [username],
   )
 
   if (rows.length === 0) {
     return NextResponse.json(
       { message: '사용자를 찾을 수 없습니다.' },
-      { status: 404 }
+      { status: 404 },
     )
   }
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   if (!isMatch) {
     return NextResponse.json(
       { message: '현재 비밀번호가 일치하지 않습니다.' },
-      { status: 401 }
+      { status: 401 },
     )
   }
 

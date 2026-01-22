@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 /* ==============================
@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken'
 ============================== */
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -42,13 +42,13 @@ export async function GET(
       JOIN users u ON p.user_id = u.id
       WHERE p.id = ?
       `,
-      [postId]
+      [postId],
     )
 
     if (!post) {
       return NextResponse.json(
         { message: '존재하지 않는 게시글' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
@@ -57,7 +57,7 @@ export async function GET(
     ------------------------- */
     const [[voteMeta]]: any = await db.query(
       `SELECT end_at FROM post_votes WHERE post_id = ?`,
-      [postId]
+      [postId],
     )
 
     let vote = null
@@ -79,7 +79,7 @@ export async function GET(
         GROUP BY o.id
         ORDER BY o.id ASC
         `,
-        [postId]
+        [postId],
       )
 
       /* -------------------------
@@ -94,12 +94,12 @@ export async function GET(
           FROM post_vote_logs
           WHERE post_id = ? AND user_id = ?
           `,
-          [postId, userId]
+          [postId, userId],
         )
 
         if (myVote) {
           myVoteIndex = options.findIndex(
-            (o: any) => o.optionId === myVote.option_id
+            (o: any) => o.optionId === myVote.option_id,
           )
         }
       }
@@ -124,7 +124,7 @@ export async function GET(
 ============================== */
 export async function PUT(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -140,7 +140,7 @@ export async function PUT(
 
     const [[post]]: any = await db.query(
       `SELECT user_id FROM posts WHERE id = ?`,
-      [postId]
+      [postId],
     )
 
     if (!post || post.user_id !== userId)
@@ -171,7 +171,7 @@ export async function PUT(
           INSERT INTO post_vote_options (post_id, option_text)
           VALUES (?, ?)
           `,
-          [postId, opt]
+          [postId, opt],
         )
       }
     }
@@ -188,7 +188,7 @@ export async function PUT(
 ============================== */
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -203,7 +203,7 @@ export async function DELETE(
 
     const [[post]]: any = await db.query(
       `SELECT user_id FROM posts WHERE id = ?`,
-      [postId]
+      [postId],
     )
 
     if (!post || post.user_id !== userId)

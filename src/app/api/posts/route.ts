@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -72,6 +72,21 @@ export async function POST(req: Request) {
 
     if (!title || !content || !category) {
       return NextResponse.json({ message: '필수 값 누락' }, { status: 400 })
+    }
+
+    /* 🔒 졸업생 게시판 글쓰기 권한 체크 */
+    if (category === 'graduate') {
+      const [[user]]: any = await db.query(
+        `SELECT grade FROM users WHERE id = ?`,
+        [userId],
+      )
+
+      if (!user || user.grade !== '졸업생') {
+        return NextResponse.json(
+          { message: '졸업생만 게시글을 작성할 수 있습니다.' },
+          { status: 403 },
+        )
+      }
     }
 
     const postId = uuidv4()

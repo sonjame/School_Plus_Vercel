@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 export async function PUT(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: commentId } = await context.params // ✅ 핵심
@@ -27,13 +27,13 @@ export async function PUT(
     /* 🔍 댓글 소유자 확인 */
     const [[comment]]: any = await db.query(
       `SELECT user_id FROM post_comments WHERE id = ?`,
-      [commentId]
+      [commentId],
     )
 
     if (!comment) {
       return NextResponse.json(
         { message: 'comment not found' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
@@ -56,7 +56,7 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: commentId } = await context.params
@@ -72,13 +72,13 @@ export async function DELETE(
 
     const [[comment]]: any = await db.query(
       `SELECT user_id FROM post_comments WHERE id = ?`,
-      [commentId]
+      [commentId],
     )
 
     if (!comment) {
       return NextResponse.json(
         { message: 'comment not found' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 

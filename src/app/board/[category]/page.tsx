@@ -14,6 +14,7 @@ export default function CategoryPage() {
     grade1: '1학년게시판',
     grade2: '2학년게시판',
     grade3: '3학년게시판',
+    graduate: '졸업생게시판',
   }
 
   if (!category || !boardTitleMap[category]) {

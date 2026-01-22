@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -23,7 +23,7 @@ export async function POST(
     if (!type) {
       return NextResponse.json(
         { message: '신고 유형이 필요합니다.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -32,7 +32,7 @@ export async function POST(
       INSERT INTO post_reports (post_id, user_id, type, content)
       VALUES (?, ?, ?, ?)
       `,
-      [postId, userId, type, content || null]
+      [postId, userId, type, content || null],
     )
 
     return NextResponse.json({ success: true })

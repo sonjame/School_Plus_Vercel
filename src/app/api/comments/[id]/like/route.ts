@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> } // ✅ Promise
+  context: { params: Promise<{ id: string }> }, // ✅ Promise
 ) {
   try {
     // ✅ 반드시 await
@@ -21,24 +21,24 @@ export async function POST(
 
     const [[exist]]: any = await db.query(
       `SELECT id FROM comment_likes WHERE comment_id = ? AND user_id = ?`,
-      [commentId, userId]
+      [commentId, userId],
     )
 
     if (exist) {
       await db.query(
         `DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?`,
-        [commentId, userId]
+        [commentId, userId],
       )
     } else {
       await db.query(
         `INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)`,
-        [commentId, userId]
+        [commentId, userId],
       )
     }
 
     const [[{ count }]]: any = await db.query(
       `SELECT COUNT(*) AS count FROM comment_likes WHERE comment_id = ?`,
-      [commentId]
+      [commentId],
     )
 
     return NextResponse.json({ likes: count })

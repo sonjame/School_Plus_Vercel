@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   if (!year || !semester || !school) {
     return NextResponse.json(
       { message: 'year/semester/school required' },
-      { status: 400 }
+      { status: 400 },
     )
   }
   const [rows]: any = await db.query(
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
      subject
    FROM subject_reviews
    WHERE year = ? AND semester = ? AND school = ?`,
-    [year, semester, school]
+    [year, semester, school],
   )
 
   const grouped: Record<string, any[]> = {}
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     `INSERT INTO subject_reviews
    (year, semester, subject, teacher, rating, reason, created_at, user_id, school)
    VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
-    [year, semester, subject, teacher, rating, reason ?? '', userId, school]
+    [year, semester, subject, teacher, rating, reason ?? '', userId, school],
   )
 
   return NextResponse.json({ ok: true })
@@ -73,7 +73,7 @@ export async function DELETE(req: Request) {
   const [result]: any = await db.query(
     `DELETE FROM subject_reviews
      WHERE id = ? AND user_id = ?`,
-    [id, userId]
+    [id, userId],
   )
 
   // 🔒 본인 글 아니면 삭제 안 됨

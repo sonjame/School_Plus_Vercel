@@ -1,4 +1,4 @@
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       score = VALUES(score),
       updated_at = CURRENT_TIMESTAMP
     `,
-      [userId, year, semester, exam, subject, score ?? null]
+      [userId, year, semester, exam, subject, score ?? null],
     )
   }
 
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     FROM exam_scores
     WHERE user_id = ? AND year = ?
     `,
-    [userId, year]
+    [userId, year],
   )
 
   return NextResponse.json(rows)
@@ -98,7 +98,7 @@ export async function PUT(req: Request) {
     SET subject = ?
     WHERE user_id = ? AND year = ? AND exam = ? AND subject = ?
     `,
-    [newSubject, userId, year, exam, oldSubject]
+    [newSubject, userId, year, exam, oldSubject],
   )
 
   return NextResponse.json({ ok: true })
@@ -124,7 +124,7 @@ export async function DELETE(req: Request) {
     DELETE FROM exam_scores
     WHERE user_id = ? AND year = ? AND exam = ? AND subject = ?
     `,
-    [userId, year, exam, subject]
+    [userId, year, exam, subject],
   )
 
   return NextResponse.json({ ok: true })

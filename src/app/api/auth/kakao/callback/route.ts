@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export const runtime = 'nodejs'
 
@@ -55,18 +55,18 @@ export async function GET(req: Request) {
         AND provider = 'kakao'
         AND social_id = ?
       `,
-      [username, kakaoId]
+      [username, kakaoId],
     )
 
     if (rows.length === 0) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/auth/find-password?error=not-match`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/auth/find-password?error=not-match`,
       )
     }
 
     // ✅ 인증 성공 → 비밀번호 재설정 페이지
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/reset-password/kakao?username=${username}`
+      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/reset-password/kakao?username=${username}`,
     )
   }
 
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
   =================================================== */
   if (state === 'find-id') {
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/find-id/result?social_id=${kakaoId}`
+      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/find-id/result?social_id=${kakaoId}`,
     )
   }
 
@@ -93,6 +93,6 @@ export async function GET(req: Request) {
       `&provider=kakao` +
       `&social_id=${kakaoId}` +
       `&name=${encodeURIComponent(name)}` +
-      `&email=${encodeURIComponent(email ?? '')}`
+      `&email=${encodeURIComponent(email ?? '')}`,
   )
 }

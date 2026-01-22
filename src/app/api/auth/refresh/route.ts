@@ -1,30 +1,38 @@
 import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
+
+function getCookieFromRequest(req: Request, name: string) {
+  const cookieHeader = req.headers.get('cookie')
+  if (!cookieHeader) return null
+
+  const cookies = cookieHeader.split(';').map((c) => c.trim())
+  const target = cookies.find((c) => c.startsWith(`${name}=`))
+  return target ? decodeURIComponent(target.split('=')[1]) : null
+}
 
 export async function POST(req: Request) {
   try {
-    const { refreshToken } = await req.json()
+    /* =========================
+       1️⃣ Request에서 refreshToken 읽기
+    ========================= */
+    const refreshToken = getCookieFromRequest(req, 'refreshToken')
 
     if (!refreshToken) {
-      return NextResponse.json(
-        { message: 'Refresh token required' },
-        { status: 400 },
-      )
+      return NextResponse.json({ code: 'NO_REFRESH_TOKEN' }, { status: 401 })
     }
 
     /* =========================
-       1️⃣ Refresh JWT 검증
+       2️⃣ JWT 검증
     ========================= */
     const decoded: any = jwt.verify(
       refreshToken,
       process.env.JWT_REFRESH_SECRET!,
     )
-
     const userId = decoded.id
 
     /* =========================
-       2️⃣ DB에서 refreshToken 유효성 확인
+       3️⃣ DB 유효성 검사
     ========================= */
     const [rows]: any = await db.query(
       `
@@ -38,20 +46,20 @@ export async function POST(req: Request) {
 
     if (rows.length === 0) {
       return NextResponse.json(
-        { message: 'Invalid refresh token' },
+        { code: 'INVALID_REFRESH_TOKEN' },
         { status: 401 },
       )
     }
 
     /* =========================
-       3️⃣ 기존 refreshToken 폐기 (회전)
+       4️⃣ 기존 refreshToken 폐기
     ========================= */
     await db.query(`UPDATE refresh_tokens SET revoked = true WHERE token = ?`, [
       refreshToken,
     ])
 
     /* =========================
-       4️⃣ 새 refreshToken 발급 (+30일)
+       5️⃣ 새 refreshToken 발급
     ========================= */
     const newRefreshToken = jwt.sign(
       { id: userId },
@@ -68,40 +76,38 @@ export async function POST(req: Request) {
     )
 
     /* =========================
-       5️⃣ users 테이블에서 school_code 조회 (🔥 핵심)
+       6️⃣ 새 accessToken 발급
     ========================= */
     const [userRows]: any = await db.query(
       `SELECT school_code FROM users WHERE id = ?`,
       [userId],
     )
 
-    if (userRows.length === 0) {
-      return NextResponse.json({ message: 'User not found' }, { status: 401 })
-    }
-
-    const schoolCode = userRows[0].school_code
-
-    /* =========================
-       6️⃣ 새 accessToken 발급
-    ========================= */
     const newAccessToken = jwt.sign(
       {
         id: userId,
-        school_code: schoolCode,
+        school_code: userRows[0].school_code,
       },
       process.env.JWT_SECRET!,
       { expiresIn: '1h' },
     )
 
     /* =========================
-       7️⃣ 응답
+       7️⃣ 응답 + 쿠키 갱신
     ========================= */
-    return NextResponse.json({
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
+    const res = NextResponse.json({ accessToken: newAccessToken })
+
+    res.cookies.set('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
     })
+
+    return res
   } catch (e) {
     console.error('❌ refresh error:', e)
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ code: 'REFRESH_FAILED' }, { status: 401 })
   }
 }

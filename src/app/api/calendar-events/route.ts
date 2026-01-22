@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 /* ==============================
    GET : 사용자 일정 조회
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   WHERE user_id = ?
   ORDER BY event_date ASC
       `,
-      [Number(userId)]
+      [Number(userId)],
     )
 
     return NextResponse.json(rows)
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         end_time || null,
         color || null,
         event_date,
-      ]
+      ],
     )
 
     return NextResponse.json({ success: true })
@@ -126,7 +126,7 @@ export async function PUT(req: Request) {
         event_date,
         Number(id),
         Number(userId),
-      ]
+      ],
     )
 
     return NextResponse.json({ success: true })
@@ -155,7 +155,7 @@ export async function DELETE(req: Request) {
       WHERE id = ?
         AND user_id = ?
       `,
-      [Number(id), Number(userId)]
+      [Number(id), Number(userId)],
     )
 
     return NextResponse.json({ success: true })

@@ -99,7 +99,7 @@ export default function HomePage() {
     /* ==========================================
        📆 오늘 요일
     ========================================== */
-    const dayNames = ['월', '화', '수', '목', '금']
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
     const now = new Date()
     setToday(`${dayNames[now.getDay()]}요일`)
 
@@ -129,7 +129,7 @@ export default function HomePage() {
         const weekStart = todayZero - diffToMonday * msPerDay
         const weekEnd = weekStart + 6 * msPerDay
 
-        const dayNames = ['월', '화', '수', '목', '금']
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토']
         let list: HomeCalendarItem[] = []
 
         /* ======================

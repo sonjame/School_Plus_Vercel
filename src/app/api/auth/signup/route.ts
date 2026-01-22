@@ -1,4 +1,4 @@
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
 
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       level,
       grade,
       social_id,
+      provider,
     } = await req.json()
 
     // 🔐 비밀번호 검증 (카카오 포함)
@@ -24,29 +25,37 @@ export async function POST(req: Request) {
     if (!password || !passwordRegex.test(password)) {
       return NextResponse.json(
         { message: '비밀번호 조건을 만족하지 않습니다.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
     // ✅ 무조건 사용자가 입력한 비밀번호 사용
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    const authProvider: 'email' | 'kakao' | 'google' =
+      provider ??
+      (social_id
+        ? 'kakao' // 실제로는 인증 완료 API에서 명확히 지정
+        : 'email')
+
     await db.query(
       `INSERT INTO users 
-   (username, password, name, email, social_id, school, school_code, edu_code, level, grade)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (username, password, name, email, social_id,
+        school, school_code, edu_code, level, grade, provider)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         hashedPassword,
         name,
         email,
-        social_id, // 🔥 이게 NULL이면 안 됨
+        authProvider === 'email' ? null : social_id,
         school,
         schoolCode,
         eduCode,
         level,
         grade,
-      ]
+        authProvider,
+      ],
     )
 
     return NextResponse.json({ ok: true })
@@ -54,7 +63,7 @@ export async function POST(req: Request) {
     console.error('signup error:', err)
     return NextResponse.json(
       { message: '회원가입 중 오류가 발생했습니다.' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

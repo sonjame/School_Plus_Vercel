@@ -1,10 +1,13 @@
 import mysql from 'mysql2/promise'
 
-export const db = mysql.createPool({
-  host: 'localhost',
-  user: 'schoolplus',
-  password: 'schoolplus123!',
-  database: 'schooling',
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: 'railway',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 5,
 })
+
+export default db

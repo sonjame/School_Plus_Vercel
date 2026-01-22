@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function POST(req: Request) {
   try {
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     if (!username || !school || !eduCode || !schoolCode) {
       return NextResponse.json(
         { message: '요청 값이 올바르지 않습니다.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       `UPDATE users 
    SET school = ?, edu_code = ?, school_code = ?
    WHERE username = ?`,
-      [school, eduCode, schoolCode, username]
+      [school, eduCode, schoolCode, username],
     )
 
     // ✅ 반드시 JSON 반환
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
         eduCode,
         schoolCode,
       },
-      { status: 200 }
+      { status: 200 },
     )
   } catch (err) {
     console.error('학교 변경 API 오류:', err)
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     // ✅ 에러여도 JSON 반환
     return NextResponse.json(
       { message: '서버 오류가 발생했습니다.' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

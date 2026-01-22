@@ -26,6 +26,7 @@ export default function BoardMainPage() {
       { key: 'grade1', title: '1학년게시판', icon: '1️⃣' },
       { key: 'grade2', title: '2학년게시판', icon: '2️⃣' },
       { key: 'grade3', title: '3학년게시판', icon: '3️⃣' },
+      { key: 'graduate', title: '졸업생게시판', icon: '🧭' },
     ]
 
     async function load() {

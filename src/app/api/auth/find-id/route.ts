@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { RowDataPacket } from 'mysql2'
 
 export async function POST(req: Request) {
@@ -18,19 +18,19 @@ export async function POST(req: Request) {
   if (method === 'kakao') {
     return NextResponse.json(
       { message: '카카오 로그인 회원은 카카오 로그인을 이용해주세요.' },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
   const [rows] = await db.query<(RowDataPacket & { username: string })[]>(
     query,
-    params
+    params,
   )
 
   if (rows.length === 0) {
     return NextResponse.json(
       { message: '해당 정보로 가입된 회원이 없습니다.' },
-      { status: 404 }
+      { status: 404 },
     )
   }
 

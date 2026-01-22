@@ -1,4 +1,4 @@
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
 
   const [rows]: any = await db.query(
     'SELECT id FROM users WHERE username = ?',
-    [username]
+    [username],
   )
 
   return NextResponse.json({

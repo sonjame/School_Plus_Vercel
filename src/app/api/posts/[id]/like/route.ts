@@ -1,10 +1,10 @@
 // app/api/posts/[id]/like/route.ts
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -17,24 +17,24 @@ export async function POST(
     // 중복 좋아요 체크
     const [[exist]]: any = await db.query(
       `SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?`,
-      [postId, userId]
+      [postId, userId],
     )
 
     if (exist) {
       await db.query(
         `DELETE FROM post_likes WHERE post_id = ? AND user_id = ?`,
-        [postId, userId]
+        [postId, userId],
       )
     } else {
       await db.query(
         `INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)`,
-        [postId, userId]
+        [postId, userId],
       )
     }
 
     const [[{ count }]]: any = await db.query(
       `SELECT COUNT(*) as count FROM post_likes WHERE post_id = ?`,
-      [postId]
+      [postId],
     )
 
     await db.query(`UPDATE posts SET likes = ? WHERE id = ?`, [count, postId])

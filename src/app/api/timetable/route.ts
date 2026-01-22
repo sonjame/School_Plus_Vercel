@@ -1,4 +1,4 @@
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
       AND semester = ?
     ORDER BY day, period
     `,
-    [userId, year, semester]
+    [userId, year, semester],
   )
 
   return NextResponse.json(rows)
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
   await db.query(
     `DELETE FROM timetables WHERE user_id = ? AND year = ? AND semester = ?`,
-    [userId, year, semester]
+    [userId, year, semester],
   )
 
   for (const c of classes) {
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       (user_id, year, semester, day, period, subject, teacher, room)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [userId, year, semester, c.day, c.period, c.subject, c.teacher, c.room]
+      [userId, year, semester, c.day, c.period, c.subject, c.teacher, c.room],
     )
   }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db' // mysql2/promise pool
+import db from '@/src/lib/db' // mysql2/promise pool
 import fetch from 'node-fetch'
 
 type NeisSchoolScheduleResponse = {

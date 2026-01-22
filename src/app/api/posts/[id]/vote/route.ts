@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 
 export async function POST(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: postId } = await context.params
@@ -27,7 +27,7 @@ export async function POST(
       WHERE post_id = ?
       ORDER BY id ASC
       `,
-      [postId]
+      [postId],
     )
 
     const option = options[optionIndex]
@@ -43,7 +43,7 @@ export async function POST(
       FROM post_vote_logs
       WHERE post_id = ? AND user_id = ?
       `,
-      [postId, userId]
+      [postId, userId],
     )
 
     if (exist) {
@@ -54,7 +54,7 @@ export async function POST(
           DELETE FROM post_vote_logs
           WHERE post_id = ? AND user_id = ?
           `,
-          [postId, userId]
+          [postId, userId],
         )
       } else {
         // 다른 옵션 → 변경
@@ -64,7 +64,7 @@ export async function POST(
           SET option_id = ?, voted_at = NOW()
           WHERE post_id = ? AND user_id = ?
           `,
-          [optionId, postId, userId]
+          [optionId, postId, userId],
         )
       }
     } else {
@@ -74,7 +74,7 @@ export async function POST(
         INSERT INTO post_vote_logs (post_id, user_id, option_id)
         VALUES (?, ?, ?)
         `,
-        [postId, userId, optionId]
+        [postId, userId, optionId],
       )
     }
 

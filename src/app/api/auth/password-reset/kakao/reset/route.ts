@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import bcrypt from 'bcrypt'
 
 export async function POST(req: Request) {
@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     if (!username || !newPassword) {
       return NextResponse.json(
         { message: '잘못된 요청입니다.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -22,13 +22,13 @@ export async function POST(req: Request) {
       WHERE username = ?
         AND provider = 'kakao'
       `,
-      [hashed, username]
+      [hashed, username],
     )
 
     if (result.affectedRows === 0) {
       return NextResponse.json(
         { message: '계정을 찾을 수 없습니다.' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 

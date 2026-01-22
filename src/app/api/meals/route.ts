@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 
 // NEIS 호출 함수 (지금 쓰는 로직 거의 그대로)
 async function fetchMealFromNEIS(
   date: string,
   eduCode: string,
-  schoolCode: string
+  schoolCode: string,
 ) {
   const key = process.env.NEXT_PUBLIC_NEIS_KEY
   const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=${key}&Type=json&ATPT_OFCDC_SC_CODE=${eduCode}&SD_SCHUL_CODE=${schoolCode}&MLSV_YMD=${date}`
@@ -24,7 +24,7 @@ async function fetchMealFromNEIS(
       v
         .replace(/[\u2460-\u2473]/g, '')
         .replace(/\(\s?[0-9.]+\s?\)/g, '')
-        .trim()
+        .trim(),
     )
     .filter(Boolean)
 }
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   const [rows]: any = await db.query(
     `SELECT menu FROM meals
      WHERE school_code=? AND meal_date=? AND meal_type='중식'`,
-    [schoolCode, mysqlDate]
+    [schoolCode, mysqlDate],
   )
 
   if (rows.length > 0) {
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   await db.query(
     `INSERT INTO meals (school_code, edu_code, meal_date, menu)
      VALUES (?, ?, ?, ?)`,
-    [schoolCode, eduCode, mysqlDate, JSON.stringify(meal)]
+    [schoolCode, eduCode, mysqlDate, JSON.stringify(meal)],
   )
 
   return NextResponse.json({ meal })
