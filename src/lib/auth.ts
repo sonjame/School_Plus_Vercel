@@ -83,8 +83,8 @@ export const authOptions: NextAuthOptions = {
 
     // ✅ 이거 추가!!!
     async redirect({ url, baseUrl }) {
-      // 회원가입 페이지로 보내고 싶다면
-      return `${baseUrl}/signup`
+      if (url.startsWith(baseUrl)) return url
+      return `${baseUrl}/auth/signup`
     },
   },
 }
