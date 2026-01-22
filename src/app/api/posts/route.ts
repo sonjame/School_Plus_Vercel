@@ -22,27 +22,35 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const category = searchParams.get('category')
 
-    const [rows] = await db.query(
-      `
-      SELECT
-        p.id,
-        p.title,
-        p.content,
-        p.category,
-        u.name AS author,
-        p.likes,
-        COUNT(DISTINCT c.id) AS commentCount,
-        DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') AS created_at
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      LEFT JOIN post_comments c ON p.id = c.post_id
-      WHERE p.category = ?
-        AND p.school_code = ?
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-      `,
-      [category, schoolCode],
-    )
+    let query = `
+  SELECT
+    p.id,
+    p.title,
+    p.content,
+    p.category,
+    u.name AS author,
+    p.likes,
+    COUNT(DISTINCT c.id) AS commentCount,
+    DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') AS created_at
+  FROM posts p
+  JOIN users u ON p.user_id = u.id
+  LEFT JOIN post_comments c ON p.id = c.post_id
+  WHERE p.school_code = ?
+`
+
+    const params: any[] = [schoolCode]
+
+    if (category) {
+      query += ` AND p.category = ?`
+      params.push(category)
+    }
+
+    query += `
+  GROUP BY p.id
+  ORDER BY p.created_at DESC
+`
+
+    const [rows] = await db.query(query, params)
 
     return NextResponse.json(rows)
   } catch (e) {
@@ -67,6 +75,13 @@ export async function POST(req: Request) {
 
     const userId = decoded.id
     const schoolCode = decoded.school_code
+
+    if (!schoolCode) {
+      return NextResponse.json(
+        { message: 'school_code가 토큰에 없습니다. 다시 로그인해주세요.' },
+        { status: 401 },
+      )
+    }
 
     const { title, content, category, images, vote } = await req.json()
 
