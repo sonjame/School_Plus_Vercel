@@ -54,9 +54,16 @@ export async function POST(req: Request) {
     }
 
     /* 3️⃣ Access Token */
-    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    })
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        school_code: user.school_code, // ⭐ 이 줄 추가
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '1h',
+      },
+    )
 
     /* 4️⃣ Refresh Token */
     const refreshToken = jwt.sign(
