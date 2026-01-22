@@ -13,6 +13,8 @@ import {
   Bar,
 } from 'recharts'
 
+type ExamType = keyof typeof EXAM_TO_SEMESTER
+
 /* ================= 상수 ================= */
 const EXAMS = [
   '1학기 중간고사',
@@ -115,7 +117,8 @@ export default function GradePage() {
       return
     }
 
-    const semester = EXAM_TO_SEMESTER[selectedExam]
+    const semester = EXAM_TO_SEMESTER[selectedExam as ExamType]
+
     const scores = scoresByExam[selectedExam]
 
     if (!scores || Object.keys(scores).length === 0) {
@@ -185,7 +188,7 @@ export default function GradePage() {
     const token = localStorage.getItem('accessToken')
     if (!token) return alert('로그인이 필요합니다.')
 
-    const semester = EXAM_TO_SEMESTER[selectedExam]
+    const semester = EXAM_TO_SEMESTER[selectedExam as ExamType]
 
     const res = await fetch('/api/exam-score', {
       method: 'POST',
@@ -252,7 +255,7 @@ export default function GradePage() {
     setSubjectsByExam((prev) => ({
       ...prev,
       [selectedExam]: prev[selectedExam].map((s) =>
-        s === oldSubject ? newName : s
+        s === oldSubject ? newName : s,
       ),
     }))
 
@@ -275,14 +278,14 @@ export default function GradePage() {
 
     const res = await fetch(
       `/api/exam-score?year=${selectedYear}&exam=${encodeURIComponent(
-        selectedExam
+        selectedExam,
       )}&subject=${encodeURIComponent(subject)}`,
       {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     )
 
     if (!res.ok) return alert('과목 삭제 실패')
@@ -301,7 +304,7 @@ export default function GradePage() {
 
   /* ================= 시간표 과목 불러오기 ================= */
   const loadFromTimetable = async () => {
-    const semester = EXAM_TO_SEMESTER[selectedExam]
+    const semester = EXAM_TO_SEMESTER[selectedExam as ExamType]
 
     const token = localStorage.getItem('accessToken')
 
@@ -316,7 +319,7 @@ export default function GradePage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     )
 
     if (!res.ok) {
@@ -330,8 +333,10 @@ export default function GradePage() {
     // ✅ 과목명만 추출 + 중복 제거
     const subjects = Array.from(
       new Set(
-        data.map((row: any) => String(row.subject ?? '').trim()).filter(Boolean)
-      )
+        data
+          .map((row: any) => String(row.subject ?? '').trim())
+          .filter(Boolean),
+      ),
     )
 
     setSubjectsByExam((prev: any) => ({
