@@ -1,16 +1,18 @@
 import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/src/lib/auth'
+import jwt from 'jsonwebtoken'
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session) {
+  /* 🔐 JWT 인증 */
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) {
     return NextResponse.json([], { status: 401 })
   }
 
-  const userId = session.user.id
+  const token = authHeader.replace('Bearer ', '')
+  const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+
+  const userId = decoded.id // ✅ 여기서 id 확보
 
   const { searchParams } = new URL(req.url)
   const year = Number(searchParams.get('year'))
