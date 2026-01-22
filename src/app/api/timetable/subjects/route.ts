@@ -1,4 +1,4 @@
-import { db } from '@/src/lib/db'
+import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/src/lib/auth'
@@ -6,7 +6,7 @@ import { authOptions } from '@/src/lib/auth'
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.id) {
+  if (!session) {
     return NextResponse.json([], { status: 401 })
   }
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       AND year = ?
       AND semester = ?
     `,
-    [userId, year, semester]
+    [userId, year, semester],
   )
 
   return NextResponse.json(rows)
