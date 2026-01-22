@@ -361,7 +361,11 @@ export default function GradePage() {
   /* ================= 그래프 데이터 ================= */
   const chartData = EXAMS.map((exam) => {
     const s = scoresByExam[exam]
-    const values = s ? Object.values(s) : []
+
+    const values = s
+      ? Object.values(s).filter((v): v is number => typeof v === 'number')
+      : []
+
     return {
       label: exam.replace('학기 ', '').replace('고사', ''),
       avg: values.length
