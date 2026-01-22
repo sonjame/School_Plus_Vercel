@@ -222,6 +222,11 @@ export default function MyInfoPagePreview() {
       return
     }
 
+    if (!user) {
+      alert('사용자 정보가 없습니다.')
+      return
+    }
+
     const res = await fetch('/api/user/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
