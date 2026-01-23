@@ -81,10 +81,6 @@ export const authOptions: NextAuthOptions = {
       return session
     },
 
-    // ✅ 이거 추가!!!
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) return url
-      return `${baseUrl}/auth/signup`
-    },
+    // ❌ redirect 콜백 제거
   },
 }
