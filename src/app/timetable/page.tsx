@@ -24,15 +24,15 @@ interface SubjectReview {
 const fetchSubjectReviews = async (
   year: number,
   semester: '1학기' | '2학기',
-  school: string
+  school: string,
 ) => {
   const res = await fetch(
     `/api/subject-review?year=${year}&semester=${semester}&school=${encodeURIComponent(
-      school
+      school,
     )}`,
     {
       cache: 'no-store',
-    }
+    },
   )
 
   if (!res.ok) return {}
@@ -127,7 +127,7 @@ export default function TimetablePage() {
 
   const YEARS = Array.from(
     { length: 3 + 1 + 1 }, // 과거3 + 현재1 + 미래1
-    (_, i) => CURRENT_YEAR - 3 + i
+    (_, i) => CURRENT_YEAR - 3 + i,
   )
 
   const [term, setTerm] = useState<{
@@ -270,7 +270,7 @@ export default function TimetablePage() {
 
     const url = getShareURL()
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/png')
+      canvas.toBlob((b) => resolve(b), 'image/png'),
     )
     if (!blob) return alert('이미지 변환 실패')
 
@@ -302,7 +302,7 @@ export default function TimetablePage() {
     if (!edit) return
     if (!edit.subject.trim()) {
       const filtered = classes.filter(
-        (c) => !(c.day === edit.day && c.period === edit.period)
+        (c) => !(c.day === edit.day && c.period === edit.period),
       )
       save(filtered)
       setEdit(null)
@@ -310,7 +310,7 @@ export default function TimetablePage() {
     }
 
     const filtered = classes.filter(
-      (c) => !(c.day === edit.day && c.period === edit.period)
+      (c) => !(c.day === edit.day && c.period === edit.period),
     )
     save([...filtered, edit])
     setEdit(null)
@@ -319,7 +319,7 @@ export default function TimetablePage() {
   const deleteEdit = () => {
     if (!edit) return
     const filtered = classes.filter(
-      (c) => !(c.day === edit.day && c.period === edit.period)
+      (c) => !(c.day === edit.day && c.period === edit.period),
     )
     save(filtered)
     setEdit(null)
@@ -358,7 +358,7 @@ export default function TimetablePage() {
   useEffect(() => {
     if (!mySchool) return
     fetchSubjectReviews(term.year, term.semester, mySchool).then(
-      setSubjectReviews
+      setSubjectReviews,
     )
   }, [term, mySchool])
 
@@ -366,8 +366,8 @@ export default function TimetablePage() {
     new Set(
       (Array.isArray(classes) ? classes : [])
         .filter((c) => c.subject && c.teacher)
-        .map((c) => `${c.subject}|${c.teacher}`)
-    )
+        .map((c) => `${c.subject}|${c.teacher}`),
+    ),
   )
   const makeReviewKey = (subject: string, teacher: string) =>
     `${subject}|${teacher}`
@@ -408,7 +408,7 @@ export default function TimetablePage() {
                 <option key={`${y}-${s}`} value={`${y}-${s}`}>
                   {y}년 · {s}
                 </option>
-              ))
+              )),
             )}
           </select>
         </div>
@@ -428,9 +428,10 @@ export default function TimetablePage() {
       <div
         ref={tableRef}
         style={{
-          width: '100%',
+          width: '105%',
           maxWidth: '1000px',
-          margin: '0 auto',
+          marginLeft: -10,
+          margin: '0',
           overflowX: 'auto',
         }}
       >
@@ -453,7 +454,7 @@ export default function TimetablePage() {
 
                 {DAYS.map((d) => {
                   const cell = classes.find(
-                    (c) => c.day === d && c.period === p
+                    (c) => c.day === d && c.period === p,
                   )
 
                   const bg = cell ? getSubjectColor(cell.subject) : '#f8f8f8'
@@ -464,7 +465,7 @@ export default function TimetablePage() {
                       onClick={() => openEdit(d, p)}
                       style={{
                         border: '1px solid #000',
-                        height: 70,
+                        height: 55,
                         background: bg,
                         cursor: 'pointer',
                         verticalAlign: 'middle',
@@ -867,7 +868,7 @@ export default function TimetablePage() {
               const updated = await fetchSubjectReviews(
                 term.year,
                 term.semester,
-                mySchool // ✅ 반드시 전달
+                mySchool, // ✅ 반드시 전달
               )
               setSubjectReviews(updated)
 
@@ -953,7 +954,7 @@ export default function TimetablePage() {
                             const updated = await fetchSubjectReviews(
                               term.year,
                               term.semester,
-                              mySchool
+                              mySchool,
                             )
 
                             setSubjectReviews(updated)
@@ -978,7 +979,7 @@ export default function TimetablePage() {
                             const updated = await fetchSubjectReviews(
                               term.year,
                               term.semester,
-                              mySchool
+                              mySchool,
                             )
 
                             setSubjectReviews(updated)
@@ -1113,7 +1114,11 @@ const modalBox: React.CSSProperties = {
   background: 'white',
   borderRadius: 12,
   padding: 20,
-  width: 360,
+  width: '80%', // ✅ 모바일 대응
+  maxWidth: 420, // ✅ PC 최대 폭
+  maxHeight: '80dvh', // ✅ 모바일 화면 기준 높이
+  overflowY: 'auto', // ✅ 내용 많으면 스크롤
+
   boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
 }
 
@@ -1128,6 +1133,7 @@ const modalTitle: React.CSSProperties = {
 const modalButtons: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
+
   gap: 10,
   marginTop: 8,
 }

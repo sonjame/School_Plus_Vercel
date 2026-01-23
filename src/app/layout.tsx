@@ -133,7 +133,7 @@ export default function RootLayout({
         }}
       >
         {/* 모바일 햄버거 버튼 */}
-        {!isPC && (
+        {!isPC && !sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
             style={{
@@ -319,7 +319,6 @@ export default function RootLayout({
         {/* overlay */}
         {!isPC && sidebarOpen && (
           <div
-            onClick={() => setSidebarOpen(false)}
             style={{
               position: 'fixed',
               top: 0,

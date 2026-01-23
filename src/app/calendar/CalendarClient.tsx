@@ -720,6 +720,7 @@ export default function CalendarPage() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 10px;
+          margin-top: 40px;
         }
 
         .nav-btn {
@@ -741,8 +742,18 @@ export default function CalendarPage() {
           margin-bottom: 6px;
         }
 
+        .weekday-row {
+          text-align: center; /* ⭐ 요일 전체 중앙 */
+        }
+
+        .weekday-row .w {
+          display: flex;
+          justify-content: center;
+          align-items: center; /* ⭐ 각 요일 셀 중앙 */
+        }
+
         .grid-calendar {
-          gap: 10px;
+          gap: 2px;
         }
 
         .cell {
@@ -752,6 +763,7 @@ export default function CalendarPage() {
           padding: 6px;
           cursor: pointer;
           position: relative;
+          overflow: hidden; /* 🔥 넘치는 내용 숨김 */
         }
 
         .cell.empty {
@@ -1029,12 +1041,18 @@ export default function CalendarPage() {
 
         /* 🔥 삭제 확인 모달 */
         .delete-modal {
+          position: fixed; /* ⭐ 중요 */
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%); /* ⭐ 중앙 정렬 */
           background: #ffffff;
           border-radius: 14px;
           padding: 20px;
-          width: 360px;
+          width: 80%;
+          max-width: 360px;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
           animation: pop 0.15s ease-out;
+          z-index: 10000;
         }
 
         .delete-title {
@@ -1118,29 +1136,31 @@ export default function CalendarPage() {
 
           /* ===== 🔥 모달 덮어쓰기 (핵심) ===== */
           .modal {
-            width: 100%;
-            height: auto;
-            max-height: 75vh; /* 🔥 90 → 75 */
+            width: 80%;
+            height: 58dvh; /* 🔥 핵심 */
+            max-height: none; /* 🔥 제거 */
             border-radius: 16px 16px 0 0;
             position: fixed;
             bottom: 0;
-            left: 0;
+            top: 20%; /* ← 위로 올리는 핵심 */
+            left: 15;
             right: 0;
             overflow-y: auto;
-            padding: 12px 14px 20px; /* 🔥 padding 축소 */
+            padding: 16px 14px calc(env(safe-area-inset-bottom) + 20px);
           }
+
           .modal-backdrop {
             align-items: flex-end;
           }
 
           /* ===== 기타 모바일 조정 ===== */
           .cell {
-            min-height: 70px;
-            padding: 4px;
+            min-height: 55px;
+            padding: 0.5px;
           }
 
           .cell-date {
-            font-size: 12px;
+            font-size: 10px;
           }
 
           .add-btn {

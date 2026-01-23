@@ -257,7 +257,7 @@ export default function HomePage() {
       style={{
         maxWidth: '1000px',
         margin: '0 auto',
-        padding: 'clamp(10px, 3vw, 20px)',
+        padding: 'clamp(8px, 3vw, 16px)',
         backgroundColor: '#fff',
         borderRadius: '14px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
@@ -344,8 +344,9 @@ export default function HomePage() {
               style={{
                 display: 'flex',
                 gap: '12px',
-                overflowX: sortedTodayItems.length > 3 ? 'auto' : 'visible',
-                paddingBottom: '6px',
+                overflowX: 'auto', // 🔥 무조건 가로 스크롤
+                WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
+                paddingBottom: '8px',
               }}
             >
               {sortedTodayItems.map((item, idx) => (
@@ -355,7 +356,9 @@ export default function HomePage() {
                   style={{
                     textDecoration: 'none',
                     color: 'inherit',
-                    flex: '0 0 325px', // 🔥 카드 고정 폭
+                    flex: '0 0 clamp(240px, 80vw, 320px)',
+
+                    // 🔥 카드 고정 폭
                   }}
                 >
                   <div
@@ -426,8 +429,9 @@ export default function HomePage() {
               style={{
                 display: 'flex',
                 gap: '12px',
-                overflowX: sortedWeekItems.length > 3 ? 'auto' : 'visible',
-                paddingBottom: '6px',
+                overflowX: 'auto', // 🔥 무조건 가로 스크롤
+                WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
+                paddingBottom: '8px',
               }}
             >
               {sortedWeekItems.map((item, idx) => (
@@ -437,7 +441,9 @@ export default function HomePage() {
                   style={{
                     textDecoration: 'none',
                     color: 'inherit',
-                    flex: '0 0 325px', // 🔥 카드 고정 폭
+                    flex: '0 0 clamp(240px, 80vw, 320px)',
+
+                    // 🔥 카드 고정 폭
                   }}
                 >
                   <div
@@ -524,7 +530,9 @@ export default function HomePage() {
           style={{
             display: 'flex',
             gap: '8px',
-            flexWrap: 'wrap',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: '6px',
             marginBottom: '14px',
           }}
         >
@@ -542,6 +550,8 @@ export default function HomePage() {
                 background:
                   selectedCategory === tab.key ? '#4FC3F7' : '#E1F5FE',
                 color: selectedCategory === tab.key ? 'white' : '#0277BD',
+                whiteSpace: 'nowrap', // ⭐ 줄바꿈 방지 (핵심)
+                flex: '0 0 auto', // ⭐ 버튼 폭 고정
               }}
             >
               {tab.label}
@@ -765,10 +775,10 @@ function TodayTimetable({ today }: { today: string }) {
       style={{
         backgroundColor: '#E1F5FE',
         borderRadius: '12px',
-        padding: '16px',
+        padding: '12px',
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: '10px',
+        gap: '8px',
       }}
     >
       {todayList.map((c, i) => {

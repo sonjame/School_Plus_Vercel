@@ -894,7 +894,7 @@ export default function MyInfoPagePreview() {
                 background: 'white',
                 borderRadius: 12,
                 padding: 20,
-                width: '90%',
+                width: '80%',
                 maxWidth: 360,
               }}
             >
@@ -954,7 +954,7 @@ export default function MyInfoPagePreview() {
                 background: 'white',
                 borderRadius: 12,
                 padding: 20,
-                width: '90%',
+                width: '80%',
                 maxWidth: 360,
               }}
             >
@@ -1040,7 +1040,7 @@ export default function MyInfoPagePreview() {
                 background: 'white',
                 borderRadius: 12,
                 padding: 22,
-                width: '90%',
+                width: '80%',
                 maxWidth: 360,
                 textAlign: 'center',
               }}

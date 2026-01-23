@@ -54,7 +54,7 @@ export default function TimetablePreview() {
             headers: {
               Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
             },
-          }
+          },
         )
 
         if (!res.ok) return
@@ -93,13 +93,13 @@ export default function TimetablePreview() {
       </h3>
 
       {/* 요일 탭 */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
         {days.map((day) => (
           <button
             key={day}
             onClick={() => setSelectedDay(day)}
             style={{
-              padding: '6px 14px',
+              padding: '5px 12px',
               borderRadius: '8px',
               border: '1px solid #4FC3F7',
               backgroundColor: selectedDay === day ? '#4FC3F7' : 'white',
@@ -130,7 +130,7 @@ export default function TimetablePreview() {
         ) : (
           filtered.map((c, i) => {
             const colorKey = Object.keys(subjectColors).find((k) =>
-              c.subject.includes(k)
+              c.subject.includes(k),
             )
             const bg = colorKey
               ? subjectColors[colorKey]
