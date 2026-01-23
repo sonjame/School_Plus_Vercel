@@ -57,6 +57,18 @@ export default function RootLayout({
     }
   }, [])
 
+  // ✅ 여기 바로 아래에 추가 👇
+  useEffect(() => {
+    if (!isPC) {
+      document.body.style.overflow = sidebarOpen ? 'hidden' : 'auto'
+    }
+
+    // 🔥 컴포넌트 언마운트 시 복구 (중요)
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [sidebarOpen, isPC])
+
   // ⭐ alert 모달
   const showAlert = (msg: string, callback?: () => void) => {
     setModal({
@@ -163,7 +175,13 @@ export default function RootLayout({
             width: isPC ? '220px' : '240px',
             height: '100vh',
             background: '#4DB8FF',
-            padding: '20px 14px',
+
+            /* ✅ padding 분해 */
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            paddingLeft: '14px',
+            paddingRight: '14px',
+
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
@@ -172,41 +190,50 @@ export default function RootLayout({
             zIndex: 998,
             overflowY: 'auto',
             overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y',
           }}
         >
-          {/* 모바일 X */}
-          {!isPC && (
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                background: 'rgba(0,0,0,0.25)',
-                color: 'white',
-                border: 'none',
-                padding: '8px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                alignSelf: 'flex-end',
-              }}
-            >
-              ✕
-            </button>
-          )}
-
           {/* 학교 이름 표시 */}
-          <Link
-            href="/"
+          {/* 사이드바 헤더 */}
+          <div
             style={{
-              fontSize: '20px',
-              fontWeight: 700,
-              marginBottom: '18px',
-              color: 'white',
-              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '12px',
             }}
           >
-            {user?.school ? `🏫 ${user.school}` : 'School Community'}
-          </Link>
+            {/* 학교 이름 */}
+            <Link
+              href="/"
+              style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: 'white',
+                textDecoration: 'none',
+                lineHeight: 1.2,
+              }}
+            >
+              {user?.school ? `🏫 ${user.school}` : 'School Plus'}
+            </Link>
+
+            {/* 모바일 X 버튼 */}
+            {!isPC && (
+              <button
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
           {/* 메뉴 */}
           <MenuItem icon="👤" label="내정보" href="/my-info" />
@@ -319,6 +346,7 @@ export default function RootLayout({
         {/* overlay */}
         {!isPC && sidebarOpen && (
           <div
+            onClick={() => setSidebarOpen(false)} // ⭐ 핵심
             style={{
               position: 'fixed',
               top: 0,

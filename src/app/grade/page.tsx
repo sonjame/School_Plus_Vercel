@@ -12,6 +12,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
+import Modal from '@/src/components/Modal'
 
 type ExamType = keyof typeof EXAM_TO_SEMESTER
 
@@ -52,6 +53,20 @@ export default function GradePage() {
 
   const [editingSubject, setEditingSubject] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [savedModalOpen, setSavedModalOpen] = useState(false)
+
+  const [isMobile, setIsMobile] = useState(false)
+
+  const [subjectAlertOpen, setSubjectAlertOpen] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   /* ================= 로드 ================= */
   useEffect(() => {
@@ -149,7 +164,7 @@ export default function GradePage() {
     // ✅ 핵심: 저장 후 다시 로드
     await reloadScores()
 
-    alert('점수가 저장되었습니다.')
+    setSavedModalOpen(true)
   }
 
   const reloadScores = async () => {
@@ -183,7 +198,10 @@ export default function GradePage() {
 
   const addSubject = async () => {
     const subject = newSubject.trim()
-    if (!subject) return alert('과목명을 입력하세요')
+    if (!subject) {
+      setSubjectAlertOpen(true)
+      return
+    }
 
     const token = localStorage.getItem('accessToken')
     if (!token) return alert('로그인이 필요합니다.')
@@ -271,8 +289,6 @@ export default function GradePage() {
   }
 
   const deleteSubject = async (subject: string) => {
-    if (!confirm(`"${subject}" 과목을 삭제할까요?`)) return
-
     const token = localStorage.getItem('accessToken')
     if (!token) return
 
@@ -300,6 +316,12 @@ export default function GradePage() {
       delete next[subject]
       return { ...prev, [selectedExam]: next }
     })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    await deleteSubject(deleteTarget)
+    setDeleteTarget(null)
   }
 
   /* ================= 시간표 과목 불러오기 ================= */
@@ -387,7 +409,54 @@ export default function GradePage() {
         rel="stylesheet"
       />
 
-      <div style={styles.wrapper}>
+      {/* ================= 모달 영역 ================= */}
+
+      {/* 🗑 과목 삭제 모달 */}
+      <Modal
+        open={!!deleteTarget}
+        title="과목 삭제"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        confirmText="삭제"
+        danger
+      >
+        <p>
+          <b>{deleteTarget}</b> 과목을 삭제할까요?
+          <br />
+          삭제된 점수는 복구할 수 없습니다.
+        </p>
+      </Modal>
+
+      {/* 💾 저장 완료 모달 */}
+      <Modal
+        open={savedModalOpen}
+        title="저장 완료"
+        onClose={() => setSavedModalOpen(false)} // 필수
+        onConfirm={() => setSavedModalOpen(false)}
+        confirmText="확인"
+        showCancel={false} // ⭐ 여기!
+      >
+        <p>점수가 정상적으로 저장되었습니다 ✅</p>
+      </Modal>
+
+      {/* ⚠️ 과목명 입력 안내 모달 */}
+      <Modal
+        open={subjectAlertOpen}
+        title="입력 오류"
+        onClose={() => setSubjectAlertOpen(false)}
+        onConfirm={() => setSubjectAlertOpen(false)}
+        confirmText="확인"
+        showCancel={false}
+      >
+        <p>과목명을 입력하세요.</p>
+      </Modal>
+
+      <div
+        style={{
+          ...styles.wrapper,
+          padding: isMobile ? '16px 8px' : '40px 0',
+        }}
+      >
         <div style={styles.page}>
           <h1 style={styles.title}>
             <span className="material-symbols-rounded">school</span>
@@ -395,7 +464,13 @@ export default function GradePage() {
           </h1>
 
           {/* 상단 컨트롤 */}
-          <div style={styles.topRow}>
+          <div
+            style={{
+              ...styles.topRow,
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+            }}
+          >
             {/* 왼쪽: 년도 + 시간표 */}
             <div style={styles.yearGroup}>
               <select
@@ -410,7 +485,14 @@ export default function GradePage() {
                 ))}
               </select>
 
-              <button style={styles.greenBtn} onClick={loadFromTimetable}>
+              <button
+                style={{
+                  ...styles.greenBtn,
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
+                }}
+                onClick={loadFromTimetable}
+              >
                 <span className="material-symbols-rounded">schedule</span>
                 시간표 불러오기
               </button>
@@ -419,7 +501,10 @@ export default function GradePage() {
             {/* 오른쪽: 점수 마스킹 */}
             <button
               onClick={() => setMaskScore((v) => !v)}
-              style={styles.maskBtn}
+              style={{
+                ...styles.maskBtn,
+                width: isMobile ? '100%' : 'auto',
+              }}
             >
               {maskScore ? '점수 보기 👁️' : '점수 가리기 🙈'}
             </button>
@@ -433,6 +518,9 @@ export default function GradePage() {
                 onClick={() => setSelectedExam(exam)}
                 style={{
                   ...styles.examBtn,
+                  flex: isMobile ? '1 1 45%' : 'none',
+                  padding: isMobile ? '12px 10px' : '8px 14px',
+                  fontSize: isMobile ? 14 : 13,
                   background: selectedExam === exam ? '#2563eb' : '#f1f5f9',
                   color: selectedExam === exam ? '#fff' : '#111',
                 }}
@@ -446,7 +534,14 @@ export default function GradePage() {
 
           <div style={styles.card}>
             {subjects.map((subj) => (
-              <div key={subj} style={styles.subjectRow}>
+              <div
+                key={subj}
+                style={{
+                  ...styles.subjectRow,
+                  flexDirection: 'row',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                }}
+              >
                 <div style={styles.left}>
                   {editingSubject === subj ? (
                     <input
@@ -468,7 +563,12 @@ export default function GradePage() {
                     type={maskScore ? 'password' : 'text'}
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    style={styles.scoreInput}
+                    style={{
+                      ...styles.scoreInput,
+                      width: isMobile ? 64 : 80,
+                      fontSize: isMobile ? 14 : 14,
+                      padding: isMobile ? '6px' : '7px',
+                    }}
                     placeholder="점수 입력"
                     value={scores[subj] ?? ''}
                     onChange={(e) => {
@@ -498,7 +598,7 @@ export default function GradePage() {
                     </>
                   ) : (
                     <>
-                      <button onClick={() => deleteSubject(subj)}>🗑</button>
+                      <button onClick={() => setDeleteTarget(subj)}>🗑</button>
                     </>
                   )}
                 </div>
@@ -532,7 +632,7 @@ export default function GradePage() {
 
           {/* 그래프 카드 */}
           <div style={styles.graphCard}>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={isMobile ? 220 : 280}>
               {graphType === 'line' ? (
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -613,7 +713,7 @@ const styles = {
   },
 
   page: {
-    maxWidth: 1200,
+    maxWidth: 1100,
     width: '100%',
     margin: '0 auto',
     padding: 'clamp(16px, 5vw, 50px)',
@@ -671,6 +771,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 10, // ✅ 추가
   },
 
   scoreInput: {
