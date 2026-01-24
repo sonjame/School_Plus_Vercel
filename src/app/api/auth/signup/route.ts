@@ -34,10 +34,16 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     /* ===============================
-       2️⃣ provider 그대로 사용
+   2️⃣ provider 검증 (수정)
     =============================== */
-    const authProvider: 'email' | 'kakao' | 'google' =
-      provider === 'kakao' || provider === 'google' ? provider : 'email'
+    if (provider !== 'email' && provider !== 'kakao' && provider !== 'google') {
+      return NextResponse.json(
+        { message: 'provider 값이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
+
+    const authProvider = provider
 
     /* ===============================
        3️⃣ social_id 규칙
