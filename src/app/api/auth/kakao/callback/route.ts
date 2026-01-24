@@ -84,7 +84,7 @@ export async function GET(req: Request) {
   =================================================== */
   const baseUrl =
     process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000'
+      ? 'https://school-plus-vercel.vercel.app/'
       : process.env.NEXT_PUBLIC_BASE_URL
 
   return NextResponse.redirect(

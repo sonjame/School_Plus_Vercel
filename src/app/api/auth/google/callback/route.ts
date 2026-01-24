@@ -45,10 +45,9 @@ export async function GET(req: Request) {
   const email = user.email
   const picture = user.picture
 
-  const baseUrl = process.env.BASE_URL!
-
+  // 🔥 signup 페이지로 사용자 정보 전달
   return NextResponse.redirect(
-    `${baseUrl}/auth/signup?verified=1&id=${id}&name=${encodeURIComponent(
+    `http://localhost:3000/auth/signup?verified=1&id=${id}&name=${encodeURIComponent(
       name,
     )}&email=${email}&picture=${encodeURIComponent(picture)}`,
   )
