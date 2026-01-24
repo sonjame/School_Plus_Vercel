@@ -18,7 +18,6 @@ export async function POST(req: Request) {
       provider,
     } = await req.json()
 
-    // 🔐 비밀번호 검증 (카카오 포함)
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{6,}$/
 
@@ -29,14 +28,17 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ 무조건 사용자가 입력한 비밀번호 사용
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const authProvider: 'email' | 'kakao' | 'google' =
-      provider ??
-      (social_id
-        ? 'kakao' // 실제로는 인증 완료 API에서 명확히 지정
-        : 'email')
+    // ✅ provider는 추론하지 말고 그대로 사용
+    const authProvider: 'email' | 'kakao' | 'google' = provider ?? 'email'
+
+    // 🔥 테스트용 social_id (중복 허용)
+    const realSocialId = social_id
+    const testSocialId =
+      process.env.NODE_ENV === 'development' && realSocialId
+        ? `${realSocialId}_${Date.now()}`
+        : realSocialId
 
     await db.query(
       `INSERT INTO users 
@@ -48,7 +50,7 @@ export async function POST(req: Request) {
         hashedPassword,
         name,
         email,
-        authProvider === 'email' ? null : social_id,
+        authProvider === 'email' ? null : testSocialId,
         school,
         schoolCode,
         eduCode,
