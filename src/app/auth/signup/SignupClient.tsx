@@ -256,11 +256,19 @@ export default function SignupPage() {
   const handleFinalSubmit = async () => {
     const social = JSON.parse(localStorage.getItem('socialUser') || '{}')
 
+    let provider: 'email' | 'kakao' | 'google' = 'email'
+
+    if (social?.id) {
+      // 카카오/구글로 왔으면 query의 provider 사용
+      provider = (searchParams.get('provider') as any) || 'kakao'
+    }
+
     const body = {
       username,
       password,
       name: realName,
       email: verifiedEmail || null,
+      provider,
       social_id: social.id || null, // ⭐⭐⭐ 이 줄 추가 (핵심)
       school,
       schoolCode,
