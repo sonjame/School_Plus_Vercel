@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     /* ===============================
-   2️⃣ provider 검증 (수정)
+   2️⃣ provider 검증
     =============================== */
     if (provider !== 'email' && provider !== 'kakao' && provider !== 'google') {
       return NextResponse.json(
@@ -46,8 +46,15 @@ export async function POST(req: Request) {
     const authProvider = provider
 
     /* ===============================
-       3️⃣ social_id 규칙
+   3️⃣ social_id 규칙
     =============================== */
+    if (authProvider !== 'email' && !social_id) {
+      return NextResponse.json(
+        { message: 'social_id가 필요합니다.' },
+        { status: 400 },
+      )
+    }
+
     const finalSocialId = authProvider === 'email' ? null : social_id
 
     /* ===============================
