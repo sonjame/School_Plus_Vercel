@@ -83,12 +83,17 @@ export default function SignupPage() {
     const socialId = searchParams.get('id') || searchParams.get('social_id')
 
     if (socialName && socialId) {
+      const provider =
+        searchParams.get('provider') ||
+        (searchParams.get('id') ? 'google' : null)
+
       localStorage.setItem(
         'socialUser',
         JSON.stringify({
           id: socialId,
           name: socialName,
-          email: socialEmail || null, // 이메일 없어도 OK
+          email: socialEmail || null,
+          provider, // 🔥 핵심
         }),
       )
     }
@@ -258,9 +263,8 @@ export default function SignupPage() {
 
     let provider: 'email' | 'kakao' | 'google' = 'email'
 
-    if (social?.id) {
-      // 카카오/구글로 왔으면 query의 provider 사용
-      provider = (searchParams.get('provider') as any) || 'kakao'
+    if (social?.id && social.provider) {
+      provider = social.provider
     }
 
     const body = {
