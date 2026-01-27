@@ -255,7 +255,8 @@ export default function HomePage() {
   return (
     <div
       style={{
-        maxWidth: '1000px',
+        width: '100%',
+        maxWidth: '1600px',
         margin: '0 auto',
         padding: 'clamp(8px, 3vw, 16px)',
         backgroundColor: '#fff',
