@@ -14,8 +14,38 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+    const accessToken = authHeader.replace('Bearer ', '')
+    let decoded: any
+    let newAccessToken: string | null = null
+
+    try {
+      decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
+          method: 'POST',
+          headers: {
+            cookie: req.headers.get('cookie') ?? '',
+          },
+        })
+
+        if (!refreshRes.ok) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        newAccessToken =
+          refreshRes.headers.get('x-access-token') ||
+          (await refreshRes.json()).accessToken
+
+        if (!newAccessToken) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
+      } else {
+        throw e
+      }
+    }
 
     const schoolCode = decoded.school_code
 
@@ -56,7 +86,13 @@ export async function GET(req: Request) {
 
     const [rows] = await db.query(query, params)
 
-    return NextResponse.json(rows)
+    const res = NextResponse.json(rows)
+
+    if (newAccessToken) {
+      res.headers.set('x-access-token', newAccessToken)
+    }
+
+    return res
   } catch (e) {
     console.error('❌ GET posts error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })
@@ -74,8 +110,44 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+    const accessToken = authHeader.replace('Bearer ', '')
+    let decoded: any
+    let newAccessToken: string | null = null
+
+    try {
+      decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        // 🔥 refresh 시도
+        const refreshRes = await fetch(
+          `${process.env.BASE_URL}/api/auth/refresh`,
+          {
+            method: 'POST',
+            headers: {
+              cookie: req.headers.get('cookie') ?? '',
+            },
+          },
+        )
+
+        if (!refreshRes.ok) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        newAccessToken = refreshRes.headers.get('x-access-token')
+        if (!newAccessToken) {
+          const data = await refreshRes.json()
+          newAccessToken = data.accessToken
+        }
+
+        if (!newAccessToken) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
+      } else {
+        throw e
+      }
+    }
 
     const userId = decoded.id
     const schoolCode = decoded.school_code
@@ -148,7 +220,13 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, id: postId })
+    const res = NextResponse.json({ success: true, id: postId })
+
+    if (newAccessToken) {
+      res.headers.set('x-access-token', newAccessToken)
+    }
+
+    return res
   } catch (e) {
     console.error('❌ POST posts error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })
