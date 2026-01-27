@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server'
 import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
+import {
+  S3Client,
+  CopyObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3'
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+})
 
 /* ==============================
    GET : 게시글 상세 조회 (+ 투표)
@@ -35,6 +48,8 @@ export async function GET(
         p.content,
         p.category,
         p.likes,
+        p.images,
+        p.attachments,
         DATE_FORMAT(
   CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
   '%Y-%m-%d %H:%i:%s'
@@ -123,7 +138,23 @@ WHERE post_id = ?
       }
     }
 
-    return NextResponse.json({ ...post, vote })
+    return NextResponse.json({
+      ...post,
+      images:
+        typeof post.images === 'string'
+          ? JSON.parse(post.images)
+          : Array.isArray(post.images)
+            ? post.images
+            : [],
+      // 🔥 이 블록 추가
+      attachments:
+        typeof post.attachments === 'string'
+          ? JSON.parse(post.attachments)
+          : Array.isArray(post.attachments)
+            ? post.attachments
+            : [],
+      vote,
+    })
   } catch (e) {
     console.error('❌ GET post error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })
@@ -139,37 +170,131 @@ export async function PUT(
 ) {
   try {
     const { id: postId } = await context.params
-    const { title, content, vote } = await req.json()
+    const {
+      title,
+      content,
+      images = [],
+      attachments = [],
+      vote,
+    } = await req.json()
 
+    /* 🔐 인증 */
     const authHeader = req.headers.get('authorization')
-    if (!authHeader)
+    if (!authHeader) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
 
-    const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+    const accessToken = authHeader.replace('Bearer ', '')
+    let decoded: any
+    let newAccessToken: string | null = null
+
+    try {
+      decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
+          method: 'POST',
+          headers: {
+            cookie: req.headers.get('cookie') ?? '',
+          },
+        })
+
+        if (!refreshRes.ok) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        newAccessToken =
+          refreshRes.headers.get('x-access-token') ||
+          (await refreshRes.json()).accessToken
+
+        if (!newAccessToken) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
+      } else {
+        throw e
+      }
+    }
+
     const userId = decoded.id
 
+    /* 🔒 작성자 확인 */
     const [[post]]: any = await db.query(
       `SELECT user_id FROM posts WHERE id = ?`,
       [postId],
     )
 
-    if (!post || post.user_id !== userId)
+    if (!post || post.user_id !== userId) {
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
+    }
 
-    /* 게시글 수정 */
-    await db.query(`UPDATE posts SET title = ?, content = ? WHERE id = ?`, [
-      title,
-      content,
-      postId,
-    ])
+    /* ==============================
+       🔥 temp → posts 이미지 처리
+    ============================== */
+    const finalImages: string[] = []
 
-    /* 기존 투표 완전 삭제 */
+    for (const url of images) {
+      // 새로 업로드된 temp 이미지
+      if (url.includes('/temp/')) {
+        const key = url.split('.amazonaws.com/')[1] // temp/xxx.png
+        if (!key) continue
+
+        const fileName = key.split('/').pop()
+        const newKey = `posts/${postId}/${fileName}`
+
+        // 1️⃣ 복사
+        await s3.send(
+          new CopyObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET!,
+            CopySource: `${process.env.AWS_S3_BUCKET}/${key}`,
+            Key: newKey,
+          }),
+        )
+
+        // 2️⃣ temp 삭제
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET!,
+            Key: key,
+          }),
+        )
+
+        // 3️⃣ 최종 URL
+        finalImages.push(
+          `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${newKey}`,
+        )
+      } else {
+        // 기존 posts 이미지 → 그대로 유지
+        finalImages.push(url)
+      }
+    }
+
+    /* ==============================
+       게시글 수정
+    ============================== */
+    await db.query(
+      `
+  UPDATE posts
+  SET title = ?, content = ?, images = ?, attachments = ?
+  WHERE id = ?
+  `,
+      [
+        title,
+        content,
+        JSON.stringify(finalImages),
+        JSON.stringify(attachments ?? []),
+        postId,
+      ],
+    )
+
+    /* ==============================
+       🔥 투표 재설정
+    ============================== */
     await db.query(`DELETE FROM post_vote_logs WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_vote_options WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_votes WHERE post_id = ?`, [postId])
 
-    /* 투표 재생성 */
     if (vote?.enabled && Array.isArray(vote.options)) {
       await db.query(`INSERT INTO post_votes (post_id, end_at) VALUES (?, ?)`, [
         postId,
@@ -178,16 +303,20 @@ export async function PUT(
 
       for (const opt of vote.options) {
         await db.query(
-          `
-          INSERT INTO post_vote_options (post_id, option_text)
-          VALUES (?, ?)
-          `,
+          `INSERT INTO post_vote_options (post_id, option_text)
+           VALUES (?, ?)`,
           [postId, opt],
         )
       }
     }
 
-    return NextResponse.json({ success: true })
+    const res = NextResponse.json({ success: true })
+
+    if (newAccessToken) {
+      res.headers.set('x-access-token', newAccessToken)
+    }
+
+    return res
   } catch (e) {
     console.error('❌ PUT post error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })
@@ -197,6 +326,7 @@ export async function PUT(
 /* ==============================
    DELETE : 게시글 삭제
 ============================== */
+
 export async function DELETE(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -208,25 +338,100 @@ export async function DELETE(
     if (!authHeader)
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
-    const token = authHeader.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+    const accessToken = authHeader.replace('Bearer ', '')
+    let decoded: any
+    let newAccessToken: string | null = null
+
+    try {
+      decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
+          method: 'POST',
+          headers: {
+            cookie: req.headers.get('cookie') ?? '',
+          },
+        })
+
+        if (!refreshRes.ok) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        newAccessToken =
+          refreshRes.headers.get('x-access-token') ||
+          (await refreshRes.json()).accessToken
+
+        if (!newAccessToken) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
+      } else {
+        throw e
+      }
+    }
+
     const userId = decoded.id
 
+    /* 1️⃣ 게시글 + 이미지 조회 */
     const [[post]]: any = await db.query(
-      `SELECT user_id FROM posts WHERE id = ?`,
+      `SELECT user_id, images FROM posts WHERE id = ?`,
       [postId],
     )
 
     if (!post || post.user_id !== userId)
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
 
+    /* 2️⃣ images JSON 파싱 */
+    let images: string[] = []
+    if (post.images) {
+      try {
+        images =
+          typeof post.images === 'string'
+            ? JSON.parse(post.images)
+            : post.images
+      } catch {
+        images = []
+      }
+    }
+
+    /* 3️⃣ S3 이미지 삭제 */
+    for (const url of images) {
+      const key = (() => {
+        try {
+          const u = new URL(url)
+          return decodeURIComponent(u.pathname.slice(1))
+        } catch {
+          return null
+        }
+      })()
+
+      if (!key) continue
+
+      console.log('🧹 S3 DELETE:', key)
+
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_S3_BUCKET!,
+          Key: key,
+        }),
+      )
+    }
+
+    /* 4️⃣ DB 정리 */
     await db.query(`DELETE FROM post_vote_logs WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_vote_options WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_votes WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM comments WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM posts WHERE id = ?`, [postId])
 
-    return NextResponse.json({ success: true })
+    const res = NextResponse.json({ success: true })
+
+    if (newAccessToken) {
+      res.headers.set('x-access-token', newAccessToken)
+    }
+
+    return res
   } catch (e) {
     console.error('❌ DELETE post error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })

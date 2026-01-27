@@ -23,7 +23,11 @@ export default function EditPostPage() {
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [image, setImage] = useState<string>('')
+  const [images, setImages] = useState<string[]>([])
+  /* 🔥 첨부 링크/영상 수정 */
+  const [attachments, setAttachments] = useState<
+    { type: 'link' | 'video'; url: string }[]
+  >([])
 
   /* 🔥 투표 수정 상태 */
   const [voteEnabled, setVoteEnabled] = useState(false)
@@ -91,6 +95,8 @@ export default function EditPostPage() {
       setPost(data)
       setTitle(data.title)
       setContent(data.content)
+      setImages(Array.isArray(data.images) ? data.images : [])
+      setAttachments(Array.isArray(data.attachments) ? data.attachments : [])
 
       /* 🔥 기존 투표 데이터 복원 */
       if (data.vote?.enabled) {
@@ -126,13 +132,30 @@ export default function EditPostPage() {
   }, [content])
 
   /* 이미지 업로드 */
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = () => setImage(reader.result as string)
-    reader.readAsDataURL(file)
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch('/api/upload/temp', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: formData,
+    })
+
+    if (!res.ok) {
+      showAlert('이미지 업로드 실패')
+      return
+    }
+
+    const data = await res.json()
+
+    // ⭐ temp 이미지 URL 추가
+    setImages((prev) => [...prev, data.url])
   }
 
   /* ------------------------------
@@ -160,6 +183,8 @@ export default function EditPostPage() {
         body: JSON.stringify({
           title,
           content,
+          images,
+          attachments, // 🔥 추가
           vote: voteEnabled
             ? {
                 enabled: true,
@@ -238,22 +263,126 @@ export default function EditPostPage() {
             사진 업로드
           </label>
 
-          {image && (
-            <div style={previewWrap}>
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <img src={image} style={previewImg} />
+          {images.length > 0 && (
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {images.map((url, idx) => (
+                <div key={idx} style={{ position: 'relative' }}>
+                  <img
+                    src={url}
+                    style={{
+                      width: 120,
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 12,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    }}
+                  />
 
-                <button style={deleteBtn} onClick={() => setImage('')}>
-                  <span
-                    className="material-symbols-rounded"
-                    style={{ fontSize: 20 }}
+                  {/* 삭제 버튼 */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setImages((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    style={deleteBtn}
                   >
-                    close
-                  </span>
-                </button>
-              </div>
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           )}
+
+          {/* 🔗 첨부 링크 / 영상 수정 */}
+          <hr style={{ margin: '20px 0', borderColor: '#ddd' }} />
+
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
+            🔗 첨부 링크 / 영상
+          </h3>
+
+          {attachments.map((a, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginBottom: 10,
+                alignItems: 'center',
+              }}
+            >
+              <select
+                value={a.type}
+                onChange={(e) => {
+                  const list = [...attachments]
+                  list[idx].type = e.target.value as 'link' | 'video'
+                  setAttachments(list)
+                }}
+                style={{
+                  padding: '10px',
+                  borderRadius: 8,
+                  border: '1px solid #ccc',
+                }}
+              >
+                <option value="link">링크</option>
+                <option value="video">유튜브</option>
+              </select>
+
+              <input
+                value={a.url}
+                onChange={(e) => {
+                  const list = [...attachments]
+                  list[idx].url = e.target.value
+                  setAttachments(list)
+                }}
+                placeholder={
+                  a.type === 'video'
+                    ? 'https://youtu.be/...'
+                    : 'https://example.com'
+                }
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: 8,
+                }}
+              />
+
+              <button
+                onClick={() =>
+                  setAttachments(attachments.filter((_, i) => i !== idx))
+                }
+                style={{
+                  background: '#ff5252',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          ))}
+
+          <button
+            onClick={() =>
+              setAttachments([...attachments, { type: 'link', url: '' }])
+            }
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: '#E3F2FD',
+              border: '1px solid #90CAF9',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontWeight: 600,
+              marginBottom: 10,
+            }}
+          >
+            + 첨부 추가
+          </button>
 
           {/* ------------------------------- */}
           {/* 🔥 투표 수정 UI */}

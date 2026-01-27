@@ -21,6 +21,16 @@ export default function WritePage() {
   const [tempMinute, setTempMinute] = useState('00')
   const [tempAmPm, setTempAmPm] = useState<'오전' | '오후'>('오후')
 
+  //이미지 클릭시 확대
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerImage, setViewerImage] = useState<string | null>(null)
+  const [viewerIndex, setViewerIndex] = useState<number>(0)
+
+  //URL / 영상 링크 추가
+  const [attachments, setAttachments] = useState<
+    { type: 'link' | 'video'; url: string }[]
+  >([])
+
   /* 모달 */
   const [modal, setModal] = useState({
     show: false,
@@ -72,19 +82,41 @@ export default function WritePage() {
     }
   }, [category])
 
+  const uploadToS3 = async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const res = await fetch('/api/upload/image', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      throw new Error('이미지 업로드 실패')
+    }
+
+    const data = await res.json()
+    return data.url // ✅ S3 URL
+  }
+
   /* 이미지 업로드 */
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
 
     const fileArray = Array.from(files)
-    fileArray.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        setImages((prev) => [...prev, reader.result as string])
+
+    for (const file of fileArray) {
+      try {
+        const url = await uploadToS3(file)
+        setImages((prev) => [...prev, url]) // ✅ base64 ❌, S3 URL ⭕
+      } catch (err) {
+        alert('이미지 업로드 실패')
       }
-      reader.readAsDataURL(file)
-    })
+    }
+
+    // 같은 파일 다시 선택 가능하게
+    e.target.value = ''
   }
 
   /* 투표 옵션 변경 */
@@ -136,6 +168,7 @@ export default function WritePage() {
         content,
         category,
         images,
+        attachments,
         vote: voteEnabled
           ? {
               enabled: true,
@@ -373,6 +406,71 @@ export default function WritePage() {
             onChange={handleImageUpload}
           />
 
+          {/* 🔗 URL / 영상 링크 추가 */}
+          <label style={label}>링크 / 영상 추가</label>
+
+          <input
+            placeholder="https:// (Enter를 누르면 추가)"
+            style={inputBox}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+
+              const input = e.currentTarget
+              const url = input.value.trim()
+              if (!url) return
+
+              const isVideo =
+                url.includes('youtube.com') || url.includes('youtu.be')
+
+              setAttachments((prev) => [
+                ...prev,
+                {
+                  type: isVideo ? 'video' : 'link',
+                  url,
+                },
+              ])
+
+              input.value = ''
+            }}
+          />
+
+          {attachments.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {attachments.map((a, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    border: '1px solid #CFD8DC',
+                    borderRadius: 10,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>
+                    {a.type === 'video' ? '🎬 영상' : '🔗 링크'} · {a.url}
+                  </span>
+
+                  <button
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 16,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <label htmlFor="uploadImage" style={uploadBtn}>
             <span className="material-symbols-rounded" style={uploadBtnIcon}>
               image
@@ -384,7 +482,16 @@ export default function WritePage() {
             <div style={previewGrid}>
               {images.map((src, idx) => (
                 <div key={idx} style={previewBox}>
-                  <img src={src} style={previewImg} />
+                  <img
+                    src={src}
+                    style={{ ...previewImg, cursor: 'zoom-in' }}
+                    onClick={() => {
+                      setViewerIndex(idx)
+                      setViewerImage(src)
+                      setViewerOpen(true)
+                    }}
+                  />
+
                   <button
                     style={deleteBtn}
                     onClick={() =>
@@ -481,6 +588,105 @@ export default function WritePage() {
               확인
             </button>
           </div>
+        </div>
+      )}
+
+      {viewerOpen && viewerImage && (
+        <div
+          onClick={() => setViewerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999999,
+          }}
+        >
+          {/* ❌ 닫기 버튼 */}
+          <button
+            onClick={() => setViewerOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50%',
+              width: 44,
+              height: 44,
+              fontSize: 22,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+
+          {/* ⬅️ 이전 버튼 */}
+          {images.length > 1 && viewerIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIndex = viewerIndex - 1
+                setViewerIndex(newIndex)
+                setViewerImage(images[newIndex])
+              }}
+              style={{
+                position: 'absolute',
+                left: 20,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: 44,
+                height: 44,
+                fontSize: 24,
+                cursor: 'pointer',
+              }}
+            >
+              ‹
+            </button>
+          )}
+
+          {/* 이미지 */}
+          <img
+            src={viewerImage}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              borderRadius: 14,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+            }}
+          />
+
+          {/* ➡️ 다음 버튼 */}
+          {images.length > 1 && viewerIndex < images.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIndex = viewerIndex + 1
+                setViewerIndex(newIndex)
+                setViewerImage(images[newIndex])
+              }}
+              style={{
+                position: 'absolute',
+                right: 20,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: 44,
+                height: 44,
+                fontSize: 24,
+                cursor: 'pointer',
+              }}
+            >
+              ›
+            </button>
+          )}
         </div>
       )}
     </>
@@ -580,8 +786,8 @@ const uploadBtnIcon: React.CSSProperties = {
 
 const previewGrid: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-  gap: '14px',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+  gap: '16px',
   marginTop: '10px',
   marginBottom: '14px',
 }
@@ -594,8 +800,8 @@ const previewBox: React.CSSProperties = {
 }
 
 const previewImg: React.CSSProperties = {
-  width: 110,
-  height: 110,
+  width: '100%',
+  height: 180,
   objectFit: 'cover',
   borderRadius: 12,
   boxShadow: '0 4px 10px rgba(0,0,0,0.08)',

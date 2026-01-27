@@ -32,6 +32,11 @@ export default function PostDetailPage() {
   const [reportType, setReportType] = useState('')
   const [reportText, setReportText] = useState('')
 
+  // 🔍 이미지 뷰어 (확대)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerImage, setViewerImage] = useState<string | null>(null)
+  const [viewerIndex, setViewerIndex] = useState(0)
+
   const [openCommentMenu, setOpenCommentMenu] = useState<string | null>(null)
 
   /* 🔒 댓글 작성 권한 (학년별) */
@@ -804,15 +809,99 @@ export default function PostDetailPage() {
               <img
                 key={i}
                 src={src}
+                onClick={() => {
+                  setViewerIndex(i)
+                  setViewerImage(src)
+                  setViewerOpen(true)
+                }}
                 style={{
                   width: '100%',
                   height: 140,
                   objectFit: 'cover',
                   borderRadius: 10,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  cursor: 'zoom-in',
                 }}
               />
             ))}
+          </div>
+        )}
+
+        {/* 🔗 첨부 링크 / 영상 */}
+        {Array.isArray(post.attachments) && post.attachments.length > 0 && (
+          <div style={{ padding: '12px 20px' }}>
+            <h4
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                marginBottom: 8,
+                color: '#37474F',
+              }}
+            >
+              📎 첨부
+            </h4>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {post.attachments.map(
+                (a: { type: 'link' | 'video'; url: string }, idx: number) => {
+                  // 🎬 유튜브 영상
+                  if (a.type === 'video') {
+                    const videoId = a.url.includes('youtu.be')
+                      ? a.url.split('youtu.be/')[1]
+                      : a.url.split('v=')[1]?.split('&')[0]
+
+                    return (
+                      <div key={idx} style={{ marginBottom: 10 }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '100%',
+                            aspectRatio: '16 / 9',
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                            background: '#000',
+                          }}
+                        >
+                          <iframe
+                            src={`https://www.youtube.com/embed/${videoId}`}
+                            allowFullScreen
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
+                              border: 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  // 🔗 일반 링크
+                  return (
+                    <a
+                      key={idx}
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: '1px solid #CFD8DC',
+                        textDecoration: 'none',
+                        color: '#0288D1',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        background: '#F5FAFF',
+                      }}
+                    >
+                      🔗 {a.url}
+                    </a>
+                  )
+                },
+              )}
+            </div>
           </div>
         )}
 
@@ -1105,6 +1194,105 @@ export default function PostDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {viewerOpen && viewerImage && post?.images && (
+        <div
+          onClick={() => setViewerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999999,
+          }}
+        >
+          {/* ❌ 닫기 버튼 */}
+          <button
+            onClick={() => setViewerOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50%',
+              width: 44,
+              height: 44,
+              fontSize: 22,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+
+          {/* ⬅️ 이전 */}
+          {post.images.length > 1 && viewerIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIndex = viewerIndex - 1
+                setViewerIndex(newIndex)
+                setViewerImage(post.images[newIndex])
+              }}
+              style={{
+                position: 'absolute',
+                left: 20,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: 44,
+                height: 44,
+                fontSize: 24,
+                cursor: 'pointer',
+              }}
+            >
+              ‹
+            </button>
+          )}
+
+          {/* 이미지 */}
+          <img
+            src={viewerImage}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              borderRadius: 14,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+            }}
+          />
+
+          {/* ➡️ 다음 */}
+          {post.images.length > 1 && viewerIndex < post.images.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIndex = viewerIndex + 1
+                setViewerIndex(newIndex)
+                setViewerImage(post.images[newIndex])
+              }}
+              style={{
+                position: 'absolute',
+                right: 20,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: 44,
+                height: 44,
+                fontSize: 24,
+                cursor: 'pointer',
+              }}
+            >
+              ›
+            </button>
+          )}
         </div>
       )}
     </div>

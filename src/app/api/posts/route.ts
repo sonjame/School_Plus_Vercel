@@ -3,6 +3,12 @@ import db from '@/src/lib/db'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 
+import {
+  S3Client,
+  CopyObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3'
+
 /* =========================
    게시글 조회 (메인용)
 ========================= */
@@ -58,6 +64,8 @@ export async function GET(req: Request) {
     p.title,
     p.content,
     p.category,
+    p.images,
+    p.attachments,
     u.name AS author,
     p.likes,
     COUNT(DISTINCT c.id) AS commentCount,
@@ -86,7 +94,17 @@ export async function GET(req: Request) {
 
     const [rows] = await db.query(query, params)
 
-    const res = NextResponse.json(rows)
+    const parsedRows = (rows as any[]).map((p) => ({
+      ...p,
+      images:
+        typeof p.images === 'string' ? JSON.parse(p.images) : (p.images ?? []),
+      attachments:
+        typeof p.attachments === 'string'
+          ? JSON.parse(p.attachments)
+          : (p.attachments ?? []),
+    }))
+
+    const res = NextResponse.json(parsedRows)
 
     if (newAccessToken) {
       res.headers.set('x-access-token', newAccessToken)
@@ -99,12 +117,19 @@ export async function GET(req: Request) {
   }
 }
 
+const s3 = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+})
+
 /* =========================
    게시글 생성 (+ 이미지 + 투표)
 ========================= */
 export async function POST(req: Request) {
   try {
-    /* 🔐 JWT 인증 */
     const authHeader = req.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -118,30 +143,20 @@ export async function POST(req: Request) {
       decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
     } catch (e) {
       if (e instanceof jwt.TokenExpiredError) {
-        // 🔥 refresh 시도
-        const refreshRes = await fetch(
-          `${process.env.BASE_URL}/api/auth/refresh`,
-          {
-            method: 'POST',
-            headers: {
-              cookie: req.headers.get('cookie') ?? '',
-            },
+        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
+          method: 'POST',
+          headers: {
+            cookie: req.headers.get('cookie') ?? '',
           },
-        )
+        })
 
         if (!refreshRes.ok) {
           return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
         }
 
-        newAccessToken = refreshRes.headers.get('x-access-token')
-        if (!newAccessToken) {
-          const data = await refreshRes.json()
-          newAccessToken = data.accessToken
-        }
-
-        if (!newAccessToken) {
-          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-        }
+        newAccessToken =
+          refreshRes.headers.get('x-access-token') ||
+          (await refreshRes.json()).accessToken
 
         decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
       } else {
@@ -152,57 +167,90 @@ export async function POST(req: Request) {
     const userId = decoded.id
     const schoolCode = decoded.school_code
 
-    if (!schoolCode) {
-      return NextResponse.json(
-        { message: 'school_code가 토큰에 없습니다. 다시 로그인해주세요.' },
-        { status: 401 },
-      )
-    }
-
-    const { title, content, category, images, vote } = await req.json()
+    const {
+      title,
+      content,
+      category,
+      images = [],
+      attachments = [], // 🔥 추가
+      vote,
+    } = await req.json()
 
     if (!title || !content || !category) {
       return NextResponse.json({ message: '필수 값 누락' }, { status: 400 })
     }
 
-    /* 🔒 졸업생 게시판 글쓰기 권한 체크 */
-    if (category === 'graduate') {
-      const [[user]]: any = await db.query(
-        `SELECT grade FROM users WHERE id = ?`,
-        [userId],
-      )
-
-      if (!user || user.grade !== '졸업생') {
-        return NextResponse.json(
-          { message: '졸업생만 게시글을 작성할 수 있습니다.' },
-          { status: 403 },
-        )
-      }
-    }
-
     const postId = uuidv4()
 
-    /* 1️⃣ 게시글 */
-    await db.query(
-      `
-      INSERT INTO posts (
-        id, user_id, category, title, content, likes, school_code
-      ) VALUES (?, ?, ?, ?, ?, 0, ?)
-      `,
-      [postId, userId, category, title, content, schoolCode],
-    )
+    /* ==============================
+       🔥 temp → posts 이미지 이동
+    ============================== */
+    const finalImages: string[] = []
 
-    /* 2️⃣ 이미지 */
-    if (Array.isArray(images)) {
-      for (const url of images) {
-        await db.query(
-          `INSERT INTO post_images (post_id, image_url) VALUES (?, ?)`,
-          [postId, url],
+    for (const url of images) {
+      if (url.includes('/temp/')) {
+        const key = url.split('.amazonaws.com/')[1]
+        const fileName = key.split('/').pop()
+        const newKey = `posts/${postId}/${fileName}`
+
+        await s3.send(
+          new CopyObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET!,
+            CopySource: `${process.env.AWS_S3_BUCKET}/${key}`,
+            Key: newKey,
+          }),
         )
+
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET!,
+            Key: key,
+          }),
+        )
+
+        finalImages.push(
+          `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${newKey}`,
+        )
+      } else {
+        // ✅ 이미 확정된 이미지 / 외부 URL
+        finalImages.push(url)
       }
     }
 
-    /* 3️⃣ 투표 */
+    /* ==============================
+       게시글 INSERT
+    ============================== */
+    await db.query(
+      `
+   INSERT INTO posts (
+    id,
+    user_id,
+    category,
+    title,
+    content,
+    images,
+    attachments, -- 🔥 추가
+    likes,
+    school_code
+  )
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+
+      `,
+      [
+        postId,
+        userId,
+        category,
+        title,
+        content,
+        JSON.stringify(finalImages),
+        JSON.stringify(attachments ?? []), // 🔥 핵심
+        schoolCode,
+      ],
+    )
+
+    /* ==============================
+       투표
+    ============================== */
     if (vote?.enabled && Array.isArray(vote.options)) {
       await db.query(`INSERT INTO post_votes (post_id, end_at) VALUES (?, ?)`, [
         postId,
@@ -211,10 +259,8 @@ export async function POST(req: Request) {
 
       for (const opt of vote.options) {
         await db.query(
-          `
-          INSERT INTO post_vote_options (post_id, option_text, vote_count)
-          VALUES (?, ?, 0)
-          `,
+          `INSERT INTO post_vote_options (post_id, option_text)
+           VALUES (?, ?)`,
           [postId, opt.text ?? opt],
         )
       }
