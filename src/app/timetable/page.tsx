@@ -10,6 +10,19 @@ interface ClassItem {
   room: string
 }
 
+interface OCRCandidate {
+  subject: string
+  teacher: string
+  room: string
+  period: number
+  day: string | null
+}
+
+interface AddSlot {
+  day: string
+  period: number
+}
+
 /* ===== 과목 평가 타입 ===== */
 interface SubjectReview {
   id: number
@@ -138,10 +151,14 @@ export default function TimetablePage() {
     semester: '1학기',
   })
 
-  const [addForm, setAddForm] = useState({
-    day: '월',
-    start: 1,
-    end: 1,
+  const [addForm, setAddForm] = useState<{
+    slots: AddSlot[]
+    subject: string
+    teacher: string
+    room: string
+  }>({
+    // 기본으로 한 칸 만들어두기 (월 1교시)
+    slots: [{ day: '월', period: 1 }],
     subject: '',
     teacher: '',
     room: '',
@@ -150,6 +167,79 @@ export default function TimetablePage() {
   const tableRef = useRef<HTMLDivElement>(null)
 
   const [isMobile, setIsMobile] = useState(false)
+
+  // const fullOCRInputRef = useRef<HTMLInputElement>(null)
+
+  // 🔥 Full OCR 결과 임시 보관
+  const [ocrCandidates, setOCRCandidates] = useState<OCRCandidate[]>([])
+
+  const [ocrModalOpen, setOCRModalOpen] = useState(false)
+
+  // const handleFullOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0]
+  //   if (!file) return
+
+  //   const formData = new FormData()
+  //   formData.append('image', file)
+
+  //   try {
+  //     const res = await fetch('/api/timetable/parse-full', {
+  //       method: 'POST',
+  //       body: formData,
+  //     })
+
+  //     if (!res.ok) {
+  //       alert('시간표 분석 실패')
+  //       return
+  //     }
+
+  //     const data = await res.json()
+  //     console.log('📦 OCR FULL RESULT:', data)
+
+  //     // ✅ parse-full은 classes ❌ / candidates ⭕
+  //     if (!Array.isArray(data.candidates) || data.candidates.length === 0) {
+  //       alert('수업 정보를 인식하지 못했습니다')
+  //       return
+  //     }
+
+  //     // ❌ 자동 저장 절대 금지
+  //     // await save(...)
+
+  //     // ⭕ 임시 상태로만 보관
+  //     const DAYS = ['월', '화', '수', '목', '금']
+
+  //     // 🔥 교시별로 묶기
+  //     const grouped: Record<number, OCRCandidate[]> = {}
+
+  //     for (const c of data.candidates) {
+  //       if (!grouped[c.period]) grouped[c.period] = []
+  //       grouped[c.period].push(c)
+  //     }
+
+  //     // 🔥 교시 안에서 요일 순서대로 배정
+  //     const withDay: OCRCandidate[] = []
+
+  //     Object.values(grouped).forEach((list) => {
+  //       list.forEach((c, idx) => {
+  //         withDay.push({
+  //           ...c,
+  //           day: DAYS[idx] ?? null, // 월~금 자동 배치
+  //         })
+  //       })
+  //     })
+
+  //     setOCRCandidates(withDay)
+
+  //     setOCRModalOpen(true)
+  //   } catch (err) {
+  //     console.error('FULL OCR ERROR:', err)
+  //     alert('시간표 OCR 중 오류가 발생했습니다.')
+  //   } finally {
+  //     if (fullOCRInputRef.current) {
+  //       fullOCRInputRef.current.value = ''
+  //     }
+  //   }
+  // }
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -335,19 +425,38 @@ export default function TimetablePage() {
   }
 
   /* ----------------- 수업 추가 ----------------- */
+
   const saveAdd = () => {
-    const { day, start, end, subject, teacher, room } = addForm
-    if (!subject.trim()) return alert('과목을 입력해주세요.')
-    if (end < start) return alert('종료 교시가 더 빠릅니다.')
+    const { slots, subject, teacher, room } = addForm
+
+    if (slots.length === 0) return alert('요일/교시를 추가해주세요')
+    if (!subject.trim()) return alert('과목을 입력해주세요')
 
     let next = [...classes]
 
-    for (let p = start; p <= end; p++) {
-      next = next.filter((c) => !(c.day === day && c.period === p))
-      next.push({ day, period: p, subject, teacher, room })
+    for (const { day, period } of slots) {
+      // 기존 같은 칸 지우고
+      next = next.filter((c) => !(c.day === day && c.period === period))
+      // 새 수업 넣기
+      next.push({
+        day,
+        period,
+        subject,
+        teacher,
+        room,
+      })
     }
 
     save(next)
+
+    // 초기화
+    setAddForm({
+      slots: [{ day: '월', period: 1 }],
+      subject: '',
+      teacher: '',
+      room: '',
+    })
+
     setAddOpen(false)
   }
 
@@ -427,6 +536,21 @@ export default function TimetablePage() {
         <button style={btn('#4FC3F7')} onClick={() => setAddOpen(true)}>
           ➕ 수업 추가하기
         </button>
+
+        {/* <button
+          style={btn('#81C784')}
+          onClick={() => fullOCRInputRef.current?.click()}
+        >
+          📷 시간표 사진으로 한 번에 추가
+        </button>
+
+        <input
+          type="file"
+          accept="image/*"
+          ref={fullOCRInputRef}
+          style={{ display: 'none' }}
+          onChange={handleFullOCR}
+        /> */}
 
         {/* 내보내기 옵션 버튼 */}
         <button style={btn('#FF9800')} onClick={() => setExportOpen(true)}>
@@ -642,54 +766,87 @@ export default function TimetablePage() {
         {/* ----------------- 수업 추가 모달 ----------------- */}
         {addOpen && (
           <Modal onClose={() => setAddOpen(false)} title="📘 수업 추가">
-            <Row label="요일">
-              <select
-                value={addForm.day}
-                onChange={(e) =>
-                  setAddForm({ ...addForm, day: e.target.value })
-                }
-                style={inputCss}
+            {/* 요일+교시 슬롯들 */}
+            <Row label={<span style={{ marginLeft: 6 }}>교시</span>}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  width: '85%',
+                }}
               >
-                {DAYS.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </Row>
+                {addForm.slots.map((slot, idx) => (
+                  <div
+                    key={idx}
+                    style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+                  >
+                    {/* 요일 선택 */}
+                    <select
+                      value={slot.day}
+                      onChange={(e) => {
+                        const next = [...addForm.slots]
+                        next[idx] = { ...slot, day: e.target.value }
+                        setAddForm({ ...addForm, slots: next })
+                      }}
+                      style={{ ...inputCss, flex: 1 }}
+                    >
+                      {DAYS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}요일
+                        </option>
+                      ))}
+                    </select>
 
-            <Row label="시작교시">
-              <select
-                value={addForm.start}
-                onChange={(e) =>
-                  setAddForm({ ...addForm, start: Number(e.target.value) })
-                }
-                style={inputCss}
-              >
-                {PERIODS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}교시
-                  </option>
-                ))}
-              </select>
-            </Row>
+                    {/* 교시 선택 */}
+                    <select
+                      value={slot.period}
+                      onChange={(e) => {
+                        const next = [...addForm.slots]
+                        next[idx] = { ...slot, period: Number(e.target.value) }
+                        setAddForm({ ...addForm, slots: next })
+                      }}
+                      style={{ ...inputCss, flex: 1 }}
+                    >
+                      {PERIODS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}교시
+                        </option>
+                      ))}
+                    </select>
 
-            <Row label="종료교시">
-              <select
-                value={addForm.end}
-                onChange={(e) =>
-                  setAddForm({ ...addForm, end: Number(e.target.value) })
-                }
-                style={inputCss}
-              >
-                {PERIODS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}교시
-                  </option>
+                    {/* 슬롯 삭제 버튼 */}
+                    <button
+                      type="button"
+                      style={iconBtn}
+                      onClick={() => {
+                        const next = addForm.slots.filter((_, i) => i !== idx)
+                        setAddForm({ ...addForm, slots: next })
+                      }}
+                    >
+                      ❌
+                    </button>
+                  </div>
                 ))}
-              </select>
+
+                {/* 슬롯 추가 버튼 */}
+                <button
+                  type="button"
+                  style={smallBtn('#CFD8DC')}
+                  onClick={() =>
+                    setAddForm({
+                      ...addForm,
+                      slots: [...addForm.slots, { day: '월', period: 1 }],
+                    })
+                  }
+                >
+                  ➕ 요일/교시 추가
+                </button>
+              </div>
             </Row>
 
             <Row label="과목">
-              <div style={{ display: 'flex', gap: 6, width: '79%' }}>
+              <div style={{ display: 'flex', gap: 6, width: '82%' }}>
                 <select
                   value={
                     DEFAULT_SUBJECTS.includes(addForm.subject)
@@ -799,7 +956,7 @@ export default function TimetablePage() {
               <input
                 type="text"
                 style={inputCss}
-                value={edit.teacher}
+                value={edit.teacher ?? ''}
                 placeholder="예: 김선생"
                 onChange={(e) => setEdit({ ...edit, teacher: e.target.value })}
               />
@@ -1030,6 +1187,95 @@ export default function TimetablePage() {
             })()}
           </Modal>
         )}
+
+        {ocrModalOpen && (
+          <Modal
+            title="📷 인식된 시간표 미리보기"
+            onClose={() => setOCRModalOpen(false)}
+          >
+            {ocrCandidates.map((c, idx) => (
+              <div
+                key={idx}
+                style={{
+                  border: '1px solid #E0E0E0',
+                  borderRadius: 8,
+                  padding: 10,
+                  marginBottom: 8,
+                }}
+              >
+                <strong>{c.period}교시</strong>
+                <div>과목: {c.subject}</div>
+                <div>교사: {c.teacher}</div>
+                <div>교실: {c.room}</div>
+
+                {/* 🔥 요일 선택 (핵심 수정) */}
+                <select
+                  value={c.day ?? ''}
+                  onChange={(e) => {
+                    const next = [...ocrCandidates]
+                    next[idx] = { ...c, day: e.target.value }
+                    setOCRCandidates(next)
+                  }}
+                  style={{
+                    marginTop: 6,
+                    padding: '4px 6px',
+                    width: '100%',
+                  }}
+                >
+                  <option value="">요일 선택</option>
+                  {DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}요일
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            <button
+              style={btn('#4FC3F7')}
+              onClick={() => {
+                // 🔥 요일 선택 안 된 항목 방어
+                const valid = ocrCandidates.filter(
+                  (c) =>
+                    c.day &&
+                    c.subject.trim() &&
+                    Number.isInteger(c.period) &&
+                    c.period >= 1 &&
+                    c.period <= 10,
+                )
+
+                if (valid.length === 0) {
+                  alert('저장할 수 있는 수업이 없습니다')
+                  return
+                }
+
+                const mapped: ClassItem[] = valid.map((c) => ({
+                  day: c.day!, // ✅ 각 수업마다 선택한 요일
+                  period: c.period,
+                  subject: c.subject,
+                  teacher: c.teacher,
+                  room: c.room,
+                }))
+
+                const next = [...classes]
+
+                for (const item of mapped) {
+                  const idx = next.findIndex(
+                    (c) => c.day === item.day && c.period === item.period,
+                  )
+                  if (idx >= 0) next[idx] = item
+                  else next.push(item)
+                }
+
+                save(next) // ✅ 실제 시간표 + DB 저장
+                setOCRModalOpen(false)
+              }}
+            >
+              시간표에 저장
+            </button>
+          </Modal>
+        )}
       </div>
     </div>
   )
@@ -1080,7 +1326,7 @@ function Row({
   label,
   children,
 }: {
-  label: string
+  label: React.ReactNode // 🔥 string → ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -1240,3 +1486,35 @@ const termSelect: React.CSSProperties = {
   fontFamily: "'Roboto', sans-serif",
   boxShadow: 'inset 0 0 0 1px #DDD',
 }
+
+const iconBtn: React.CSSProperties = {
+  width: 25,
+  height: 25,
+  minWidth: 25,
+  minHeight: 25,
+  padding: 0,
+  borderRadius: 6,
+  border: 'none',
+  background: '#CFD8DC',
+  color: '#fff',
+  fontSize: 14,
+  lineHeight: '28px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const smallBtn = (color: string): React.CSSProperties => ({
+  background: color,
+  color: '#333',
+  border: 'none',
+  borderRadius: 6,
+  padding: '4px 6px',
+  cursor: 'pointer',
+  fontWeight: 500,
+  fontSize: 13,
+  lineHeight: 1.2,
+  width: 'fit-content', // 🔥 내용만큼만
+  marginLeft: 'auto', // ✅ 오른쪽으로
+})
