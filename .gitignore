@@ -62,3 +62,7 @@ next-env.d.ts
 .env.production.local
 .env.test.local
 
+# 🔐 secrets
+credentials/
+*.json
+
