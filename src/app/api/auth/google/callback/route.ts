@@ -48,8 +48,12 @@ export async function GET(req: Request) {
   const baseUrl = process.env.BASE_URL!
 
   return NextResponse.redirect(
-    `${baseUrl}/auth/signup?verified=1&id=${id}&name=${encodeURIComponent(
-      name,
-    )}&email=${email}&picture=${encodeURIComponent(picture)}`,
+    `${baseUrl}/auth/signup` +
+      `?verified=1` +
+      `&provider=google` + // 🔥 이 줄이 핵심
+      `&id=${id}` +
+      `&name=${encodeURIComponent(name)}` +
+      `&email=${encodeURIComponent(email)}` +
+      `&picture=${encodeURIComponent(picture)}`,
   )
 }

@@ -25,8 +25,17 @@ export async function GET(req: Request) {
   })
 
   const tokenData = await tokenRes.json()
+
+  console.error('🔥 Kakao token response:', tokenData)
+
   if (!tokenData.access_token) {
-    return NextResponse.json({ error: 'Failed to get token' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to get token',
+        kakao: tokenData, // 👈 이게 핵심
+      },
+      { status: 500 },
+    )
   }
 
   /* 2️⃣ 사용자 정보 */

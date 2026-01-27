@@ -95,7 +95,9 @@ export async function POST(req: Request) {
     /* =========================
        7️⃣ 응답 + 쿠키 갱신
     ========================= */
-    const res = NextResponse.json({ accessToken: newAccessToken })
+    const res = NextResponse.json({ ok: true })
+
+    res.headers.set('x-access-token', newAccessToken)
 
     res.cookies.set('refreshToken', newRefreshToken, {
       httpOnly: true,
@@ -107,6 +109,10 @@ export async function POST(req: Request) {
 
     return res
   } catch (e) {
+    if (e instanceof jwt.TokenExpiredError) {
+      return NextResponse.json({ code: 'REFRESH_EXPIRED' }, { status: 401 })
+    }
+
     console.error('❌ refresh error:', e)
     return NextResponse.json({ code: 'REFRESH_FAILED' }, { status: 401 })
   }

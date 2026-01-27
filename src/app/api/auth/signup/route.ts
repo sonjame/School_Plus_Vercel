@@ -18,6 +18,9 @@ export async function POST(req: Request) {
       provider,
     } = await req.json()
 
+    /* ===============================
+       1️⃣ 비밀번호 검증
+    =============================== */
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{6,}$/
 
@@ -30,16 +33,33 @@ export async function POST(req: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // ✅ provider는 추론하지 말고 그대로 사용
-    const authProvider: 'email' | 'kakao' | 'google' = provider ?? 'email'
+    /* ===============================
+   2️⃣ provider 검증
+    =============================== */
+    if (provider !== 'email' && provider !== 'kakao' && provider !== 'google') {
+      return NextResponse.json(
+        { message: 'provider 값이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
 
-    // 🔥 테스트용 social_id (중복 허용)
-    const realSocialId = social_id
-    const testSocialId =
-      process.env.NODE_ENV === 'development' && realSocialId
-        ? `${realSocialId}_${Date.now()}`
-        : realSocialId
+    const authProvider = provider
 
+    /* ===============================
+   3️⃣ social_id 규칙
+    =============================== */
+    if (authProvider !== 'email' && !social_id) {
+      return NextResponse.json(
+        { message: 'social_id가 필요합니다.' },
+        { status: 400 },
+      )
+    }
+
+    const finalSocialId = authProvider === 'email' ? null : social_id
+
+    /* ===============================
+       4️⃣ INSERT
+    =============================== */
     await db.query(
       `INSERT INTO users 
        (username, password, name, email, social_id,
@@ -50,7 +70,7 @@ export async function POST(req: Request) {
         hashedPassword,
         name,
         email,
-        authProvider === 'email' ? null : testSocialId,
+        finalSocialId,
         school,
         schoolCode,
         eduCode,
@@ -61,8 +81,17 @@ export async function POST(req: Request) {
     )
 
     return NextResponse.json({ ok: true })
-  } catch (err) {
+  } catch (err: any) {
     console.error('signup error:', err)
+
+    // 🔴 혹시 DB UNIQUE 에러면 메시지 분리
+    if (err?.code === 'ER_DUP_ENTRY') {
+      return NextResponse.json(
+        { message: '이미 존재하는 계정 정보입니다.' },
+        { status: 409 },
+      )
+    }
+
     return NextResponse.json(
       { message: '회원가입 중 오류가 발생했습니다.' },
       { status: 500 },

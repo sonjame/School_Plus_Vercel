@@ -83,12 +83,17 @@ export default function SignupPage() {
     const socialId = searchParams.get('id') || searchParams.get('social_id')
 
     if (socialName && socialId) {
+      const provider =
+        searchParams.get('provider') ||
+        (searchParams.get('id') ? 'google' : null)
+
       localStorage.setItem(
         'socialUser',
         JSON.stringify({
           id: socialId,
           name: socialName,
-          email: socialEmail || null, // 이메일 없어도 OK
+          email: socialEmail || null,
+          provider, // 🔥 핵심
         }),
       )
     }
@@ -256,11 +261,18 @@ export default function SignupPage() {
   const handleFinalSubmit = async () => {
     const social = JSON.parse(localStorage.getItem('socialUser') || '{}')
 
+    let provider: 'email' | 'kakao' | 'google' = 'email'
+
+    if (social?.id && social.provider) {
+      provider = social.provider
+    }
+
     const body = {
       username,
       password,
       name: realName,
       email: verifiedEmail || null,
+      provider,
       social_id: social.id || null, // ⭐⭐⭐ 이 줄 추가 (핵심)
       school,
       schoolCode,
