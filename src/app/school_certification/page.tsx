@@ -8,31 +8,38 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     background: '#f5f7fb',
     fontFamily: 'Arial, sans-serif',
-    padding: '80px 20px 40px 20px',
+    padding: 'clamp(24px, 6vw, 80px) clamp(12px, 4vw, 20px) 40px',
     minHeight: '100vh',
   },
+
   layout: {
-    maxWidth: 850,
-    margin: '100px auto',
-    padding: '0 20px',
+    maxWidth: 1200,
+    margin: 'clamp(24px, 6vw, 20px) auto', // 🔥 PC에서 위 여백 감소
+    padding: '0 clamp(6px, 3vw, 24px)',
   },
+
   card: {
-    maxWidth: 700,
+    maxWidth: 'min(960px, 100%)', // 🔥 모바일에서는 사실상 풀폭
     margin: '0 auto',
     background: '#fff',
     borderRadius: 24,
-    padding: 32,
+    padding: 'clamp(16px, 4vw, 40px)', // 🔥 모바일 패딩 더 감소
     boxShadow: '0 8px 30px rgba(15,23,42,0.12)',
   },
-  title: { fontSize: 22, fontWeight: 700 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 6 },
+
+  title: { fontSize: 25, fontWeight: 700 },
+  subtitle: {
+    fontSize: 'clamp(13px, 2.8vw, 15px)',
+    color: '#6b7280',
+    marginTop: 6,
+  },
 
   infoBox: {
     background: '#d8eaff',
     border: '1px solid #aacbff',
-    padding: 14,
+    padding: 16,
     borderRadius: 14,
-    fontSize: 13,
+    fontSize: 'clamp(13px, 2.8vw, 15px)',
     margin: '20px 0',
     color: '#374151',
     lineHeight: 1.5,
@@ -41,17 +48,17 @@ const styles: Record<string, React.CSSProperties> = {
   noteBox: {
     background: '#e4efff',
     border: '1px solid #b4ccff',
-    padding: 12,
+    padding: 16,
     borderRadius: 14,
     marginTop: 16,
-    fontSize: 11,
+    fontSize: 'clamp(13px, 2.8vw, 15px)',
     color: '#374151',
   },
 
   sectionTitle: {
     fontWeight: 700,
     marginBottom: 10,
-    fontSize: 14,
+    fontSize: 'clamp(13px, 2.8vw, 15px)',
     marginTop: 20,
   },
 
@@ -59,7 +66,10 @@ const styles: Record<string, React.CSSProperties> = {
     border: '2px dashed #9bbcff',
     background: '#e4efff',
     borderRadius: 18,
-    height: 380,
+    height: 'clamp(260px, 45vw, 440px)',
+    width: '100%',
+    maxWidth: '100%',
+    margin: '0 auto',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
