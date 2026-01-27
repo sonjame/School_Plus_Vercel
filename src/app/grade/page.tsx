@@ -454,7 +454,7 @@ export default function GradePage() {
       <div
         style={{
           ...styles.wrapper,
-          padding: isMobile ? '16px 8px' : '40px 0',
+          padding: isMobile ? '16px 8px' : '0',
         }}
       >
         <div style={styles.page}>
@@ -709,23 +709,26 @@ const styles = {
   wrapper: {
     background: '#f1f5f9',
     minHeight: '100vh',
-    padding: '40px 0',
+    padding: '0',
   },
 
   page: {
-    maxWidth: 1100,
-    width: '100%',
-    margin: '0 auto',
-    padding: 'clamp(16px, 5vw, 50px)',
+    width: '97%', // 🔥 전체 폭 사용
+    maxWidth: 'none', // 🔥 1100px 제한 제거
+    margin: 0, // 🔥 중앙 정렬 제거
+    padding: '24px', // 🔥 내부 여백만 유지
     background: '#fff',
-    borderRadius: 16,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+    borderRadius: 0, // 🔥 앱 느낌 (선택)
+    boxShadow: 'none', // 🔥 카드 느낌 제거 (선택)
     fontFamily: 'Noto Sans KR, sans-serif',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '100vh',
   },
-
   title: {
     fontSize: 28,
     fontWeight: 700,
+    marginTop: 0,
     display: 'flex',
     alignItems: 'center',
     gap: 8,
@@ -821,14 +824,13 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-
     width: '140px',
     padding: '10px 14px',
     background: '#2563eb',
     color: '#fff',
     borderRadius: 10,
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: 0,
     border: 'none',
     cursor: 'pointer',
   },
@@ -841,13 +843,14 @@ const styles = {
   avgBox: {
     textAlign: 'center',
     fontSize: 18,
-    marginBottom: 20,
+    marginBottom: 0,
   },
 
   graphCard: {
     background: '#f8fafc',
     padding: 16,
     borderRadius: 12,
+    marginBottom: 0,
   },
 
   left: {
