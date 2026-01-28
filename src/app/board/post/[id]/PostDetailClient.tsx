@@ -727,13 +727,17 @@ export default function PostDetailPage() {
 
   const alreadyVoted = myVoteIndex !== null
 
+  function getBoardListPath(category: string) {
+    return `/board/${category}`
+  }
+
   return (
     <div
       style={{
         maxWidth: 'min(1200px, 98vw)',
         margin: '0 auto',
         padding: 'clamp(12px, 2vw, 18px) clamp(10px, 2vw, 16px)',
-        marginTop: 'clamp(8px, 3vw, 0px)',
+        marginTop: 'clamp(16px, 4vw, 32px)',
       }}
     >
       <h3
@@ -802,6 +806,31 @@ export default function PostDetailPage() {
             borderRadius: '12px 12px 0 0',
           }}
         >
+          <button
+            onClick={() => {
+              if (post?.category) {
+                router.push(getBoardListPath(post.category))
+              } else {
+                router.push('/board')
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: 6,
+              background: 'transparent',
+              border: 'none',
+              color: '#4FC3F7',
+              fontSize: 20,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 8,
+              paddingLeft: 0,
+            }}
+          >
+            ❮ 뒤로가기
+          </button>
           <strong>{post.author}</strong> ·{' '}
           <span style={{ color: '#999' }}>{dateStr}</span>
         </div>
