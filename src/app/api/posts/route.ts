@@ -108,6 +108,8 @@ export async function POST(req: Request) {
     const accessToken = authHeader.replace('Bearer ', '')
 
     let decoded: any
+    let newAccessToken: string | null = null
+
     try {
       decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
     } catch (e) {
@@ -126,6 +128,10 @@ export async function POST(req: Request) {
         newAccessToken =
           refreshRes.headers.get('x-access-token') ||
           (await refreshRes.json()).accessToken
+
+        if (!newAccessToken) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
 
         decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
       } else {
