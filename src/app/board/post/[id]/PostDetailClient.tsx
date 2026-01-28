@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type React from 'react'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>()
@@ -104,11 +105,7 @@ export default function PostDetailPage() {
         return
       }
 
-      const res = await fetch(`/api/posts/${postId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const res = await apiFetch(`/api/posts/${postId}`)
 
       if (!res.ok) {
         showAlert('게시글을 찾을 수 없습니다.', () => router.push('/board'))
@@ -125,11 +122,7 @@ export default function PostDetailPage() {
   /* 🔥 댓글 로딩 (DB) */
   useEffect(() => {
     async function loadComments() {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const res = await apiFetch(`/api/posts/${postId}/comments`)
 
       if (!res.ok) return
 
@@ -227,12 +220,8 @@ export default function PostDetailPage() {
     const userId = localStorage.getItem('userId')
     if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const res = await fetch(`/api/posts/${postId}/comments`, {
+    const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
       body: JSON.stringify({
         content: commentValue,
         parent: null,
@@ -259,12 +248,8 @@ export default function PostDetailPage() {
     const userId = localStorage.getItem('userId')
     if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const res = await fetch(`/api/posts/${postId}/comments`, {
+    const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
       body: JSON.stringify({
         content: replyValue,
         parent: replyTarget,
@@ -283,12 +268,8 @@ export default function PostDetailPage() {
   const saveEdit = async () => {
     if (!editId) return
 
-    const res = await fetch(`/api/comments/${editId}`, {
+    const res = await apiFetch(`/api/comments/${editId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
       body: JSON.stringify({ content: editValue }),
     })
 
@@ -305,11 +286,8 @@ export default function PostDetailPage() {
   /* 댓글 삭제 */
   const deleteComment = async (id: string) => {
     showConfirm('댓글을 삭제하시겠습니까?', async () => {
-      const res = await fetch(`/api/comments/${id}`, {
+      const res = await apiFetch(`/api/comments/${id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
       })
 
       if (!res.ok) return showAlert('댓글 삭제 실패')
@@ -327,11 +305,8 @@ export default function PostDetailPage() {
         return
       }
 
-      const res = await fetch(`/api/posts/${postId}`, {
+      const res = await apiFetch(`/api/posts/${postId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
       })
 
       if (!res.ok) {
@@ -410,15 +385,9 @@ export default function PostDetailPage() {
     const userId = localStorage.getItem('userId')
     if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const res = await fetch(`/api/posts/${postId}/like`, {
+    const res = await apiFetch(`/api/posts/${postId}/like`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
-      body: JSON.stringify({
-        userId: Number(userId), // 🔥 이게 핵심
-      }),
+      body: JSON.stringify({ userId: Number(userId) }),
     })
 
     if (!res.ok) {
@@ -437,11 +406,8 @@ export default function PostDetailPage() {
     const userId = localStorage.getItem('userId')
     if (!userId) return showAlert('로그인이 필요합니다.')
 
-    const res = await fetch(`/api/posts/${postId}/scrap`, {
+    const res = await apiFetch(`/api/posts/${postId}/scrap`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
     })
 
     if (!res.ok) {
@@ -469,12 +435,8 @@ export default function PostDetailPage() {
       return
     }
 
-    const res = await fetch(`/api/posts/${postId}/vote`, {
+    const res = await apiFetch(`/api/posts/${postId}/vote`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify({
         optionIndex: index,
       }),
@@ -486,11 +448,7 @@ export default function PostDetailPage() {
     }
 
     // 🔥 다시 서버에서 게시글을 불러온다
-    const refreshed = await fetch(`/api/posts/${postId}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
-    })
+    const refreshed = await apiFetch(`/api/posts/${postId}`)
 
     const data = await refreshed.json()
     setPost(data)
@@ -498,11 +456,8 @@ export default function PostDetailPage() {
 
   /* 댓글 좋아요 */
   const toggleCommentLike = async (commentId: string) => {
-    const res = await fetch(`/api/comments/${commentId}/like`, {
+    const res = await apiFetch(`/api/comments/${commentId}/like`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
     })
 
     if (!res.ok) return showAlert('댓글 좋아요 실패')
@@ -727,9 +682,28 @@ export default function PostDetailPage() {
 
   const alreadyVoted = myVoteIndex !== null
 
+  function getBoardListPath(category: string) {
+    return `/board/${category}`
+  }
+
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
-      <h3 style={{ color: '#4FC3F7', marginBottom: '12px' }}>
+    <div
+      style={{
+        maxWidth: 'min(1200px, 98vw)',
+        margin: '0 auto',
+        padding: 'clamp(12px, 2vw, 18px) clamp(10px, 2vw, 16px)',
+        marginTop: 'clamp(16px, 4vw, 32px)',
+      }}
+    >
+      <h3
+        style={{
+          color: '#4FC3F7',
+          marginBottom: '16px',
+          fontSize: 'clamp(20px, 2.5vw, 28px)', // 🔥 크기 업
+          fontWeight: 600, // 🔥 타이틀 느낌
+          lineHeight: 1.2,
+        }}
+      >
         {post.category === 'free'
           ? '📢 자유게시판'
           : post.category === 'promo'
@@ -787,6 +761,31 @@ export default function PostDetailPage() {
             borderRadius: '12px 12px 0 0',
           }}
         >
+          <button
+            onClick={() => {
+              if (post?.category) {
+                router.push(getBoardListPath(post.category))
+              } else {
+                router.push('/board')
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: 6,
+              background: 'transparent',
+              border: 'none',
+              color: '#4FC3F7',
+              fontSize: 20,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 8,
+              paddingLeft: 0,
+            }}
+          >
+            ❮ 뒤로가기
+          </button>
           <strong>{post.author}</strong> ·{' '}
           <span style={{ color: '#999' }}>{dateStr}</span>
         </div>
@@ -838,7 +837,7 @@ export default function PostDetailPage() {
                 color: '#37474F',
               }}
             >
-              📎 첨부
+              🎬 첨부
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -894,6 +893,9 @@ export default function PostDetailPage() {
                         fontSize: 14,
                         fontWeight: 600,
                         background: '#F5FAFF',
+                        wordBreak: 'break-all',
+                        overflowWrap: 'anywhere',
+                        maxWidth: '100%',
                       }}
                     >
                       🔗 {a.url}

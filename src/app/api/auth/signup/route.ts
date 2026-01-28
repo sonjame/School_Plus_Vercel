@@ -14,6 +14,7 @@ export async function POST(req: Request) {
       eduCode,
       level,
       grade,
+      class_num,
       social_id,
       provider,
     } = await req.json()
@@ -63,8 +64,8 @@ export async function POST(req: Request) {
     await db.query(
       `INSERT INTO users 
        (username, password, name, email, social_id,
-        school, school_code, edu_code, level, grade, provider)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        school, school_code, edu_code, level, grade, class_num, provider)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         hashedPassword,
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
         eduCode,
         level,
         grade,
+        class_num,
         authProvider,
       ],
     )

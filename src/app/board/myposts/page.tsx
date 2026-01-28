@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 export default function MyPostsPage() {
   const [myPosts, setMyPosts] = useState<any[]>([])
@@ -12,10 +13,14 @@ export default function MyPostsPage() {
       const userId = localStorage.getItem('userId')
       if (!userId) return
 
-      const res = await fetch(`/api/posts/mine?userId=${userId}`)
+      const res = await apiFetch(`/api/posts/mine?userId=${userId}`)
+      if (!res.ok) {
+        setMyPosts([])
+        return
+      }
+
       const data = await res.json()
 
-      // 🔥 핵심: 배열만 상태에 넣기
       if (Array.isArray(data)) {
         setMyPosts(data)
       } else if (Array.isArray(data.posts)) {
@@ -135,8 +140,8 @@ function categoryToName(c: string) {
   return c === 'free'
     ? '자유'
     : c === 'promo'
-    ? '홍보'
-    : c === 'club'
-    ? '동아리'
-    : `${c.replace('grade', '')}학년`
+      ? '홍보'
+      : c === 'club'
+        ? '동아리'
+        : `${c.replace('grade', '')}학년`
 }

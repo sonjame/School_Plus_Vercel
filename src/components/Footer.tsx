@@ -69,25 +69,25 @@ export default function WeeklyMealPage() {
     Promise.all(
       dates.map(async (d) => {
         const res = await fetch(
-          `/api/meals?date=${d.key}&eduCode=${eduCode}&schoolCode=${schoolCode}`
+          `/api/meals?date=${d.key}&eduCode=${eduCode}&schoolCode=${schoolCode}`,
         )
         const data = await res.json()
         return { date: d.key, label: d.label, meal: data.meal }
-      })
+      }),
     ).then(setWeekMeals)
   }, [ready, eduCode, schoolCode])
 
   return (
     <div
       style={{
+        minHeight: '250px',
         marginBottom: '32px',
         padding: '20px',
         background: '#F3FAFF',
         borderRadius: '16px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-
-        /* 모바일 화면 조건 */
-        maxWidth: '900px',
+        width: '100%',
+        maxWidth: '1500px', // 🔥 HomePage와 통일
         margin: '0 auto',
       }}
     >
@@ -171,6 +171,7 @@ export default function WeeklyMealPage() {
               padding: '12px',
               boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
               border: '1px solid #E1F5FE',
+              minHeight: '140px',
             }}
           >
             <div

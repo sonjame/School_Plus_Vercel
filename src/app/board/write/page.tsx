@@ -142,6 +142,24 @@ export default function WritePage() {
     setVoteOptions((prev) => prev.filter((_, idx) => idx !== i))
   }
 
+  const handleCancel = () => {
+    const hasContent =
+      title.trim() ||
+      content.trim() ||
+      images.length > 0 ||
+      attachments.length > 0 ||
+      voteOptions.some((v) => v.trim())
+
+    if (!hasContent) {
+      window.location.href = `/board/${category}`
+      return
+    }
+
+    showAlert('작성 중인 내용이 삭제됩니다.\n정말 취소할까요?', () => {
+      window.location.href = `/board/${category}`
+    })
+  }
+
   /* 글 작성 */
   const submit = async () => {
     if (!title.trim() || !content.trim()) {
@@ -209,6 +227,15 @@ export default function WritePage() {
     <>
       <div style={pageWrap}>
         <div style={card}>
+          {/* ❌ 닫기 버튼 */}
+          <button
+            onClick={() => handleCancel()}
+            style={closeBtn}
+            aria-label="글쓰기 취소"
+          >
+            ✕
+          </button>
+
           <h2 style={titleStyle}>글쓰기</h2>
 
           {/* 카테고리 */}
@@ -709,13 +736,13 @@ const pageWrap: React.CSSProperties = {
 
 const card: React.CSSProperties = {
   width: '100%',
-  maxWidth: 720,
+  maxWidth: 'min(960px, 92vw)', // 🔥 핵심
   background: '#fff',
-  padding: '36px 40px',
+  padding: '36px clamp(20px, 3vw, 40px)', // 좌우 패딩 반응형
   borderRadius: 20,
   boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
   border: '1px solid #E3EAF3',
-  marginTop: 20,
+  marginTop: 10,
 }
 
 const titleStyle: React.CSSProperties = {
@@ -951,4 +978,21 @@ const centerOkBtn: React.CSSProperties = {
   cursor: 'pointer',
 }
 
-const voteTimeWrapper = {} // 이미 다른 방식으로 개선됨
+const closeBtn: React.CSSProperties = {
+  position: 'absolute',
+  top: 60,
+  right: 330,
+  width: 40,
+  height: 40,
+  borderRadius: '50%',
+  border: 'none',
+  background: '#F1F5F9',
+  color: '#37474F',
+  fontSize: 22,
+  fontWeight: 700,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: '0.2s',
+}

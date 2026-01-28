@@ -686,17 +686,20 @@ export default function CalendarPage() {
       <style jsx>{`
         .page-wrapper {
           width: 100%;
-          min-height: 100vh;
+          height: 100vh; /* 🔥 min-height ❌ → height ✅ */
           display: flex;
           justify-content: center;
+          align-items: stretch; /* 🔥 중앙정렬 제거 */
           background: #f5f7fb;
         }
 
         .main-layout {
-          width: 1120px;
+          width: 100%; /* 🔥 1120px ❌ */
+          max-width: none; /* 🔥 제한 제거 */
+          height: 100%;
           display: flex;
           gap: 28px;
-          padding: 64px 20px;
+          padding: 0; /* 🔥 좌우 여백 제거 */
         }
 
         .calendar-area,
@@ -738,7 +741,7 @@ export default function CalendarPage() {
         }
 
         .weekday-row {
-          font-size: 12px;
+          font-size: 14px;
           margin-bottom: 6px;
         }
 
@@ -781,7 +784,7 @@ export default function CalendarPage() {
 
         .cell-academic {
           margin-top: 2px;
-          font-size: 10px;
+          font-size: 12px;
           padding: 2px 4px;
           background: #eff6ff;
           border-radius: 6px;
@@ -808,14 +811,14 @@ export default function CalendarPage() {
           right: 6px;
           background: #111827;
           color: #fff;
-          font-size: 10px;
+          font-size: 12px;
           padding: 2px 4px;
           border-radius: 6px;
         }
 
         .rp-section-title {
           margin-top: 10px;
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 600;
         }
 
@@ -827,19 +830,19 @@ export default function CalendarPage() {
         }
 
         .rp-card-title {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 600;
         }
 
         .rp-none,
         .rp-empty {
           margin-top: 8px;
-          font-size: 13px;
+          font-size: 14px;
           color: #9ca3af;
         }
 
         .rp-date {
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 600;
         }
 
@@ -852,7 +855,7 @@ export default function CalendarPage() {
           padding: 8px;
           border-radius: 8px;
           cursor: pointer;
-          font-size: 13px;
+          font-size: 14px;
         }
 
         .modal-backdrop {
@@ -894,7 +897,7 @@ export default function CalendarPage() {
           margin-top: 8px;
           border-radius: 6px;
           border: 1px solid #d1d5db;
-          font-size: 13px;
+          font-size: 14px;
           resize: none;
         }
 

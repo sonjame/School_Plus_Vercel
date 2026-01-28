@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 interface ClassItem {
   day: string
@@ -252,16 +253,12 @@ export default function TimetablePage() {
   useEffect(() => {
     if (!myUserId) return
 
-    fetch(`/api/timetable?year=${term.year}&semester=${term.semester}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
-    })
+    apiFetch(`/api/timetable?year=${term.year}&semester=${term.semester}`)
       .then((res) => res.json())
       .then((data) => {
-        // 🔥 방어: 배열 아닐 경우 대비
         setClasses(Array.isArray(data) ? data : [])
       })
+      .catch(() => setClasses([]))
   }, [term, myUserId])
 
   /* 🔥 선택한 연도/학기 Home에서도 쓰기 위해 저장 */
@@ -285,11 +282,10 @@ export default function TimetablePage() {
   const save = async (next: ClassItem[]) => {
     setClasses(next)
 
-    await fetch('/api/timetable', {
+    await apiFetch('/api/timetable', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
       },
       body: JSON.stringify({
         year: term.year,

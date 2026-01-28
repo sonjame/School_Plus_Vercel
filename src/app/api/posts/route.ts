@@ -21,36 +21,13 @@ export async function GET(req: Request) {
     }
 
     const accessToken = authHeader.replace('Bearer ', '')
-    let decoded: any
-    let newAccessToken: string | null = null
 
+    let decoded: any
     try {
       decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
-    } catch (e) {
-      if (e instanceof jwt.TokenExpiredError) {
-        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
-          method: 'POST',
-          headers: {
-            cookie: req.headers.get('cookie') ?? '',
-          },
-        })
-
-        if (!refreshRes.ok) {
-          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-        }
-
-        newAccessToken =
-          refreshRes.headers.get('x-access-token') ||
-          (await refreshRes.json()).accessToken
-
-        if (!newAccessToken) {
-          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-        }
-
-        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
-      } else {
-        throw e
-      }
+    } catch {
+      // 🔥 만료 / 위조 → 그냥 401
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
     const schoolCode = decoded.school_code
@@ -59,26 +36,25 @@ export async function GET(req: Request) {
     const category = searchParams.get('category')
 
     let query = `
-  SELECT
-    p.id,
-    p.title,
-    p.content,
-    p.category,
-    p.images,
-    p.attachments,
-    u.name AS author,
-    p.likes,
-    COUNT(DISTINCT c.id) AS commentCount,
-    DATE_FORMAT(
-  CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
-  '%Y-%m-%d %H:%i:%s'
-) AS created_at
-
-  FROM posts p
-  JOIN users u ON p.user_id = u.id
-  LEFT JOIN post_comments c ON p.id = c.post_id
-  WHERE p.school_code = ?
-`
+      SELECT
+        p.id,
+        p.title,
+        p.content,
+        p.category,
+        p.images,
+        p.attachments,
+        u.name AS author,
+        p.likes,
+        COUNT(DISTINCT c.id) AS commentCount,
+        DATE_FORMAT(
+          CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+          '%Y-%m-%d %H:%i:%s'
+        ) AS created_at
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN post_comments c ON p.id = c.post_id
+      WHERE p.school_code = ?
+    `
 
     const params: any[] = [schoolCode]
 
@@ -88,9 +64,9 @@ export async function GET(req: Request) {
     }
 
     query += `
-  GROUP BY p.id
-  ORDER BY p.created_at DESC
-`
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `
 
     const [rows] = await db.query(query, params)
 
@@ -104,13 +80,7 @@ export async function GET(req: Request) {
           : (p.attachments ?? []),
     }))
 
-    const res = NextResponse.json(parsedRows)
-
-    if (newAccessToken) {
-      res.headers.set('x-access-token', newAccessToken)
-    }
-
-    return res
+    return NextResponse.json(parsedRows)
   } catch (e) {
     console.error('❌ GET posts error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })
@@ -136,32 +106,12 @@ export async function POST(req: Request) {
     }
 
     const accessToken = authHeader.replace('Bearer ', '')
-    let decoded: any
-    let newAccessToken: string | null = null
 
+    let decoded: any
     try {
       decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
-    } catch (e) {
-      if (e instanceof jwt.TokenExpiredError) {
-        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
-          method: 'POST',
-          headers: {
-            cookie: req.headers.get('cookie') ?? '',
-          },
-        })
-
-        if (!refreshRes.ok) {
-          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-        }
-
-        newAccessToken =
-          refreshRes.headers.get('x-access-token') ||
-          (await refreshRes.json()).accessToken
-
-        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
-      } else {
-        throw e
-      }
+    } catch {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = decoded.id
@@ -172,7 +122,7 @@ export async function POST(req: Request) {
       content,
       category,
       images = [],
-      attachments = [], // 🔥 추가
+      attachments = [],
       vote,
     } = await req.json()
 
@@ -212,7 +162,6 @@ export async function POST(req: Request) {
           `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${newKey}`,
         )
       } else {
-        // ✅ 이미 확정된 이미지 / 외부 URL
         finalImages.push(url)
       }
     }
@@ -222,19 +171,18 @@ export async function POST(req: Request) {
     ============================== */
     await db.query(
       `
-   INSERT INTO posts (
-    id,
-    user_id,
-    category,
-    title,
-    content,
-    images,
-    attachments, -- 🔥 추가
-    likes,
-    school_code
-  )
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
-
+      INSERT INTO posts (
+        id,
+        user_id,
+        category,
+        title,
+        content,
+        images,
+        attachments,
+        likes,
+        school_code
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
       `,
       [
         postId,
@@ -243,7 +191,7 @@ export async function POST(req: Request) {
         title,
         content,
         JSON.stringify(finalImages),
-        JSON.stringify(attachments ?? []), // 🔥 핵심
+        JSON.stringify(attachments ?? []),
         schoolCode,
       ],
     )
@@ -266,13 +214,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const res = NextResponse.json({ success: true, id: postId })
-
-    if (newAccessToken) {
-      res.headers.set('x-access-token', newAccessToken)
-    }
-
-    return res
+    return NextResponse.json({ success: true, id: postId })
   } catch (e) {
     console.error('❌ POST posts error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })

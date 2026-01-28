@@ -30,6 +30,8 @@ export default function SignupPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
 
+  const [class_num, setClassNum] = useState('') // 반 (예: 3반)
+
   // ⭐ 아이디 중복체크 관련
   const [idAvailable, setIdAvailable] = useState<boolean | null>(null)
 
@@ -273,12 +275,13 @@ export default function SignupPage() {
       name: realName,
       email: verifiedEmail || null,
       provider,
-      social_id: social.id || null, // ⭐⭐⭐ 이 줄 추가 (핵심)
+      social_id: social.id || null,
       school,
       schoolCode,
       eduCode,
       level,
       grade,
+      class_num: class_num ? Number(class_num) : null, // ⭐ 핵심
     }
 
     // 🔑 일반 회원만 비밀번호 포함
@@ -672,6 +675,21 @@ export default function SignupPage() {
 
             <p style={{ fontSize: '13px', color: '#d32f2f', marginTop: '6px' }}>
               ⚠️ 한번 선택한 학년은 변경할 수 없습니다.
+            </p>
+
+            <input
+              style={{ ...inputStyle, marginTop: '12px' }}
+              placeholder="반을 입력하세요 (선택, 예: 3반)"
+              value={class_num}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9]/g, '')
+                setClassNum(value)
+              }}
+            />
+
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              ℹ️ 반을 모르면 비워두셔도 됩니다. 나중에 내 정보에서 수정할 수
+              있어요.
             </p>
 
             <button

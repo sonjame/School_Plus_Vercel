@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 interface Post {
   id: string
@@ -30,17 +31,10 @@ export default function BoardMainPage() {
     ]
 
     async function load() {
-      const token = localStorage.getItem('accessToken')
-      if (!token) return
-
-      const result = []
+      const result: BoardSection[] = []
 
       for (const b of boards) {
-        const res = await fetch(`/api/posts?category=${b.key}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const res = await apiFetch(`/api/posts?category=${b.key}`)
 
         const posts = res.ok ? await res.json() : []
         result.push({ ...b, posts })

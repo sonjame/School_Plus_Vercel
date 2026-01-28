@@ -18,6 +18,9 @@ const s3 = new S3Client({
 /* ==============================
    GET : 게시글 상세 조회 (+ 투표)
 ============================== */
+/* ==============================
+   GET : 게시글 상세 조회 (+ 투표)
+============================== */
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -30,11 +33,44 @@ export async function GET(
     ------------------------- */
     const auth = req.headers.get('authorization')
     let userId: number | null = null
+    let newAccessToken: string | null = null
+    let decoded: any = null
 
     if (auth) {
       const token = auth.replace('Bearer ', '')
-      const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
-      userId = decoded.id
+
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET!)
+      } catch (e) {
+        if (e instanceof jwt.TokenExpiredError) {
+          // ⭐ 토큰 재발급 시도
+          const refreshRes = await fetch(
+            new URL('/api/auth/refresh', req.url),
+            {
+              method: 'POST',
+              headers: {
+                cookie: req.headers.get('cookie') ?? '',
+              },
+            },
+          )
+
+          if (refreshRes.ok) {
+            newAccessToken =
+              refreshRes.headers.get('x-access-token') ||
+              (await refreshRes.json()).accessToken
+
+            decoded = jwt.verify(newAccessToken!, process.env.JWT_SECRET!)
+          } else {
+            decoded = null // 로그인 안 된 상태로 처리
+          }
+        } else {
+          throw e
+        }
+      }
+
+      if (decoded) {
+        userId = decoded.id
+      }
     }
 
     /* -------------------------
@@ -51,10 +87,9 @@ export async function GET(
         p.images,
         p.attachments,
         DATE_FORMAT(
-  CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
-  '%Y-%m-%d %H:%i:%s'
-) AS created_at,
-
+          CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+          '%Y-%m-%d %H:%i:%s'
+        ) AS created_at,
         p.user_id,
         COALESCE(u.name, '알 수 없음') AS author
       FROM posts p
@@ -75,32 +110,28 @@ export async function GET(
        투표 메타
     ------------------------- */
     const [[voteMeta]]: any = await db.query(
-      `SELECT
-  DATE_FORMAT(
-    CONVERT_TZ(end_at, '+00:00', '+09:00'),
-    '%Y-%m-%d %H:%i:%s'
-  ) AS end_at
-FROM post_votes
-WHERE post_id = ?
-`,
+      `
+      SELECT DATE_FORMAT(
+        CONVERT_TZ(end_at, '+00:00', '+09:00'),
+        '%Y-%m-%d %H:%i:%s'
+      ) AS end_at
+      FROM post_votes
+      WHERE post_id = ?
+      `,
       [postId],
     )
 
     let vote = null
 
     if (voteMeta) {
-      /* -------------------------
-         옵션 + 실제 투표 수 계산
-      ------------------------- */
       const [options]: any = await db.query(
         `
-        SELECT
+        SELECT 
           o.id AS optionId,
           o.option_text AS text,
           COUNT(l.id) AS votes
         FROM post_vote_options o
-        LEFT JOIN post_vote_logs l
-          ON o.id = l.option_id
+        LEFT JOIN post_vote_logs l ON o.id = l.option_id
         WHERE o.post_id = ?
         GROUP BY o.id
         ORDER BY o.id ASC
@@ -108,18 +139,11 @@ WHERE post_id = ?
         [postId],
       )
 
-      /* -------------------------
-         내가 투표한 옵션
-      ------------------------- */
       let myVoteIndex: number | null = null
 
       if (userId) {
         const [[myVote]]: any = await db.query(
-          `
-          SELECT option_id
-          FROM post_vote_logs
-          WHERE post_id = ? AND user_id = ?
-          `,
+          `SELECT option_id FROM post_vote_logs WHERE post_id = ? AND user_id = ?`,
           [postId, userId],
         )
 
@@ -134,11 +158,11 @@ WHERE post_id = ?
         enabled: true,
         endAt: voteMeta.end_at,
         options,
-        myVoteIndex, // ⭐ 핵심
+        myVoteIndex,
       }
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ...post,
       images:
         typeof post.images === 'string'
@@ -146,7 +170,6 @@ WHERE post_id = ?
           : Array.isArray(post.images)
             ? post.images
             : [],
-      // 🔥 이 블록 추가
       attachments:
         typeof post.attachments === 'string'
           ? JSON.parse(post.attachments)
@@ -155,6 +178,13 @@ WHERE post_id = ?
             : [],
       vote,
     })
+
+    // ⭐ 클라이언트에 재발급된 accessToken 전달
+    if (newAccessToken) {
+      res.headers.set('x-access-token', newAccessToken)
+    }
+
+    return res
   } catch (e) {
     console.error('❌ GET post error', e)
     return NextResponse.json({ message: 'server error' }, { status: 500 })

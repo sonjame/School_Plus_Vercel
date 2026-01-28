@@ -8,6 +8,7 @@ interface UserData {
   school: string
   grade: string
   entryYear: number
+  classNum?: number | null
   name?: string
   pw?: string
   userPassword?: string
@@ -86,7 +87,7 @@ export default function MyInfoPagePreview() {
   // 🔐 재로그인 안내 모달
   const [showReloginModal, setShowReloginModal] = useState(false)
   const [reloginReason, setReloginReason] = useState<
-    'password' | 'school' | null
+    'password' | 'school' | 'class' | null
   >(null)
 
   // 🔥 강제 로그아웃 함수
@@ -150,6 +151,9 @@ export default function MyInfoPagePreview() {
     null,
   )
 
+  const [showClassForm, setShowClassForm] = useState(false)
+  const [classInput, setClassInput] = useState('')
+
   const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // 🔥 회원탈퇴 상태
@@ -183,6 +187,7 @@ export default function MyInfoPagePreview() {
           parsed.password ?? parsed.pw ?? parsed.userPassword ?? undefined,
         pw: parsed.pw,
         userPassword: parsed.userPassword,
+        classNum: parsed.classNum ?? null,
       }
 
       setUser(normalized)
@@ -190,21 +195,6 @@ export default function MyInfoPagePreview() {
       setUser(null)
     }
   }, [])
-
-  useEffect(() => {
-    if (!user) return
-
-    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
-
-    localStorage.setItem(
-      'loggedInUser',
-      JSON.stringify({
-        ...prev, // 🔥 기존 token 유지
-        ...user,
-        token: prev.token, // 🔥 핵심
-      }),
-    )
-  }, [user])
 
   const handlePasswordChange = async () => {
     if (!currentPw || !newPw || !newPw2) {
@@ -387,11 +377,59 @@ export default function MyInfoPagePreview() {
     localStorage.removeItem('eduCode')
     localStorage.removeItem('schoolCode')
     localStorage.removeItem('school')
+    localStorage.removeItem('class_num')
 
     alert('회원탈퇴가 완료되었습니다.')
 
     // 로그인 페이지로 이동
     window.location.href = '/auth/login'
+  }
+
+  const handleClassSave = async () => {
+    if (!user) return
+
+    const res = await fetch('/api/user/change-class', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: user.username,
+        classNum: classInput ? Number(classInput) : null,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.message || '반 저장 중 오류가 발생했습니다.')
+      return
+    }
+
+    // ✅ React state 업데이트
+    const updatedUser = {
+      ...user,
+      classNum: data.classNum,
+    }
+    setUser(updatedUser)
+
+    // ✅ localStorage는 딱 한 번만
+    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
+
+    localStorage.setItem(
+      'loggedInUser',
+      JSON.stringify({
+        ...prev,
+        classNum: data.classNum, // 🔥 핵심
+        token: prev.token, // 🔐 토큰 유지
+      }),
+    )
+
+    // UI 정리
+    setShowClassForm(false)
+    setClassInput('')
+
+    // 🔐 반 변경 후 재로그인 요구
+    setReloginReason('class')
+    setShowReloginModal(true)
   }
 
   if (!user) {
@@ -644,6 +682,112 @@ export default function MyInfoPagePreview() {
         </div>
 
         <Field label="학년" value={getCurrentGrade(user.entryYear)} />
+
+        {/* 🔹 반 정보 */}
+        <div style={{ marginBottom: 18, width: '100%', textAlign: 'center' }}>
+          <label
+            style={{
+              marginBottom: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              display: 'block',
+              width: '80%',
+              margin: '0 auto 6px',
+              textAlign: 'left',
+            }}
+          >
+            반
+          </label>
+
+          <div
+            style={{
+              width: '85%',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <input
+              value={user.classNum ? `${user.classNum}반` : '미입력'}
+              readOnly
+              disabled
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid #e5e7eb',
+                background: '#f3f4f6',
+                color: user.classNum ? '#374151' : '#9ca3af',
+                cursor: 'not-allowed',
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowClassForm((prev) => !prev)}
+              style={{
+                padding: '8px 12px',
+                background: '#38bdf8',
+                color: 'white',
+                borderRadius: 10,
+                border: 'none',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              반 수정
+            </button>
+          </div>
+        </div>
+
+        {showClassForm && (
+          <div
+            style={{
+              width: '85%',
+              margin: '6px auto 0',
+              padding: '10px',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              background: '#f9fafb',
+            }}
+          >
+            <input
+              type="text"
+              placeholder="반 입력 (숫자만, 예: 3)"
+              value={classInput}
+              onChange={(e) =>
+                setClassInput(e.target.value.replace(/[^0-9]/g, ''))
+              }
+              style={pwInputStyle}
+            />
+
+            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+              반을 모르면 비워두셔도 됩니다.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleClassSave}
+              style={{
+                marginTop: 8,
+                width: '100%',
+                padding: '8px 0',
+                borderRadius: 8,
+                background: '#6366f1',
+                color: 'white',
+                border: 'none',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              저장
+            </button>
+          </div>
+        )}
 
         {/* 비밀번호 변경 */}
         <div style={{ marginTop: 30, textAlign: 'center' }}>
@@ -1048,7 +1192,9 @@ export default function MyInfoPagePreview() {
               <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>
                 {reloginReason === 'password'
                   ? '비밀번호가 변경되었습니다.'
-                  : '학교 정보가 변경되었습니다.'}
+                  : reloginReason === 'school'
+                    ? '학교 정보가 변경되었습니다.'
+                    : '반 정보가 변경되었습니다.'}{' '}
               </p>
 
               <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>

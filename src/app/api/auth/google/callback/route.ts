@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   const email = user.email
   const picture = user.picture
 
-  const baseUrl = process.env.BASE_URL!
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
 
   return NextResponse.redirect(
     `${baseUrl}/auth/signup` +

@@ -300,6 +300,7 @@ export default function RootLayout({
             </div>
           </div>
 
+          <MenuItem icon="💬" label="채팅" href="/chat" />
           <MenuItem icon="📅" label="일정" href="/calendar" />
           <MenuItem icon="⏰" label="시간표" href="/timetable" />
           <MenuItem icon="📊" label="모의고사" href="/scores" />

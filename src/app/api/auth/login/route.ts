@@ -99,6 +99,7 @@ export async function POST(req: Request) {
         level: user.level,
         eduCode: user.edu_code,
         schoolCode: user.school_code,
+        classNum: user.class_num,
       },
     })
 

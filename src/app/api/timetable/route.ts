@@ -2,52 +2,26 @@ import db from '@/src/lib/db'
 import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
-async function getUserId(
-  req: Request,
-): Promise<{ userId: number; newAccessToken?: string } | null> {
+function getUserId(req: Request): number | null {
   const auth = req.headers.get('authorization')
   if (!auth) return null
 
-  const accessToken = auth.replace('Bearer ', '')
+  const token = auth.replace('Bearer ', '')
 
   try {
-    const decoded: any = jwt.verify(accessToken, process.env.JWT_SECRET!)
-    return { userId: decoded.id }
-  } catch (e) {
-    if (e instanceof jwt.TokenExpiredError) {
-      // 🔥 refresh 시도
-      const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
-        method: 'POST',
-        headers: {
-          cookie: req.headers.get('cookie') ?? '',
-        },
-      })
-
-      if (!refreshRes.ok) return null
-
-      const data = await refreshRes.json()
-      const newAccessToken =
-        refreshRes.headers.get('x-access-token') ?? data.accessToken
-
-      if (!newAccessToken) return null
-
-      const decoded: any = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
-
-      return { userId: decoded.id, newAccessToken }
-    }
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: number }
+    return decoded.id
+  } catch {
     return null
   }
 }
 
 /* ================= 시간표 조회 ================= */
 export async function GET(req: Request) {
-  const authResult = await getUserId(req)
-  if (!authResult) {
+  const userId = getUserId(req)
+  if (!userId) {
     return NextResponse.json({ message: '인증 필요' }, { status: 401 })
   }
-
-  const { userId, newAccessToken } = authResult
 
   const { searchParams } = new URL(req.url)
   const year = Number(searchParams.get('year'))
@@ -61,31 +35,21 @@ export async function GET(req: Request) {
     `
     SELECT day, period, subject, teacher, room
     FROM timetables
-    WHERE user_id = ?
-      AND year = ?
-      AND semester = ?
+    WHERE user_id = ? AND year = ? AND semester = ?
     ORDER BY day, period
     `,
     [userId, year, semester],
   )
 
-  const res = NextResponse.json(rows)
-
-  if (newAccessToken) {
-    res.headers.set('x-access-token', newAccessToken)
-  }
-
-  return res
+  return NextResponse.json(rows)
 }
 
 /* ================= 시간표 저장 ================= */
 export async function POST(req: Request) {
-  const authResult = await getUserId(req)
-  if (!authResult) {
+  const userId = getUserId(req)
+  if (!userId) {
     return NextResponse.json({ message: '인증 필요' }, { status: 401 })
   }
-
-  const { userId, newAccessToken } = authResult
 
   const { year, semester, classes } = await req.json()
 
@@ -109,11 +73,5 @@ export async function POST(req: Request) {
     )
   }
 
-  const res = NextResponse.json({ ok: true })
-
-  if (newAccessToken) {
-    res.headers.set('x-access-token', newAccessToken)
-  }
-
-  return res
+  return NextResponse.json({ ok: true })
 }
