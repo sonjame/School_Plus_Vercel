@@ -221,12 +221,51 @@ export default function EditPostPage() {
 
       <div style={pageWrap}>
         <div style={card}>
-          <h2 style={titleStyle}>
-            <span className="material-symbols-rounded" style={titleIcon}>
-              edit
-            </span>
-            게시글 수정
-          </h2>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 'clamp(10px, 2vw, 16px)',
+            }}
+          >
+            {/* 제목 */}
+            <h2 style={{ ...titleStyle, marginBottom: 0 }}>
+              <span className="material-symbols-rounded" style={titleIcon}>
+                edit
+              </span>
+              게시글 수정
+            </h2>
+
+            {/* ❌ 수정 취소 버튼 */}
+            <button
+              onClick={() =>
+                showConfirm('수정을 취소하시겠습니까?', () => {
+                  router.push(`/board/post/${postId}`)
+                })
+              }
+              style={{
+                background: '#ECEFF1',
+                border: 'none',
+                borderRadius: '50%',
+                width: 36,
+                height: 36,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#546E7A',
+              }}
+              aria-label="수정 취소"
+            >
+              <span
+                className="material-symbols-rounded"
+                style={{ fontSize: 22 }}
+              >
+                close
+              </span>
+            </button>
+          </div>
 
           {/* 제목 */}
           <label style={label}>제목</label>
@@ -341,6 +380,7 @@ export default function EditPostPage() {
                 }
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   padding: '10px',
                   border: '1px solid #ccc',
                   borderRadius: 8,
@@ -352,6 +392,7 @@ export default function EditPostPage() {
                   setAttachments(attachments.filter((_, i) => i !== idx))
                 }
                 style={{
+                  flexShrink: 0,
                   background: '#ff5252',
                   color: '#fff',
                   border: 'none',
@@ -604,7 +645,8 @@ export default function EditPostPage() {
 const pageWrap: React.CSSProperties = {
   background: '#F3F6FA',
   minHeight: '100vh',
-  padding: 'clamp(12px, 4vw, 40px)',
+  padding: 'clamp(12px, 3vw, 24px)',
+  paddingTop: 'calc(72px + env(safe-area-inset-top))',
   fontFamily: 'Inter, sans-serif',
   boxSizing: 'border-box',
   overflowX: 'hidden',
@@ -612,10 +654,10 @@ const pageWrap: React.CSSProperties = {
 
 const card: React.CSSProperties = {
   width: '100%',
-  maxWidth: '700px',
+  maxWidth: 'min(900px, 96vw)', // 🔥 700 → 900
   margin: '0 auto',
   background: '#fff',
-  padding: 'clamp(18px, 4vw, 30px)',
+  padding: 'clamp(16px, 3vw, 24px)', // 🔥 내부 패딩도 축소
   borderRadius: 18,
   boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
   border: '1px solid #E3EAF3',
@@ -623,12 +665,12 @@ const card: React.CSSProperties = {
 }
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 'clamp(20px, 5vw, 26px)',
+  fontSize: 'clamp(20px, 4vw, 26px)',
   fontWeight: 800,
   display: 'flex',
   alignItems: 'center',
   color: '#0277BD',
-  marginBottom: 'clamp(14px, 3vw, 20px)',
+  marginBottom: 'clamp(10px, 2vw, 16px)', // 🔥 기존보다 줄임
 }
 
 const titleIcon: React.CSSProperties = {
