@@ -97,24 +97,58 @@ export default function BoardTemplate({
     <div
       style={{
         background: '#fff',
-        padding: '24px',
+        padding: 'clamp(14px, 2vw, 20px) clamp(10px, 2vw, 16px)',
         borderRadius: '12px',
-        maxWidth: '900px',
+        maxWidth: 'min(1200px, 98vw)',
         margin: '0 auto',
+        marginTop: 'clamp(12px, 4vw, 28px)',
       }}
     >
-      <h2
+      <div
         style={{
-          fontSize: '22px',
-          fontWeight: 700,
-          borderBottom: '2px solid #4FC3F7',
-          paddingBottom: '6px',
-          marginBottom: '18px',
-          color: '#4FC3F7',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 18,
         }}
       >
-        {title}
-      </h2>
+        {/* 🔙 뒤로가기 버튼 */}
+        <Link
+          href="/board"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background: '#E3F2FD',
+            color: '#0288D1',
+            textDecoration: 'none',
+            fontSize: 20,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+          aria-label="게시판 메인으로"
+        >
+          ←
+        </Link>
+
+        {/* 제목 */}
+        <h2
+          style={{
+            fontSize: '22px',
+            fontWeight: 700,
+            borderBottom: '2px solid #4FC3F7',
+            paddingBottom: '6px',
+            margin: 0,
+            color: '#4FC3F7',
+            flex: 1,
+          }}
+        >
+          {title}
+        </h2>
+      </div>
 
       {/* 검색 */}
       <div
@@ -204,7 +238,7 @@ export default function BoardTemplate({
                   cursor: 'pointer',
                 }}
               >
-                <h3 style={{ fontSize: 17, fontWeight: 600 }}>{p.title}</h3>
+                <h3 style={{ fontSize: 20, fontWeight: 600 }}>{p.title}</h3>
 
                 <p
                   style={{
