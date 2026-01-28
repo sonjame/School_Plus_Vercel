@@ -110,8 +110,27 @@ export async function POST(req: Request) {
     let decoded: any
     try {
       decoded = jwt.verify(accessToken, process.env.JWT_SECRET!)
-    } catch {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        const refreshRes = await fetch(new URL('/api/auth/refresh', req.url), {
+          method: 'POST',
+          headers: {
+            cookie: req.headers.get('cookie') ?? '',
+          },
+        })
+
+        if (!refreshRes.ok) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        newAccessToken =
+          refreshRes.headers.get('x-access-token') ||
+          (await refreshRes.json()).accessToken
+
+        decoded = jwt.verify(newAccessToken, process.env.JWT_SECRET!)
+      } else {
+        throw e
+      }
     }
 
     const userId = decoded.id

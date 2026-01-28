@@ -83,6 +83,7 @@ const wrap: React.CSSProperties = {
   maxWidth: '1200px',
   margin: '0 auto',
   padding: '20px',
+  marginTop: 'clamp(12px, 5vw, 32px)',
 }
 
 const title: React.CSSProperties = {
@@ -146,3 +147,4 @@ const miniPost: React.CSSProperties = {
   borderRadius: '6px',
   marginTop: '4px',
 }
+
