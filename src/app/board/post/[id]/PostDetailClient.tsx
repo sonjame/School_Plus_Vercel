@@ -728,8 +728,23 @@ export default function PostDetailPage() {
   const alreadyVoted = myVoteIndex !== null
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
-      <h3 style={{ color: '#4FC3F7', marginBottom: '12px' }}>
+    <div
+      style={{
+        maxWidth: 'min(1200px, 98vw)',
+        margin: '0 auto',
+        padding: 'clamp(12px, 2vw, 18px) clamp(10px, 2vw, 16px)',
+        marginTop: 'clamp(8px, 3vw, 0px)',
+      }}
+    >
+      <h3
+        style={{
+          color: '#4FC3F7',
+          marginBottom: '16px',
+          fontSize: 'clamp(20px, 2.5vw, 28px)', // 🔥 크기 업
+          fontWeight: 600, // 🔥 타이틀 느낌
+          lineHeight: 1.2,
+        }}
+      >
         {post.category === 'free'
           ? '📢 자유게시판'
           : post.category === 'promo'
@@ -838,7 +853,7 @@ export default function PostDetailPage() {
                 color: '#37474F',
               }}
             >
-              📎 첨부
+              🎬 첨부
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -894,6 +909,9 @@ export default function PostDetailPage() {
                         fontSize: 14,
                         fontWeight: 600,
                         background: '#F5FAFF',
+                        wordBreak: 'break-all',
+                        overflowWrap: 'anywhere',
+                        maxWidth: '100%',
                       }}
                     >
                       🔗 {a.url}
