@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 interface UserData {
+  id: number
   username: string
   password?: string
   school: string
@@ -14,6 +16,7 @@ interface UserData {
   userPassword?: string
   eduCode?: string
   schoolCode?: string
+  profileImageUrl?: string | null
 }
 
 /** 🔥 학교 검색 결과 row 타입 지정 */
@@ -160,6 +163,26 @@ export default function MyInfoPagePreview() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePw, setDeletePw] = useState('')
 
+  // 🔹 프로필 미리보기 모달
+  const [showProfileModal, setShowProfileModal] = useState(false)
+
+  const [profileHistory, setProfileHistory] = useState<
+    { id: number; image_url: string; created_at: string }[]
+  >([])
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+
+  // 🔹 이전 프로필 불러오기
+  const loadProfileHistory = async () => {
+    if (!user) return
+
+    const res = await apiFetch(`/api/user/profile-history?userId=${user.id}`)
+    const data = await res.json()
+    setProfileHistory(data)
+  }
+
+  // 회원탈퇴 완료 모달 디자인
+  const [showDeleteDoneModal, setShowDeleteDoneModal] = useState(false)
+
   useEffect(() => {
     const stored = localStorage.getItem('loggedInUser')
     if (!stored) return
@@ -176,6 +199,7 @@ export default function MyInfoPagePreview() {
       }
 
       const normalized: UserData = {
+        id: parsed.id,
         username: parsed.username,
         school: parsed.school,
         grade: parsed.grade,
@@ -188,6 +212,7 @@ export default function MyInfoPagePreview() {
         pw: parsed.pw,
         userPassword: parsed.userPassword,
         classNum: parsed.classNum ?? null,
+        profileImageUrl: parsed.profileImageUrl || '/default-profile.svg',
       }
 
       setUser(normalized)
@@ -217,9 +242,8 @@ export default function MyInfoPagePreview() {
       return
     }
 
-    const res = await fetch('/api/user/change-password', {
+    const res = await apiFetch('/api/user/change-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: user.username,
         currentPw,
@@ -299,9 +323,8 @@ export default function MyInfoPagePreview() {
   const handleConfirmSchoolChange = async () => {
     if (!user || !selectedSchoolRow) return
 
-    const res = await fetch('/api/user/change-school', {
+    const res = await apiFetch('/api/user/change-school', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: user.username,
         school: selectedSchoolRow.SCHUL_NM,
@@ -322,6 +345,7 @@ export default function MyInfoPagePreview() {
       school: data.school,
       eduCode: data.eduCode,
       schoolCode: data.schoolCode,
+      level: data.level,
     }
 
     // 🔥 기존 loggedInUser 가져오기
@@ -356,9 +380,9 @@ export default function MyInfoPagePreview() {
       return
     }
 
-    const res = await fetch('/api/user/delete', {
+    // ✅
+    const res = await apiFetch('/api/user/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: user.username,
         password: deletePw,
@@ -379,18 +403,15 @@ export default function MyInfoPagePreview() {
     localStorage.removeItem('school')
     localStorage.removeItem('class_num')
 
-    alert('회원탈퇴가 완료되었습니다.')
-
-    // 로그인 페이지로 이동
-    window.location.href = '/auth/login'
+    setShowDeleteModal(false)
+    setShowDeleteDoneModal(true)
   }
 
   const handleClassSave = async () => {
     if (!user) return
 
-    const res = await fetch('/api/user/change-class', {
+    const res = await apiFetch('/api/user/change-class', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: user.username,
         classNum: classInput ? Number(classInput) : null,
@@ -466,6 +487,282 @@ export default function MyInfoPagePreview() {
           boxShadow: '0 10px 30px rgba(15,23,42,0.12)',
         }}
       >
+        {/* 🔹 프로필 사진 */}
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <img
+              src={user.profileImageUrl || '/default-profile.svg'}
+              alt="profile"
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '2px solid #e5e7eb',
+                cursor: 'pointer',
+              }}
+            />
+            {/* 🔍 프로필 이미지 미리보기 모달 */}
+            {showProfileModal && user && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  zIndex: 10000,
+                }}
+                onClick={() => setShowProfileModal(false)}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'white',
+                    borderRadius: 16,
+                    padding: 24,
+                    width: '90%',
+                    maxWidth: 360,
+                    textAlign: 'center',
+                  }}
+                >
+                  {/* 큰 프로필 이미지 */}
+                  <img
+                    src={user.profileImageUrl || '/default-profile.svg'}
+                    alt="profile-large"
+                    style={{
+                      width: 180,
+                      height: 180,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #e5e7eb',
+                      marginBottom: 16,
+                    }}
+                  />
+
+                  {/* 버튼 영역 */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* 사진 변경 */}
+                    <label
+                      style={{
+                        padding: '8px 14px',
+                        background: '#4FC3F7',
+                        color: 'white',
+                        borderRadius: 999,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      사진 변경
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+
+                          const formData = new FormData()
+                          formData.append('file', file)
+
+                          const uploadRes = await fetch('/api/upload/profile', {
+                            method: 'POST',
+                            body: formData,
+                          })
+                          const { url } = await uploadRes.json()
+
+                          // ✅
+                          await apiFetch('/api/user/change-profile-image', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                              userId: user.id,
+                              profileImageUrl: url,
+                            }),
+                          })
+
+                          const updatedUser = { ...user, profileImageUrl: url }
+                          setUser(updatedUser)
+
+                          const prev = JSON.parse(
+                            localStorage.getItem('loggedInUser') || '{}',
+                          )
+                          localStorage.setItem(
+                            'loggedInUser',
+                            JSON.stringify({
+                              ...prev,
+                              profileImageUrl: url,
+                              token: prev.token,
+                            }),
+                          )
+
+                          setShowProfileModal(false)
+                        }}
+                      />
+                    </label>
+
+                    {/* 기본 이미지로 */}
+                    <button
+                      onClick={async () => {
+                        const defaultUrl = '/default-profile.svg'
+
+                        await apiFetch('/api/user/change-profile-image', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            userId: user.id,
+                            profileImageUrl: defaultUrl,
+                          }),
+                        })
+
+                        const updatedUser = {
+                          ...user,
+                          profileImageUrl: defaultUrl,
+                        }
+                        setUser(updatedUser)
+
+                        const prev = JSON.parse(
+                          localStorage.getItem('loggedInUser') || '{}',
+                        )
+                        localStorage.setItem(
+                          'loggedInUser',
+                          JSON.stringify({
+                            ...prev,
+                            profileImageUrl: defaultUrl,
+                            token: prev.token,
+                          }),
+                        )
+
+                        setShowProfileModal(false)
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        background: '#e5e7eb',
+                        borderRadius: 999,
+                        border: 'none',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      기본 이미지
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        await loadProfileHistory()
+                        setShowHistoryModal(true)
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        background: '#f1f5f9',
+                        borderRadius: 999,
+                        border: 'none',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      이전 프로필
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setShowProfileModal(false)}
+                    style={{
+                      marginTop: 14,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <label
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                background: '#4FC3F7',
+                color: 'white',
+                borderRadius: '50%',
+                width: 28,
+                height: 28,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              ✎
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file || !user) return
+
+                  const formData = new FormData()
+                  formData.append('file', file)
+
+                  // 1️⃣ 이미지 업로드
+                  const uploadRes = await fetch('/api/upload/profile', {
+                    method: 'POST',
+                    body: formData,
+                  })
+                  const { url } = await uploadRes.json()
+
+                  // 2️⃣ DB 저장
+                  const res = await apiFetch('/api/user/change-profile-image', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      userId: user.id,
+                      profileImageUrl: url,
+                    }),
+                  })
+
+                  const data = await res.json()
+
+                  // 3️⃣ 상태 + localStorage 반영
+                  const updatedUser = {
+                    ...user,
+                    profileImageUrl: data.profileImageUrl,
+                  }
+                  setUser(updatedUser)
+
+                  const prev = JSON.parse(
+                    localStorage.getItem('loggedInUser') || '{}',
+                  )
+
+                  localStorage.setItem(
+                    'loggedInUser',
+                    JSON.stringify({
+                      ...prev,
+                      profileImageUrl: data.profileImageUrl,
+                      token: prev.token,
+                    }),
+                  )
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
         <h1
           style={{
             fontSize: 22,
@@ -1113,7 +1410,9 @@ export default function MyInfoPagePreview() {
                   marginBottom: 10,
                 }}
               >
-                탈퇴 시 모든 정보는 삭제되며 복구할 수 없습니다.
+                탈퇴 시 개인정보는 즉시 삭제되며, 사용자가 작성한 게시글 및
+                댓글은 서비스 기록으로 남습니다. 동일한 계정 정보로는 탈퇴 후
+                30일이 지나야 재가입할 수 있습니다.
               </p>
 
               <input
@@ -1222,7 +1521,306 @@ export default function MyInfoPagePreview() {
             </div>
           </div>
         )}
+
+        {showHistoryModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.45)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 10001,
+            }}
+            onClick={() => setShowHistoryModal(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'white',
+                borderRadius: 16,
+                padding: 20,
+                width: '90%',
+                maxWidth: 420,
+                maxHeight: '80vh',
+                overflowY: 'auto',
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+                이전 프로필
+              </h3>
+
+              {profileHistory.length === 0 && (
+                <p style={{ fontSize: 13, color: '#6b7280' }}>
+                  이전 프로필이 없습니다.
+                </p>
+              )}
+
+              {profileHistory.map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 10,
+                    borderRadius: 12,
+                    border: '1px solid #e5e7eb',
+                    marginBottom: 10,
+                  }}
+                >
+                  <img
+                    src={p.image_url}
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      {new Date(p.created_at).toLocaleString()}
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        await apiFetch('/api/user/change-profile-image', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            userId: user.id,
+                            profileImageUrl: p.image_url,
+                          }),
+                        })
+
+                        const updatedUser = {
+                          ...user,
+                          profileImageUrl: p.image_url,
+                        }
+                        setUser(updatedUser)
+
+                        const prev = JSON.parse(
+                          localStorage.getItem('loggedInUser') || '{}',
+                        )
+
+                        localStorage.setItem(
+                          'loggedInUser',
+                          JSON.stringify({
+                            ...prev,
+                            profileImageUrl: p.image_url,
+                            token: prev.token,
+                          }),
+                        )
+
+                        setShowHistoryModal(false)
+                        setShowProfileModal(false)
+                      }}
+                      style={{
+                        marginTop: 6,
+                        padding: '6px 12px',
+                        borderRadius: 999,
+                        border: 'none',
+                        background: '#4FC3F7',
+                        color: 'white',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      이 프로필로 변경
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        if (!confirm('이 프로필 이미지를 삭제할까요?')) return
+
+                        const res = await apiFetch(
+                          '/api/user/delete-profile-image',
+                          {
+                            method: 'POST',
+                            body: JSON.stringify({
+                              profileImageId: p.id,
+                            }),
+                          },
+                        )
+
+                        const result = await res.json()
+
+                        // 🔥🔥🔥 여기 추가해야 함
+                        if (result.currentProfileReset) {
+                          const defaultUrl = '/default-profile.svg'
+
+                          // ✅ React state 갱신
+                          setUser((prev) =>
+                            prev
+                              ? { ...prev, profileImageUrl: defaultUrl }
+                              : prev,
+                          )
+
+                          // ✅ localStorage 갱신 (토큰 유지!)
+                          const prevLS = JSON.parse(
+                            localStorage.getItem('loggedInUser') || '{}',
+                          )
+
+                          localStorage.setItem(
+                            'loggedInUser',
+                            JSON.stringify({
+                              ...prevLS,
+                              profileImageUrl: defaultUrl,
+                              token: prevLS.token,
+                            }),
+                          )
+                        }
+
+                        // 🔄 목록 다시 불러오기
+                        await loadProfileHistory()
+                      }}
+                      style={{
+                        marginTop: 6,
+                        padding: '6px 12px',
+                        borderRadius: 999,
+                        border: 'none',
+                        background: '#ef4444',
+                        color: 'white',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                style={{
+                  marginTop: 10,
+                  width: '100%',
+                  padding: '8px 0',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#e5e7eb',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {showDeleteDoneModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: 16,
+              padding: '28px 24px',
+              width: '90%',
+              maxWidth: 360,
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              animation: 'fadeIn 0.25s ease-out',
+            }}
+          >
+            {/* 아이콘 */}
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: '#E0F2FE',
+                color: '#0284C7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 28,
+                fontWeight: 700,
+                margin: '0 auto 12px',
+              }}
+            >
+              ✓
+            </div>
+
+            {/* 제목 */}
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                marginBottom: 8,
+              }}
+            >
+              회원탈퇴가 완료되었습니다
+            </h3>
+
+            {/* 설명 */}
+            <p
+              style={{
+                fontSize: 13,
+                color: '#6b7280',
+                lineHeight: 1.5,
+                marginBottom: 18,
+              }}
+            >
+              개인정보는 안전하게 삭제되었습니다.
+              <br />
+              이용해주셔서 감사합니다.
+            </p>
+
+            {/* 버튼 */}
+            <button
+              onClick={() => {
+                // 로컬 정리
+                localStorage.clear()
+                window.location.href = '/auth/login'
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 0',
+                borderRadius: 999,
+                border: 'none',
+                background: '#4FC3F7',
+                color: 'white',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              로그인 페이지로 이동
+            </button>
+          </div>
+
+          {/* 애니메이션 */}
+          <style jsx>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+                transform: scale(0.92);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </main>
   )
 }

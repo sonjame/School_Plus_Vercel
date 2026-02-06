@@ -47,13 +47,56 @@ export default function PostDetailPage() {
   const isGradeBoard =
     post && ['grade1', 'grade2', 'grade3'].includes(post.category)
 
-  const canComment = !isGradeBoard || post?.category === myGrade
+  // 🔥 관리자 게시판은 학년 제한 제외
+  const canComment =
+    post?.category === 'admin' || !isGradeBoard || post?.category === myGrade
 
   /* 🔥 투표 관련 상태 */
   const [myVoteIndex, setMyVoteIndex] = useState<number | null>(null)
   const [totalVotes, setTotalVotes] = useState(0)
 
   const [myUserId, setMyUserId] = useState<number | null>(null)
+
+  // ✅ 신고 상태 분리
+  const [reportedPost, setReportedPost] = useState(false)
+  const [reportedComments, setReportedComments] = useState<
+    Record<string, boolean>
+  >({})
+
+  const [reportTarget, setReportTarget] = useState<{
+    type: 'post' | 'comment'
+    id: string
+  } | null>(null)
+
+  const [banInfo, setBanInfo] = useState<{
+    reason: string
+    remainHours?: number
+  } | null>(null)
+
+  const checkBanAndAlert = async (): Promise<boolean> => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return false
+
+    const res = await fetch('/api/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (res.status === 403) {
+      const data = await res.json()
+
+      setBanInfo({
+        reason: data.reason,
+        remainHours: data.remainHours,
+      })
+
+      return true // 🚫 정지 상태
+    }
+
+    return false // ✅ 정상
+  }
+
   useEffect(() => {
     const uid = localStorage.getItem('userId')
     if (uid) setMyUserId(Number(uid))
@@ -106,6 +149,12 @@ export default function PostDetailPage() {
       }
 
       const res = await apiFetch(`/api/posts/${postId}`)
+      if (res.status === 404) {
+        showAlert('🚫 신고 누적으로 숨김 처리된 게시글입니다.', () =>
+          router.push('/board'),
+        )
+        return
+      }
 
       if (!res.ok) {
         showAlert('게시글을 찾을 수 없습니다.', () => router.push('/board'))
@@ -139,11 +188,7 @@ export default function PostDetailPage() {
       const userId = localStorage.getItem('userId')
       if (!userId || !postId) return
 
-      const res = await fetch(`/api/posts/${postId}/scrap`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const res = await apiFetch(`/api/posts/${postId}/scrap`)
 
       if (!res.ok) return
 
@@ -211,14 +256,14 @@ export default function PostDetailPage() {
   ------------------------------------------- */
 
   const writeComment = async () => {
+    if (await checkBanAndAlert()) return
+
     if (!canComment) {
       showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
       return
     }
-    if (!commentValue.trim()) return
 
-    const userId = localStorage.getItem('userId')
-    if (!userId) return showAlert('로그인이 필요합니다.')
+    if (!commentValue.trim()) return
 
     const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
@@ -228,7 +273,11 @@ export default function PostDetailPage() {
       }),
     })
 
-    if (!res.ok) return showAlert('댓글 작성 실패')
+    if (!res.ok) {
+      const data = await res.json()
+      showAlert(data?.message || '댓글 작성에 실패했습니다.')
+      return
+    }
 
     const newComment = await res.json()
     setComments((prev) => [...prev, newComment])
@@ -239,14 +288,14 @@ export default function PostDetailPage() {
      대댓글 작성 (실명)
   ------------------------------------------- */
   const writeReply = async () => {
+    if (await checkBanAndAlert()) return
+
     if (!canComment) {
       showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
       return
     }
-    if (!replyValue.trim() || !replyTarget) return
 
-    const userId = localStorage.getItem('userId')
-    if (!userId) return showAlert('로그인이 필요합니다.')
+    if (!replyValue.trim() || !replyTarget) return
 
     const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
@@ -256,7 +305,11 @@ export default function PostDetailPage() {
       }),
     })
 
-    if (!res.ok) return showAlert('답글 작성 실패')
+    if (!res.ok) {
+      const data = await res.json()
+      showAlert(data?.message || '답글 작성에 실패했습니다.')
+      return
+    }
 
     const newReply = await res.json()
     setComments((prev) => [...prev, newReply])
@@ -483,181 +536,207 @@ export default function PostDetailPage() {
   const renderComments = (list: any[], depth = 0) =>
     list.map((c) => {
       const isWriter = c.user_id === myUserId
+      const canManageComment = isWriter || isAdmin
+
       const isReply = depth > 0
 
       return (
-        <div
-          key={c.id}
-          style={{
-            marginLeft: isReply ? 32 : 0,
-            background: isReply ? '#F6F7F9' : '#FFFFFF',
-            border: '1px solid #E5E7EB',
-            padding: isReply ? '10px 12px' : '14px',
-            borderRadius: 8,
-            marginBottom: 10,
-            position: 'relative',
-          }}
-        >
-          {/* 🔥 에타 스타일 왼쪽 세로 라인 (답글만) */}
-          {isReply && (
-            <div
-              style={{
-                position: 'absolute',
-                left: -16,
-                top: 0,
-                bottom: 0,
-                width: 2,
-                background: '#E5E7EB',
-                borderRadius: 2,
-              }}
-            />
-          )}
-
-          {/* 메뉴 버튼 */}
-          <button
-            style={menuBtn}
-            onClick={() =>
-              setOpenCommentMenu(openCommentMenu === c.id ? null : c.id)
-            }
+        <div key={c.id}>
+          {/* ✅ 댓글 박스 (여기만 margin 적용) */}
+          <div
+            style={{
+              marginLeft: isReply ? 24 : 0,
+              background: isReply ? '#F6F7F9' : '#FFFFFF',
+              border: '1px solid #E5E7EB',
+              padding: isReply ? '10px 12px' : '14px',
+              borderRadius: 8,
+              marginBottom: 6,
+              position: 'relative',
+            }}
           >
-            ⋮
-          </button>
-
-          {openCommentMenu === c.id && (
-            <div style={menuBox}>
-              <button style={menuItem} onClick={() => setReportOpen(true)}>
-                🚩 신고하기
-              </button>
-
-              {isWriter && (
-                <>
-                  <button
-                    style={menuItem}
-                    onClick={() => {
-                      setEditId(c.id)
-                      setEditValue(c.content)
-                    }}
-                  >
-                    ✏ 수정하기
-                  </button>
-                  <button
-                    style={menuItemRed}
-                    onClick={() => deleteComment(c.id)}
-                  >
-                    🗑 삭제하기
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {editId === c.id ? (
-            <div>
-              <textarea
-                style={textBox}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
+            {/* 🔥 에타 스타일 왼쪽 세로 라인 (답글만) */}
+            {isReply && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: -16,
+                  top: 0,
+                  bottom: 0,
+                  width: 2,
+                  background: '#E5E7EB',
+                  borderRadius: 2,
+                }}
               />
-              <button style={btnBlue} onClick={saveEdit}>
-                저장
-              </button>
-              <button style={btnGray} onClick={() => setEditId(null)}>
-                취소
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* 댓글 내용 */}
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 500,
-                  lineHeight: 1.5,
-                  color: '#111827',
-                }}
-              >
-                {c.content}
+            )}
+
+            {/* 메뉴 버튼 */}
+            <button
+              style={menuBtn}
+              onClick={() =>
+                setOpenCommentMenu(openCommentMenu === c.id ? null : c.id)
+              }
+            >
+              ⋮
+            </button>
+
+            {openCommentMenu === c.id && (
+              <div style={menuBox}>
+                <button
+                  style={{
+                    ...menuItem,
+                    color: reportedComments[c.id] ? '#9CA3AF' : undefined,
+                    cursor: reportedComments[c.id] ? 'not-allowed' : 'pointer',
+                  }}
+                  onClick={() => {
+                    if (reportedComments[c.id]) {
+                      showAlert('이미 신고한 댓글입니다.')
+                      return
+                    }
+
+                    // 🔥 어떤 댓글을 신고하는지 기억
+                    setOpenCommentMenu(null)
+                    setReportTarget({ type: 'comment', id: c.id })
+                    setReportOpen(true)
+                  }}
+                >
+                  🚩 {reportedComments[c.id] ? '신고 완료됨' : '신고하기'}
+                </button>
+
+                {canManageComment && (
+                  <>
+                    <button
+                      style={menuItem}
+                      onClick={() => {
+                        setEditId(c.id)
+                        setEditValue(c.content)
+                      }}
+                    >
+                      ✏ 수정하기
+                    </button>
+                    <button
+                      style={menuItemRed}
+                      onClick={() => deleteComment(c.id)}
+                    >
+                      🗑 삭제하기
+                    </button>
+                  </>
+                )}
               </div>
+            )}
 
-              {/* 작성자 / 시간 */}
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 12,
-                  color: '#6B7280',
-                }}
-              >
-                {c.author} · {new Date(c.created_at).toLocaleString()}
+            {editId === c.id ? (
+              <div>
+                <textarea
+                  style={textBox}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                />
+                <button style={btnBlue} onClick={saveEdit}>
+                  저장
+                </button>
+                <button style={btnGray} onClick={() => setEditId(null)}>
+                  취소
+                </button>
               </div>
+            ) : (
+              <>
+                {/* 댓글 내용 */}
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    lineHeight: 1.5,
+                    color: '#111827',
+                  }}
+                >
+                  {c.content}
+                </div>
 
-              {/* 좋아요 */}
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: c.likedUsers?.includes(username)
-                    ? '#E91E63'
-                    : '#9CA3AF',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  marginTop: 6,
-                  marginRight: 8,
-                }}
-                onClick={() => toggleCommentLike(c.id)}
-              >
-                💙 {c.likes || 0}
-              </button>
+                {/* 작성자 / 시간 */}
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: '#6B7280',
+                  }}
+                >
+                  {c.author} · {new Date(c.created_at).toLocaleString()}
+                </div>
 
-              {/* 🔥 답글 버튼은 부모 댓글 + 권한 있을 때만 */}
-              {!isReply && canComment && (
+                {/* 좋아요 */}
                 <button
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#2563EB',
+                    color: c.likedUsers?.includes(username)
+                      ? '#E91E63'
+                      : '#9CA3AF',
                     fontSize: 12,
                     cursor: 'pointer',
+                    marginTop: 6,
+                    marginRight: 8,
                   }}
-                  onClick={() => setReplyTarget(c.id)}
+                  onClick={() => toggleCommentLike(c.id)}
                 >
-                  ↪ 답글
+                  💙 {c.likes || 0}
                 </button>
-              )}
-            </>
-          )}
 
-          {/* 답글 입력창 */}
-          {replyTarget === c.id && (
-            <div
-              style={{
-                marginTop: 10,
-                marginLeft: 32,
-                background: '#F9FAFB',
-                border: '1px solid #E5E7EB',
-                borderRadius: 8,
-                padding: 10,
-              }}
-            >
-              <textarea
+                {/* 🔥 답글 버튼은 부모 댓글 + 권한 있을 때만 */}
+                {canComment && (
+                  <button
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#2563EB',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      marginTop: 6,
+                    }}
+                    onClick={() => {
+                      setReplyTarget(c.id)
+                      setReplyValue(`@${c.author} `)
+                    }}
+                  >
+                    ↪ 답글
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* 답글 입력창 */}
+            {replyTarget === c.id && (
+              <div
                 style={{
-                  ...textBox,
-                  marginBottom: 8,
+                  marginTop: 10,
+                  marginLeft: 24,
+                  background: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: 8,
+                  padding: 10,
                 }}
-                value={replyValue}
-                onChange={(e) => setReplyValue(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={btnBlue} onClick={writeReply}>
-                  답글 작성
-                </button>
-                <button style={btnGray} onClick={() => setReplyTarget(null)}>
-                  취소
-                </button>
+              >
+                <textarea
+                  style={{
+                    ...textBox,
+                    marginBottom: 8,
+                  }}
+                  value={replyValue}
+                  onChange={(e) => setReplyValue(e.target.value)}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={btnBlue} onClick={writeReply}>
+                    답글 작성
+                  </button>
+                  <button style={btnGray} onClick={() => setReplyTarget(null)}>
+                    취소
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+          {c.children?.length > 0 && (
+            <div>{renderComments(c.children, depth + 1)}</div>
           )}
-
-          {renderComments(c.children, depth + 1)}
         </div>
       )
     })
@@ -666,6 +745,28 @@ export default function PostDetailPage() {
 
   if (!post)
     return <p style={{ padding: '20px' }}>게시글을 찾을 수 없습니다.</p>
+
+  const myLevel =
+    typeof window !== 'undefined' ? localStorage.getItem('level') : null
+
+  const isAdmin = myLevel === 'admin'
+
+  // 🚫 숨김 게시글 처리 (관리자는 예외)
+  if (post.is_hidden && myLevel !== 'admin') {
+    return (
+      <div
+        style={{
+          padding: 40,
+          textAlign: 'center',
+          color: '#6B7280',
+          fontSize: 15,
+          fontWeight: 600,
+        }}
+      >
+        🚫 신고 누적으로 숨김 처리된 게시글입니다.
+      </div>
+    )
+  }
 
   const created = new Date(post.created_at)
 
@@ -687,600 +788,637 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 'min(1200px, 98vw)',
-        margin: '0 auto',
-        padding: 'clamp(12px, 2vw, 18px) clamp(10px, 2vw, 16px)',
-        marginTop: 'clamp(16px, 4vw, 32px)',
-      }}
-    >
-      <h3
-        style={{
-          color: '#4FC3F7',
-          marginBottom: '16px',
-          fontSize: 'clamp(20px, 2.5vw, 28px)', // 🔥 크기 업
-          fontWeight: 600, // 🔥 타이틀 느낌
-          lineHeight: 1.2,
-        }}
-      >
-        {post.category === 'free'
-          ? '📢 자유게시판'
-          : post.category === 'promo'
-            ? '📣 홍보게시판'
-            : post.category === 'club'
-              ? '🎭 동아리게시판'
-              : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
-      </h3>
-
-      {/* 게시글 카드 */}
-      <div style={postCard}>
-        <button onClick={() => setMenuOpen(!menuOpen)} style={menuBtn}>
-          ⋮
-        </button>
-
-        {menuOpen && (
-          <div style={menuBox}>
-            {isAuthor && (
-              <button
-                style={menuItem}
-                onClick={() => router.push(`/board/post/${postId}/edit`)}
-              >
-                ✏ 수정하기
-              </button>
-            )}
-
-            {/* 🔗 링크 복사 */}
-            <button
-              style={menuItem}
-              onClick={() => {
-                copyLink()
-                setMenuOpen(false) // 메뉴 닫기
-              }}
-            >
-              🔗 게시물 공유
-            </button>
-
-            <button style={menuItem} onClick={() => setReportOpen(true)}>
-              🚩 신고하기
-            </button>
-
-            {isAuthor && (
-              <button style={menuItemRed} onClick={deletePost}>
-                🗑 삭제하기
-              </button>
-            )}
-          </div>
-        )}
-
+    <>
+      {/* 🚫 계정 정지 모달 */}
+      {banInfo && (
         <div
           style={{
-            padding: '10px 22px',
-            fontSize: '14px',
-            background: '#F0F8FF',
-            borderRadius: '12px 12px 0 0',
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
           }}
         >
-          <button
-            onClick={() => {
-              if (post?.category) {
-                router.push(getBoardListPath(post.category))
-              } else {
-                router.push('/board')
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              gap: 6,
-              background: 'transparent',
-              border: 'none',
-              color: '#4FC3F7',
-              fontSize: 20,
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginBottom: 8,
-              paddingLeft: 0,
-            }}
-          >
-            ❮ 뒤로가기
-          </button>
-          <strong>{post.author}</strong> ·{' '}
-          <span style={{ color: '#999' }}>{dateStr}</span>
-        </div>
-
-        <div style={{ padding: '20px', background: '#F0F8FF' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 800 }}>{post.title}</h2>
-        </div>
-
-        {/* 이미지 (여러장 or 단일) */}
-        {Array.isArray(post.images) && post.images.length > 0 && (
           <div
             style={{
-              padding: '16px 20px',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-              gap: 12,
+              width: '90%',
+              maxWidth: '420px',
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
             }}
           >
-            {post.images.map((src: string, i: number) => (
-              <img
-                key={i}
-                src={src}
-                onClick={() => {
-                  setViewerIndex(i)
-                  setViewerImage(src)
-                  setViewerOpen(true)
-                }}
-                style={{
-                  width: '100%',
-                  height: 140,
-                  objectFit: 'cover',
-                  borderRadius: 10,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  cursor: 'zoom-in',
-                }}
-              />
-            ))}
-          </div>
-        )}
+            <h2 style={{ color: '#d32f2f', marginBottom: '12px' }}>
+              🚫 계정 이용 제한
+            </h2>
 
-        {/* 🔗 첨부 링크 / 영상 */}
-        {Array.isArray(post.attachments) && post.attachments.length > 0 && (
-          <div style={{ padding: '12px 20px' }}>
-            <h4
+            <p
+              style={{ fontSize: '15px', color: '#444', marginBottom: '12px' }}
+            >
+              {banInfo.reason}
+            </p>
+
+            {banInfo.remainHours !== undefined && (
+              <p style={{ fontSize: '14px', color: '#666' }}>
+                남은 정지 시간: <strong>{banInfo.remainHours}시간</strong>
+              </p>
+            )}
+
+            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+              현재 계정은 <strong>게시글·댓글 작성이 제한</strong>되어 있습니다.
+            </p>
+
+            <button
               style={{
-                fontSize: 15,
-                fontWeight: 700,
+                marginTop: '20px',
+                padding: '10px 20px',
+                background: '#4FC3F7',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              onClick={() => setBanInfo(null)}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+      <div
+        style={{
+          maxWidth: 'min(1200px, 98vw)',
+          margin: '0 auto',
+          padding: 'clamp(12px, 2vw, 18px) clamp(10px, 2vw, 16px)',
+          marginTop: 'clamp(16px, 4vw, 32px)',
+        }}
+      >
+        <h3
+          style={{
+            color: '#4FC3F7',
+            marginBottom: '16px',
+            fontSize: 'clamp(20px, 2.5vw, 28px)', // 🔥 크기 업
+            fontWeight: 600, // 🔥 타이틀 느낌
+            lineHeight: 1.2,
+          }}
+        >
+          {post.category === 'free'
+            ? '📢 자유게시판'
+            : post.category === 'promo'
+              ? '📣 홍보게시판'
+              : post.category === 'club'
+                ? '🎭 동아리게시판'
+                : post.category === 'admin'
+                  ? '🛠 관리자 게시판'
+                  : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
+        </h3>
+
+        {/* 게시글 카드 */}
+        <div style={postCard}>
+          <button onClick={() => setMenuOpen(!menuOpen)} style={menuBtn}>
+            ⋮
+          </button>
+
+          {menuOpen && (
+            <div style={menuBox}>
+              {(isAuthor || isAdmin) && (
+                <button
+                  style={menuItem}
+                  onClick={() => router.push(`/board/post/${postId}/edit`)}
+                >
+                  ✏ 수정하기
+                </button>
+              )}
+
+              {/* 🔗 링크 복사 */}
+              {/* 🔗 링크 복사 (관리자 제외) */}
+              {!isAdmin && (
+                <button
+                  style={menuItem}
+                  onClick={() => {
+                    copyLink()
+                    setMenuOpen(false)
+                  }}
+                >
+                  🔗 게시물 공유
+                </button>
+              )}
+
+              {/* 🚩 신고하기 (관리자 + 작성자 제외) */}
+              {!isAdmin && !isAuthor && (
+                <button
+                  style={menuItem}
+                  onClick={() => {
+                    if (reportedPost) {
+                      showAlert('이미 신고한 게시글입니다.')
+                      return
+                    }
+                    setReportTarget({ type: 'post', id: postId })
+                    setReportOpen(true)
+                  }}
+                >
+                  🚩 {reportedPost ? '신고 완료됨' : '신고하기'}
+                </button>
+              )}
+
+              {(isAuthor || isAdmin) && (
+                <button style={menuItemRed} onClick={deletePost}>
+                  🗑 삭제하기
+                </button>
+              )}
+            </div>
+          )}
+
+          <div
+            style={{
+              padding: '10px 22px',
+              fontSize: '14px',
+              background: '#F0F8FF',
+              borderRadius: '12px 12px 0 0',
+            }}
+          >
+            <button
+              onClick={() => {
+                if (post?.category) {
+                  router.push(getBoardListPath(post.category))
+                } else {
+                  router.push('/board')
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: 6,
+                background: 'transparent',
+                border: 'none',
+                color: '#4FC3F7',
+                fontSize: 20,
+                fontWeight: 600,
+                cursor: 'pointer',
                 marginBottom: 8,
-                color: '#37474F',
+                paddingLeft: 0,
               }}
             >
-              🎬 첨부
-            </h4>
+              ❮ 뒤로가기
+            </button>
+            <strong>{post.author}</strong> ·{' '}
+            <span style={{ color: '#999' }}>{dateStr}</span>
+          </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {post.attachments.map(
-                (a: { type: 'link' | 'video'; url: string }, idx: number) => {
-                  // 🎬 유튜브 영상
-                  if (a.type === 'video') {
-                    const videoId = a.url.includes('youtu.be')
-                      ? a.url.split('youtu.be/')[1]
-                      : a.url.split('v=')[1]?.split('&')[0]
+          <div style={{ padding: '20px', background: '#F0F8FF' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 800 }}>{post.title}</h2>
+          </div>
 
-                    return (
-                      <div key={idx} style={{ marginBottom: 10 }}>
-                        <div
-                          style={{
-                            position: 'relative',
-                            width: '100%',
-                            aspectRatio: '16 / 9',
-                            borderRadius: 12,
-                            overflow: 'hidden',
-                            background: '#000',
-                          }}
-                        >
-                          <iframe
-                            src={`https://www.youtube.com/embed/${videoId}`}
-                            allowFullScreen
+          {/* 이미지 (여러장 or 단일) */}
+          {Array.isArray(post.images) && post.images.length > 0 && (
+            <div
+              style={{
+                padding: '16px 20px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {post.images.map((src: string, i: number) => (
+                <img
+                  key={i}
+                  src={src}
+                  onClick={() => {
+                    setViewerIndex(i)
+                    setViewerImage(src)
+                    setViewerOpen(true)
+                  }}
+                  style={{
+                    width: '100%',
+                    height: 140,
+                    objectFit: 'cover',
+                    borderRadius: 10,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    cursor: 'zoom-in',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* 🔗 첨부 링크 / 영상 */}
+          {Array.isArray(post.attachments) && post.attachments.length > 0 && (
+            <div style={{ padding: '12px 20px' }}>
+              <h4
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  marginBottom: 8,
+                  color: '#37474F',
+                }}
+              >
+                🎬 첨부
+              </h4>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {post.attachments.map(
+                  (a: { type: 'link' | 'video'; url: string }, idx: number) => {
+                    // 🎬 유튜브 영상
+                    if (a.type === 'video') {
+                      const videoId = a.url.includes('youtu.be')
+                        ? a.url.split('youtu.be/')[1]
+                        : a.url.split('v=')[1]?.split('&')[0]
+
+                      return (
+                        <div key={idx} style={{ marginBottom: 10 }}>
+                          <div
                             style={{
-                              position: 'absolute',
-                              inset: 0,
+                              position: 'relative',
                               width: '100%',
-                              height: '100%',
-                              border: 'none',
+                              aspectRatio: '16 / 9',
+                              borderRadius: 12,
+                              overflow: 'hidden',
+                              background: '#000',
+                            }}
+                          >
+                            <iframe
+                              src={`https://www.youtube.com/embed/${videoId}`}
+                              allowFullScreen
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                width: '100%',
+                                height: '100%',
+                                border: 'none',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    // 🔗 일반 링크
+                    return (
+                      <a
+                        key={idx}
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 10,
+                          border: '1px solid #CFD8DC',
+                          textDecoration: 'none',
+                          color: '#0288D1',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          background: '#F5FAFF',
+                          wordBreak: 'break-all',
+                          overflowWrap: 'anywhere',
+                          maxWidth: '100%',
+                        }}
+                      >
+                        🔗 {a.url}
+                      </a>
+                    )
+                  },
+                )}
+              </div>
+            </div>
+          )}
+
+          {!post.images && post.image && (
+            <div style={{ padding: '16px 20px' }}>
+              <img
+                src={post.image}
+                style={{
+                  maxWidth: '100%',
+                  borderRadius: 10,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+              />
+            </div>
+          )}
+
+          <div style={postBody}>{post.content}</div>
+
+          {/* 🔥 투표 영역 (좋아요 버튼 위에 위치) */}
+          {hasVote && (
+            <div style={voteCard}>
+              <div style={voteHeader}>
+                <span style={{ fontWeight: 700 }}>투표</span>
+
+                {/* 🔥 마감 안내 */}
+                <span style={{ fontSize: 13, color: '#607D8B' }}>
+                  총 {totalVotes}표{alreadyVoted && ' · 내가 참여함'}
+                  {post.vote.endAt && (
+                    <>
+                      {' · '}
+                      {isVoteEnded ? (
+                        <span style={{ color: '#D32F2F', fontWeight: 700 }}>
+                          마감됨
+                        </span>
+                      ) : (
+                        <>마감 {new Date(post.vote.endAt).toLocaleString()}</>
+                      )}
+                    </>
+                  )}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                {post.vote.options.map((opt: any, idx: number) => {
+                  const votes = opt.votes || 0
+                  const percent =
+                    totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
+                  const isMyChoice = myVoteIndex === idx
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => !isVoteEnded && handleVote(idx)} // ⛔ 마감되면 클릭 막기
+                      style={{
+                        ...voteOptionRow,
+                        borderColor: isMyChoice ? '#0288D1' : '#CFD8DC',
+                        backgroundColor: isMyChoice ? '#E1F5FE' : '#FFFFFF',
+                        cursor: isVoteEnded ? 'not-allowed' : 'pointer',
+                        opacity: isVoteEnded ? 0.6 : 1, // ⛔ 흐리게 처리
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={voteOptionTop}>
+                          <span style={{ fontWeight: 600 }}>{opt.text}</span>
+                          <span style={{ fontSize: 13, color: '#546E7A' }}>
+                            {votes}표 · {percent}%
+                          </span>
+                        </div>
+
+                        <div style={voteBarTrack}>
+                          <div
+                            style={{
+                              ...voteBarFill,
+                              width: `${percent}%`,
+                              opacity: percent === 0 ? 0.15 : 0.9,
+                              background: isMyChoice
+                                ? 'linear-gradient(90deg, #4FC3F7, #0288D1)'
+                                : '#B0BEC5',
                             }}
                           />
                         </div>
                       </div>
-                    )
-                  }
 
-                  // 🔗 일반 링크
-                  return (
-                    <a
-                      key={idx}
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: 10,
-                        border: '1px solid #CFD8DC',
-                        textDecoration: 'none',
-                        color: '#0288D1',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        background: '#F5FAFF',
-                        wordBreak: 'break-all',
-                        overflowWrap: 'anywhere',
-                        maxWidth: '100%',
-                      }}
-                    >
-                      🔗 {a.url}
-                    </a>
-                  )
-                },
-              )}
-            </div>
-          </div>
-        )}
-
-        {!post.images && post.image && (
-          <div style={{ padding: '16px 20px' }}>
-            <img
-              src={post.image}
-              style={{
-                maxWidth: '100%',
-                borderRadius: 10,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
-            />
-          </div>
-        )}
-
-        <div style={postBody}>{post.content}</div>
-
-        {/* 🔥 투표 영역 (좋아요 버튼 위에 위치) */}
-        {hasVote && (
-          <div style={voteCard}>
-            <div style={voteHeader}>
-              <span style={{ fontWeight: 700 }}>투표</span>
-
-              {/* 🔥 마감 안내 */}
-              <span style={{ fontSize: 13, color: '#607D8B' }}>
-                총 {totalVotes}표{alreadyVoted && ' · 내가 참여함'}
-                {post.vote.endAt && (
-                  <>
-                    {' · '}
-                    {isVoteEnded ? (
-                      <span style={{ color: '#D32F2F', fontWeight: 700 }}>
-                        마감됨
-                      </span>
-                    ) : (
-                      <>마감 {new Date(post.vote.endAt).toLocaleString()}</>
-                    )}
-                  </>
-                )}
-              </span>
-            </div>
-
-            <div
-              style={{
-                marginTop: 10,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              {post.vote.options.map((opt: any, idx: number) => {
-                const votes = opt.votes || 0
-                const percent =
-                  totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
-                const isMyChoice = myVoteIndex === idx
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => !isVoteEnded && handleVote(idx)} // ⛔ 마감되면 클릭 막기
-                    style={{
-                      ...voteOptionRow,
-                      borderColor: isMyChoice ? '#0288D1' : '#CFD8DC',
-                      backgroundColor: isMyChoice ? '#E1F5FE' : '#FFFFFF',
-                      cursor: isVoteEnded ? 'not-allowed' : 'pointer',
-                      opacity: isVoteEnded ? 0.6 : 1, // ⛔ 흐리게 처리
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div style={voteOptionTop}>
-                        <span style={{ fontWeight: 600 }}>{opt.text}</span>
-                        <span style={{ fontSize: 13, color: '#546E7A' }}>
-                          {votes}표 · {percent}%
-                        </span>
-                      </div>
-
-                      <div style={voteBarTrack}>
-                        <div
+                      {isMyChoice && (
+                        <span
                           style={{
-                            ...voteBarFill,
-                            width: `${percent}%`,
-                            opacity: percent === 0 ? 0.15 : 0.9,
-                            background: isMyChoice
-                              ? 'linear-gradient(90deg, #4FC3F7, #0288D1)'
-                              : '#B0BEC5',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#0288D1',
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: '#E1F5FE',
+                            marginLeft: 8,
+                            whiteSpace: 'nowrap',
                           }}
-                        />
-                      </div>
-                    </div>
+                        >
+                          내 선택
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
 
-                    {isMyChoice && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: '#0288D1',
-                          padding: '2px 8px',
-                          borderRadius: 999,
-                          background: '#E1F5FE',
-                          marginLeft: 8,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        내 선택
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+              {/* 안내 문구 */}
+              <p style={{ marginTop: 8, fontSize: 12, color: '#78909C' }}>
+                {isVoteEnded
+                  ? '⛔ 투표가 마감되었습니다.'
+                  : '투표는 1회만 가능하며, 선택한 항목을 다시 누르면 취소됩니다.'}
+              </p>
             </div>
-
-            {/* 안내 문구 */}
-            <p style={{ marginTop: 8, fontSize: 12, color: '#78909C' }}>
-              {isVoteEnded
-                ? '⛔ 투표가 마감되었습니다.'
-                : '투표는 1회만 가능하며, 선택한 항목을 다시 누르면 취소됩니다.'}
-            </p>
-          </div>
-        )}
-
-        <div style={{ padding: '0 20px 20px' }}>
-          <button style={btnBlue} onClick={handleLike}>
-            💙 좋아요 {post.likes}
-          </button>
-
-          <button
-            style={{
-              padding: '8px 14px',
-              background: scrapped ? '#FFB74D' : '#E0E0E0',
-              borderRadius: '6px',
-              marginLeft: '10px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-            onClick={toggleScrap}
-          >
-            {scrapped ? '⭐ 스크랩됨' : '☆ 스크랩'}
-          </button>
-        </div>
-      </div>
-
-      {/* 댓글 */}
-      <div style={commentCard}>
-        <h3 style={{ marginBottom: '10px' }}>💬 댓글</h3>
-
-        {canComment ? (
-          <>
-            <textarea
-              style={textBox}
-              placeholder="댓글 입력..."
-              value={commentValue}
-              onChange={(e) => setCommentValue(e.target.value)}
-            />
-
-            <button style={btnBlue} onClick={writeComment}>
-              댓글 작성
-            </button>
-          </>
-        ) : (
-          <div
-            style={{
-              padding: '12px',
-              borderRadius: 8,
-              background: '#F1F5F9',
-              color: '#64748B',
-              fontSize: 14,
-              fontWeight: 600,
-              textAlign: 'center',
-            }}
-          >
-            🔒 해당 학년만 댓글을 작성할 수 있습니다
-          </div>
-        )}
-
-        <hr style={{ margin: '20px 0' }} />
-
-        {renderComments(commentTree)}
-      </div>
-
-      {/* 신고 모달 */}
-      {reportOpen && (
-        <div style={modalBg}>
-          <div style={reportBox}>
-            <h3
-              style={{
-                marginBottom: '12px',
-                fontSize: '18px',
-                fontWeight: 700,
-              }}
-            >
-              🚨 신고하기
-            </h3>
-
-            <select
-              style={inputBox}
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-            >
-              <option value="">신고 유형 선택</option>
-              <option value="욕설/비방">욕설/비방</option>
-              <option value="정치/사회 갈등">정치/사회 갈등</option>
-              <option value="광고/홍보">광고/홍보</option>
-              <option value="기타">기타</option>
-            </select>
-
-            {reportType === '기타' && (
-              <textarea
-                style={reportTextArea}
-                placeholder="신고 사유를 입력해주세요..."
-                value={reportText}
-                onChange={(e) => setReportText(e.target.value)}
-              />
-            )}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '12px',
-                marginTop: '14px',
-              }}
-            >
-              <button style={btnGray} onClick={() => setReportOpen(false)}>
-                닫기
-              </button>
-
-              <button
-                style={btnBlue}
-                onClick={async () => {
-                  if (!reportType) {
-                    showAlert('신고 유형을 선택해주세요.')
-                    return
-                  }
-
-                  const res = await fetch(`/api/posts/${postId}/report`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${localStorage.getItem(
-                        'accessToken',
-                      )}`,
-                    },
-                    body: JSON.stringify({
-                      type: reportType,
-                      content: reportType === '기타' ? reportText : null,
-                    }),
-                  })
-
-                  if (!res.ok) {
-                    showAlert('신고 처리 중 오류가 발생했습니다.')
-                    return
-                  }
-
-                  setReportOpen(false)
-                  setReportType('')
-                  setReportText('')
-                  showAlert('🚨 신고가 접수되었습니다.')
-                }}
-              >
-                제출
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 공통 모달 */}
-      {modal.show && (
-        <div style={modalBg}>
-          <div style={modalBox}>
-            <p>{modal.message}</p>
-
-            <div
-              style={{
-                marginTop: '10px',
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'center',
-              }}
-            >
-              {modal.type === 'confirm' && (
-                <button style={btnGray} onClick={modal.onCancel}>
-                  취소
-                </button>
-              )}
-
-              <button style={btnBlue} onClick={modal.onConfirm}>
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {viewerOpen && viewerImage && post?.images && (
-        <div
-          onClick={() => setViewerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 999999,
-          }}
-        >
-          {/* ❌ 닫기 버튼 */}
-          <button
-            onClick={() => setViewerOpen(false)}
-            style={{
-              position: 'absolute',
-              top: 20,
-              right: 20,
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '50%',
-              width: 44,
-              height: 44,
-              fontSize: 22,
-              cursor: 'pointer',
-            }}
-          >
-            ✕
-          </button>
-
-          {/* ⬅️ 이전 */}
-          {post.images.length > 1 && viewerIndex > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                const newIndex = viewerIndex - 1
-                setViewerIndex(newIndex)
-                setViewerImage(post.images[newIndex])
-              }}
-              style={{
-                position: 'absolute',
-                left: 20,
-                background: 'rgba(0,0,0,0.6)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '50%',
-                width: 44,
-                height: 44,
-                fontSize: 24,
-                cursor: 'pointer',
-              }}
-            >
-              ‹
-            </button>
           )}
 
-          {/* 이미지 */}
-          <img
-            src={viewerImage}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: '90%',
-              maxHeight: '90%',
-              borderRadius: 14,
-              boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
-            }}
-          />
+          <div style={{ padding: '0 20px 20px' }}>
+            <button style={btnBlue} onClick={handleLike}>
+              💙 좋아요 {post.likes}
+            </button>
 
-          {/* ➡️ 다음 */}
-          {post.images.length > 1 && viewerIndex < post.images.length - 1 && (
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                const newIndex = viewerIndex + 1
-                setViewerIndex(newIndex)
-                setViewerImage(post.images[newIndex])
+              style={{
+                padding: '8px 14px',
+                background: scrapped ? '#FFB74D' : '#E0E0E0',
+                borderRadius: '6px',
+                marginLeft: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
+              onClick={toggleScrap}
+            >
+              {scrapped ? '⭐ 스크랩됨' : '☆ 스크랩'}
+            </button>
+          </div>
+        </div>
+
+        {/* 댓글 */}
+        <div style={commentCard}>
+          <h3 style={{ marginBottom: '10px' }}>💬 댓글</h3>
+
+          {canComment ? (
+            <>
+              <textarea
+                style={textBox}
+                placeholder="댓글 입력..."
+                value={commentValue}
+                onChange={(e) => setCommentValue(e.target.value)}
+              />
+              <button style={btnBlue} onClick={writeComment}>
+                댓글 작성
+              </button>
+            </>
+          ) : (
+            <div
+              style={{
+                padding: '12px',
+                borderRadius: 8,
+                background: '#F1F5F9',
+                color: '#64748B',
+                fontSize: 14,
+                fontWeight: 600,
+                textAlign: 'center',
+              }}
+            >
+              {post?.category === 'admin'
+                ? '🔒 관리자 또는 문의 작성자만 댓글을 작성할 수 있습니다'
+                : '🔒 해당 학년만 댓글을 작성할 수 있습니다'}
+            </div>
+          )}
+
+          <hr style={{ margin: '20px 0' }} />
+
+          {renderComments(commentTree)}
+        </div>
+
+        {/* 신고 모달 */}
+        {reportOpen && (
+          <div style={modalBg}>
+            <div style={reportBox}>
+              <h3
+                style={{
+                  marginBottom: '12px',
+                  fontSize: '18px',
+                  fontWeight: 700,
+                }}
+              >
+                🚨 신고하기
+              </h3>
+
+              <select
+                style={inputBox}
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+              >
+                <option value="">신고 유형 선택</option>
+                <option value="욕설/비방">욕설/비방</option>
+                <option value="정치/사회 갈등">정치/사회 갈등</option>
+                <option value="광고/홍보">광고/홍보</option>
+                <option value="기타">기타</option>
+              </select>
+
+              {reportType === '기타' && (
+                <textarea
+                  style={reportTextArea}
+                  placeholder="신고 사유를 입력해주세요..."
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                />
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  marginTop: '14px',
+                }}
+              >
+                <button style={btnGray} onClick={() => setReportOpen(false)}>
+                  닫기
+                </button>
+
+                <button
+                  style={btnBlue}
+                  onClick={async () => {
+                    if (!reportType) {
+                      showAlert('신고 유형을 선택해주세요.')
+                      return
+                    }
+
+                    const target = reportTarget
+                    if (!target) return
+
+                    const url =
+                      target.type === 'post'
+                        ? `/api/posts/${postId}/report`
+                        : `/api/comments/${target.id}/report`
+
+                    const res = await apiFetch(url, {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        type: reportType,
+                        content: reportType === '기타' ? reportText : null,
+                      }),
+                    })
+
+                    if (res.status === 409) {
+                      showAlert('이미 신고한 항목입니다.')
+                      return
+                    }
+
+                    if (!res.ok) {
+                      showAlert('신고 처리 중 오류가 발생했습니다.')
+                      return
+                    }
+
+                    // ✅ 성공 처리
+                    if (target.type === 'post') {
+                      setReportedPost(true)
+                    } else {
+                      setReportedComments((prev) => ({
+                        ...prev,
+                        [target.id]: true,
+                      }))
+                    }
+
+                    setReportOpen(false)
+                    setReportType('')
+                    setReportText('')
+                    setReportTarget(null)
+                    showAlert('🚨 신고가 접수되었습니다.')
+                  }}
+                >
+                  제출
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 공통 모달 */}
+        {modal.show && (
+          <div style={modalBg}>
+            <div style={modalBox}>
+              <p>{modal.message}</p>
+
+              <div
+                style={{
+                  marginTop: '10px',
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'center',
+                }}
+              >
+                {modal.type === 'confirm' && (
+                  <button style={btnGray} onClick={modal.onCancel}>
+                    취소
+                  </button>
+                )}
+
+                <button style={btnBlue} onClick={modal.onConfirm}>
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {viewerOpen && viewerImage && post?.images && (
+          <div
+            onClick={() => setViewerOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 999999,
+            }}
+          >
+            {/* ❌ 닫기 버튼 */}
+            <button
+              onClick={() => setViewerOpen(false)}
               style={{
                 position: 'absolute',
+                top: 20,
                 right: 20,
                 background: 'rgba(0,0,0,0.6)',
                 color: '#fff',
@@ -1288,16 +1426,80 @@ export default function PostDetailPage() {
                 borderRadius: '50%',
                 width: 44,
                 height: 44,
-                fontSize: 24,
+                fontSize: 22,
                 cursor: 'pointer',
               }}
             >
-              ›
+              ✕
             </button>
-          )}
-        </div>
-      )}
-    </div>
+
+            {/* ⬅️ 이전 */}
+            {post.images.length > 1 && viewerIndex > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const newIndex = viewerIndex - 1
+                  setViewerIndex(newIndex)
+                  setViewerImage(post.images[newIndex])
+                }}
+                style={{
+                  position: 'absolute',
+                  left: 20,
+                  background: 'rgba(0,0,0,0.6)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 44,
+                  height: 44,
+                  fontSize: 24,
+                  cursor: 'pointer',
+                }}
+              >
+                ‹
+              </button>
+            )}
+
+            {/* 이미지 */}
+            <img
+              src={viewerImage}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: '90%',
+                maxHeight: '90%',
+                borderRadius: 14,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+              }}
+            />
+
+            {/* ➡️ 다음 */}
+            {post.images.length > 1 && viewerIndex < post.images.length - 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const newIndex = viewerIndex + 1
+                  setViewerIndex(newIndex)
+                  setViewerImage(post.images[newIndex])
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 20,
+                  background: 'rgba(0,0,0,0.6)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 44,
+                  height: 44,
+                  fontSize: 24,
+                  cursor: 'pointer',
+                }}
+              >
+                ›
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

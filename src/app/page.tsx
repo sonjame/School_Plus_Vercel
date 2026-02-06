@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import LibraryRecommend from '../components/Library'
 import TimetablePreview from '../components/Dashboard/TimetablePreview'
 import Link from 'next/link'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 interface Post {
   id: string
@@ -35,12 +36,161 @@ type DBEvent = {
   start_time?: string
 }
 
+type UnreadMessage = {
+  messageId: number
+  roomId: number
+  senderId: number
+  senderName: string
+  content: string
+  createdAt: string
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<string | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [today, setToday] = useState<string>('')
   const [calendar, setCalendar] = useState<HomeCalendarItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+  const [isChatNoticeOpen, setIsChatNoticeOpen] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState<UnreadMessage[]>([])
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [unbanModalOpen, setUnbanModalOpen] = useState(false)
+  // 🔔 관리자 알림
+  const [unreadNotifyCount, setUnreadNotifyCount] = useState(0)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [isNotifyOpen, setIsNotifyOpen] = useState(false)
+
+  const [banInfo, setBanInfo] = useState<{
+    reason: string
+    remainHours?: number
+  } | null>(null)
+
+  useEffect(() => {
+    const loadUnreadNotifications = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const res = await apiFetch('/api/notifications/unread-count')
+      if (!res.ok) return
+
+      const data = await res.json()
+      setUnreadNotifyCount(data.unreadCount || 0)
+    }
+
+    loadUnreadNotifications()
+  }, [])
+
+  const loadNotifications = async () => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const res = await apiFetch('/api/notifications')
+    if (!res.ok) return
+
+    const data = await res.json()
+    setNotifications(data || [])
+  }
+
+  const deleteNotification = async (id: number) => {
+    await apiFetch('/api/notifications/delete', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+    })
+
+    // 🔥 화면에서 즉시 제거
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+
+    // 🔔 카운트 감소
+    setUnreadNotifyCount((prev) => Math.max(0, prev - 1))
+  }
+
+  useEffect(() => {
+    if (isLoggingOut) return
+
+    const checkBanStatus = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const res = await apiFetch('/api/auth/me')
+
+      const prevStatus = localStorage.getItem('banStatus')
+
+      // 🚫 현재 정지 상태
+      if (res.status === 403) {
+        const data = await res.json()
+
+        // ⭐ 상태 기록
+        localStorage.setItem('banStatus', 'banned')
+
+        // ⭐⭐ 다음 해제 모달을 위해 초기화
+        sessionStorage.removeItem('unbanModalShown')
+
+        // ⭐ 이미 이번 정지에서 모달 봤으면 스킵
+        if (sessionStorage.getItem('banModalShown') === 'true') return
+
+        setBanInfo({
+          reason: data.reason,
+          remainHours: data.remainHours,
+        })
+
+        // ⭐ 이번 정지에서 모달 봤다고 기록
+        sessionStorage.setItem('banModalShown', 'true')
+
+        return
+      }
+
+      // ✅ 현재 정상 상태
+      if (res.ok) {
+        if (
+          prevStatus === 'banned' &&
+          sessionStorage.getItem('unbanModalShown') !== 'true'
+        ) {
+          // 🔓 계정 해제 모달
+          setUnbanModalOpen(true)
+          sessionStorage.setItem('unbanModalShown', 'true')
+
+          // ⭐ 핵심: 해제 모달을 띄운 "그 순간"에만 정리
+          localStorage.removeItem('banStatus')
+          sessionStorage.removeItem('banModalShown')
+        } else {
+          // 🔄 원래부터 정상 유저인 경우만 normal 유지
+          localStorage.setItem('banStatus', 'normal')
+        }
+      }
+    }
+
+    checkBanStatus()
+  }, [isLoggingOut])
+
+  useEffect(() => {
+    const loadUnreadChat = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const res = await apiFetch('/api/chat/unread-count')
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setUnreadChatCount(data.unreadCount || 0)
+    }
+
+    loadUnreadChat()
+  }, [])
+
+  const loadUnreadChatSummary = async () => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const res = await apiFetch('/api/chat/unread-summary')
+
+    if (!res.ok) return
+
+    const data = await res.json()
+    setUnreadMessages(data.messages || [])
+    setUnreadChatCount(data.unreadCount || 0)
+  }
 
   const CATEGORY_TABS = [
     { key: 'all', label: '전체' },
@@ -70,11 +220,7 @@ export default function HomePage() {
       let merged: Post[] = []
 
       for (const cat of categories) {
-        const res = await fetch(`/api/posts?category=${cat}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const res = await apiFetch(`/api/posts?category=${cat}`)
 
         if (!res.ok) continue
 
@@ -135,10 +281,7 @@ export default function HomePage() {
         /* ======================
        🔹 내 일정
     ====================== */
-        const res = await fetch(
-          `/api/calendar-events?userId=${userId}`,
-          { credentials: 'include' }, // 🔥 중요
-        )
+        const res = await apiFetch(`/api/calendar-events?userId=${userId}`)
 
         if (res.ok) {
           const rows: DBEvent[] = await res.json()
@@ -253,416 +396,738 @@ export default function HomePage() {
   })
 
   return (
-    <div
-      style={{
-        width: '100%',
-        maxWidth: '1600px',
-        margin: '0 auto',
-        padding: 'clamp(8px, 3vw, 16px)',
-        backgroundColor: '#fff',
-        borderRadius: '14px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-      }}
-    >
-      {/* ------------------ 상단 ------------------ */}
-      <h2
-        style={{
-          fontSize: 'clamp(20px, 4vw, 28px)',
-          fontWeight: 700,
-          color: '#4FC3F7',
-          marginBottom: '8px',
-          textAlign: 'center',
-        }}
-      >
-        School Plus
-      </h2>
-
-      <p
-        style={{
-          color: '#666',
-          marginBottom: '28px',
-          fontSize: 'clamp(13px, 2.5vw, 16px)',
-          textAlign: 'center',
-        }}
-      >
-        학생 생활을 한눈에 확인하세요 📚
-      </p>
-
-      {/* 🔥 오늘의 급식 */}
-      <section style={{ marginBottom: '26px' }}>
-        <Footer />
-      </section>
-
-      {/* 🔵 오늘의 추천 도서 버튼 */}
-      <section style={{ marginBottom: '16px', textAlign: 'left' }}>
-        <button
-          onClick={() => setShowRecommend(!showRecommend)}
-          style={{
-            padding: '10px 18px',
-            background: '#4FC3F7',
-            color: 'white',
-            borderRadius: '10px',
-            fontWeight: 600,
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '14px',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-          }}
-        >
-          {showRecommend ? '추천 도서 접기' : '오늘의 추천 도서 보기'}
-        </button>
-      </section>
-
-      {/* 🔵 오늘의 추천 도서 섹션 (토글) */}
-      {showRecommend && (
-        <section style={{ marginBottom: '26px' }}>
-          <LibraryRecommend />
-        </section>
-      )}
-
-      {/* ------------------ 오늘 일정 ------------------ */}
-      <section style={{ marginBottom: '26px' }}>
-        <h3
-          style={{
-            fontSize: 'clamp(16px, 3vw, 20px)',
-            fontWeight: 700,
-            color: '#4FC3F7',
-            borderBottom: '2px solid #4FC3F7',
-            paddingBottom: '6px',
-            marginBottom: '14px',
-          }}
-        >
-          📆 오늘 일정
-        </h3>
-
-        {sortedTodayItems.length === 0 ? (
-          <p style={{ color: '#888', fontSize: '14px' }}>
-            오늘은 등록된 일정이 없습니다.
-          </p>
-        ) : (
-          <>
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                overflowX: 'auto', // 🔥 무조건 가로 스크롤
-                WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
-                paddingBottom: '8px',
-              }}
-            >
-              {sortedTodayItems.map((item, idx) => (
-                <Link
-                  key={idx}
-                  href={`/calendar?date=${item.date}`}
-                  style={{
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    flex: '0 0 clamp(240px, 80vw, 320px)',
-
-                    // 🔥 카드 고정 폭
-                  }}
-                >
-                  <div
-                    style={{
-                      backgroundColor: '#E1F5FE',
-                      borderRadius: '14px',
-                      padding: '14px 16px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 6,
-                      }}
-                    >
-                      <strong style={{ color: '#0277BD' }}>
-                        {item.dateLabel}
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          color: '#c62828',
-                          padding: '3px 10px',
-                          borderRadius: '999px',
-                          background: '#ffebee',
-                        }}
-                      >
-                        {item.ddayLabel}
-                      </span>
-                    </div>
-                    <p style={{ marginTop: '2px', color: '#555' }}>
-                      {item.event}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ------------------ 이번 주 일정 ------------------ */}
-      <section style={{ marginBottom: '36px' }}>
-        <h3
-          style={{
-            fontSize: 'clamp(16px, 3vw, 20px)',
-            fontWeight: 700,
-            color: '#4FC3F7',
-            borderBottom: '2px solid #4FC3F7',
-            paddingBottom: '6px',
-            marginBottom: '14px',
-          }}
-        >
-          📅 이번 주 일정
-        </h3>
-
-        {sortedWeekItems.length === 0 ? (
-          <p style={{ color: '#888', fontSize: '14px' }}>
-            이번 주에 등록된 일정이 없습니다.
-          </p>
-        ) : (
-          <>
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                overflowX: 'auto', // 🔥 무조건 가로 스크롤
-                WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
-                paddingBottom: '8px',
-              }}
-            >
-              {sortedWeekItems.map((item, idx) => (
-                <Link
-                  key={idx}
-                  href={`/calendar?date=${item.date}`}
-                  style={{
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    flex: '0 0 clamp(240px, 80vw, 320px)',
-
-                    // 🔥 카드 고정 폭
-                  }}
-                >
-                  <div
-                    style={{
-                      backgroundColor: '#E1F5FE',
-                      borderRadius: '14px',
-                      padding: '14px 16px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 6,
-                      }}
-                    >
-                      <strong style={{ color: '#0277BD' }}>
-                        {item.dateLabel}
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          color: '#c62828',
-                          padding: '3px 10px',
-                          borderRadius: '999px',
-                          background: '#ffebee',
-                        }}
-                      >
-                        {item.ddayLabel}
-                      </span>
-                    </div>
-                    <p style={{ marginTop: '2px', color: '#555' }}>
-                      {item.event}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ------------------ 오늘 시간표 ------------------ */}
-      <section style={{ marginBottom: '36px' }}>
-        <h3
-          style={{
-            fontSize: 'clamp(16px, 3vw, 20px)',
-            fontWeight: 700,
-            color: '#4FC3F7',
-            borderBottom: '2px solid #4FC3F7',
-            paddingBottom: '6px',
-            marginBottom: '14px',
-          }}
-        >
-          📚 오늘의 시간표 ({today})
-        </h3>
-
-        <TodayTimetable today={today} />
-      </section>
-
-      {/* ------------------ 주간 시간표 ------------------ */}
-      <TimetablePreview />
-
-      {/* ------------------ 인기 게시물 ------------------ */}
-      <section style={{ marginTop: '36px' }}>
-        <h3
-          style={{
-            fontSize: 'clamp(16px, 3vw, 20px)',
-            fontWeight: 700,
-            color: '#4FC3F7',
-            borderBottom: '2px solid #4FC3F7',
-            paddingBottom: '6px',
-            marginBottom: '14px',
-          }}
-        >
-          🔥 인기 게시물
-        </h3>
-
-        {/* 🔘 게시판 선택 버튼 */}
+    <>
+      {/* 🔓 계정 해제 안내 모달 */}
+      {unbanModalOpen && (
         <div
           style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
             display: 'flex',
-            gap: '8px',
-            overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            paddingBottom: '6px',
-            marginBottom: '14px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
           }}
         >
-          {CATEGORY_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setSelectedCategory(tab.key)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '999px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 600,
-                background:
-                  selectedCategory === tab.key ? '#4FC3F7' : '#E1F5FE',
-                color: selectedCategory === tab.key ? 'white' : '#0277BD',
-                whiteSpace: 'nowrap', // ⭐ 줄바꿈 방지 (핵심)
-                flex: '0 0 auto', // ⭐ 버튼 폭 고정
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {popularPosts.length === 0 ? (
-          <p style={{ color: '#888' }}>아직 게시글이 없습니다.</p>
-        ) : (
           <div
             style={{
-              maxHeight: '420px', // 🔥 카드 3개 정도 높이
-              overflowY: filteredPopularPosts.length > 3 ? 'auto' : 'visible',
-              paddingRight: '6px',
+              width: '90%',
+              maxWidth: '420px',
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
             }}
           >
-            {filteredPopularPosts.map((p) => {
-              const categoryNames: Record<string, string> = {
-                free: '자유',
-                promo: '홍보',
-                club: '동아리',
-                grade1: '1학년',
-                grade2: '2학년',
-                grade3: '3학년',
-              }
+            <h2 style={{ color: '#2E7D32', marginBottom: '12px' }}>
+              ✅ 계정 이용 제한 해제
+            </h2>
 
-              return (
-                <Link
-                  href={`/board/post/${p.id}`}
-                  key={p.id}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  <div
-                    style={{
-                      backgroundColor: 'white',
-                      border: '2px solid #E1F5FE',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      marginBottom: '14px',
-                      transition: '0.2s',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.backgroundColor = '#E1F5FE')
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.backgroundColor = 'white')
-                    }
-                  >
-                    {/* ⬇️ 기존 카드 내용 그대로 */}
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        backgroundColor: '#4FC3F7',
-                        color: 'white',
-                        borderRadius: '6px',
-                        fontSize: 'clamp(11px, 2vw, 13px)',
-                        fontWeight: 600,
-                        marginBottom: '8px',
-                      }}
-                    >
-                      {categoryNames[p.category || ''] || '기타'}
-                    </span>
+            <p
+              style={{ fontSize: '15px', color: '#444', marginBottom: '12px' }}
+            >
+              계정 이용 제한이 해제되었습니다.
+            </p>
 
-                    <h4
-                      style={{
-                        fontSize: 'clamp(14px, 3vw, 17px)',
-                        fontWeight: 600,
-                        color: '#333',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      {p.title}
-                    </h4>
+            <p style={{ fontSize: '14px', color: '#555' }}>
+              다시 게시글·댓글을 작성할 수 있습니다 🎉
+            </p>
 
-                    <p
-                      style={{
-                        fontSize: 'clamp(12px, 2.3vw, 14px)',
-                        color: '#555',
-                        overflow: 'hidden',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                      }}
-                    >
-                      {p.content}
-                    </p>
+            <button
+              style={{
+                marginTop: '20px',
+                padding: '10px 20px',
+                background: '#4FC3F7',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              onClick={() => setUnbanModalOpen(false)}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+      {/* 🚫 계정 정지 모달 */}
+      {banInfo && !isLoggingOut && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              width: '90%',
+              maxWidth: '420px',
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h2 style={{ color: '#d32f2f', marginBottom: '12px' }}>
+              🚫 계정 이용 제한
+            </h2>
 
+            <p
+              style={{ fontSize: '15px', color: '#444', marginBottom: '12px' }}
+            >
+              {banInfo.reason}
+            </p>
+
+            {banInfo.remainHours !== undefined && (
+              <p style={{ fontSize: '14px', color: '#666' }}>
+                남은 정지 시간: <strong>{banInfo.remainHours}시간</strong>
+              </p>
+            )}
+
+            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+              현재 계정은 <strong>게시글 작성 및 댓글 작성이 제한</strong>되어
+              있습니다.
+            </p>
+
+            <button
+              style={{
+                marginTop: '20px',
+                padding: '10px 20px',
+                background: '#4FC3F7',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                sessionStorage.setItem('banModalShown', 'true') // ⭐ 여기
+                setBanInfo(null)
+              }}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '1600px',
+          margin: '0 auto',
+          padding: 'clamp(8px, 3vw, 16px)',
+          backgroundColor: '#fff',
+          borderRadius: '14px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+        }}
+      >
+        {/* ------------------ 상단 ------------------ */}
+
+        <div
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '32px',
+            zIndex: 1000,
+          }}
+        >
+          <div style={{ position: 'relative' }}>
+            <span
+              style={{
+                fontSize: '24px',
+                cursor: 'pointer',
+                display: 'inline-block',
+              }}
+              aria-label="채팅 알림"
+              onClick={() => {
+                setIsChatNoticeOpen((v) => !v)
+                loadUnreadChatSummary()
+                loadNotifications()
+              }}
+            >
+              🔔
+            </span>
+
+            {unreadChatCount + unreadNotifyCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-6px',
+                  background: '#e53935',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '999px',
+                  lineHeight: 1,
+                }}
+              >
+                {unreadChatCount + unreadNotifyCount}
+              </span>
+            )}
+
+            {isChatNoticeOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '36px',
+                  right: 0,
+                  width: '320px',
+                  background: '#fff',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                  padding: '12px',
+                  zIndex: 1001,
+                }}
+              >
+                {/* ================= 💬 채팅 알림 ================= */}
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                  💬 채팅 알림
+                </div>
+
+                {unreadMessages.length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#777', marginBottom: 10 }}>
+                    새로운 채팅이 없습니다.
+                  </p>
+                ) : (
+                  <>
                     <div
                       style={{
-                        fontSize: 'clamp(11px, 2vw, 13px)',
-                        color: '#777',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginTop: '8px',
+                        maxHeight: 180,
+                        overflowY: 'auto',
+                        marginBottom: 10,
                       }}
                     >
-                      <span>작성자: {p.author}</span>
-                      <span>💙 {p.likes || 0}</span>
+                      {unreadMessages.map((msg) => (
+                        <div
+                          key={`${msg.roomId}-${msg.messageId}`}
+                          style={{
+                            padding: '8px',
+                            borderBottom: '1px solid #eee',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => {
+                            setIsChatNoticeOpen(false)
+                            window.location.href = `/chat?roomId=${msg.roomId}`
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                            👤 {msg.senderName}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: '#555',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
                     </div>
+
+                    {/* ✅ 채팅방으로 가기 버튼 */}
+                    <Link
+                      href="/chat"
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        background: '#4FC3F7',
+                        color: 'white',
+                        padding: '8px 0',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        marginBottom: '12px',
+                      }}
+                      onClick={() => setIsChatNoticeOpen(false)}
+                    >
+                      채팅방으로 가기 →
+                    </Link>
+                  </>
+                )}
+
+                {/* ================= 📢 알림 ================= */}
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>📢 알림</div>
+
+                {notifications.length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#777' }}>
+                    새로운 알림이 없습니다.
+                  </p>
+                ) : (
+                  <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        style={{
+                          padding: '8px',
+                          borderBottom: '1px solid #eee',
+                          cursor: 'pointer',
+                          background: n.is_read ? '#fff' : '#E3F2FD',
+                          position: 'relative',
+                        }}
+                        onClick={async () => {
+                          await apiFetch('/api/notifications', {
+                            method: 'PATCH',
+                            body: JSON.stringify({ notificationId: n.id }),
+                          })
+                          setIsChatNoticeOpen(false)
+                          window.location.href = n.link
+                        }}
+                      >
+                        {/* ❌ 삭제 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation() // 🔥 이동 & 읽음 처리 방지
+                            deleteNotification(n.id)
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 6,
+                            right: 6,
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#9CA3AF',
+                            fontSize: 14,
+                            cursor: 'pointer',
+                          }}
+                          title="알림 삭제"
+                        >
+                          ✕
+                        </button>
+
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>
+                          {n.type === 'post_commented'}
+                          {n.type === 'comment_reply'}
+                          {n.type.startsWith('admin_') && '📢 '}
+                          {n.title}
+                        </div>
+
+                        <div style={{ fontSize: 12, color: '#555' }}>
+                          {n.message}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </Link>
-              )
-            })}
+                )}
+              </div>
+            )}
           </div>
+        </div>
+
+        <h2
+          style={{
+            fontSize: 'clamp(20px, 4vw, 28px)',
+            fontWeight: 700,
+            color: '#4FC3F7',
+            marginBottom: '8px',
+            textAlign: 'center',
+          }}
+        >
+          School Plus
+        </h2>
+
+        <p
+          style={{
+            color: '#666',
+            marginBottom: '28px',
+            fontSize: 'clamp(13px, 2.5vw, 16px)',
+            textAlign: 'center',
+          }}
+        >
+          학생 생활을 한눈에 확인하세요 📚
+        </p>
+
+        {/* 🔥 오늘의 급식 */}
+        <section style={{ marginBottom: '26px' }}>
+          <Footer />
+        </section>
+
+        {/* 🔵 오늘의 추천 도서 버튼 */}
+        <section style={{ marginBottom: '16px', textAlign: 'left' }}>
+          <button
+            onClick={() => setShowRecommend(!showRecommend)}
+            style={{
+              padding: '10px 18px',
+              background: '#4FC3F7',
+              color: 'white',
+              borderRadius: '10px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+            }}
+          >
+            {showRecommend ? '추천 도서 접기' : '오늘의 추천 도서 보기'}
+          </button>
+        </section>
+
+        {/* 🔵 오늘의 추천 도서 섹션 (토글) */}
+        {showRecommend && (
+          <section style={{ marginBottom: '26px' }}>
+            <LibraryRecommend />
+          </section>
         )}
-      </section>
-    </div>
+
+        {/* ------------------ 오늘 일정 ------------------ */}
+        <section style={{ marginBottom: '26px' }}>
+          <h3
+            style={{
+              fontSize: 'clamp(16px, 3vw, 20px)',
+              fontWeight: 700,
+              color: '#4FC3F7',
+              borderBottom: '2px solid #4FC3F7',
+              paddingBottom: '6px',
+              marginBottom: '14px',
+            }}
+          >
+            📆 오늘 일정
+          </h3>
+
+          {sortedTodayItems.length === 0 ? (
+            <p style={{ color: '#888', fontSize: '14px' }}>
+              오늘은 등록된 일정이 없습니다.
+            </p>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  overflowX: 'auto', // 🔥 무조건 가로 스크롤
+                  WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
+                  paddingBottom: '8px',
+                }}
+              >
+                {sortedTodayItems.map((item, idx) => (
+                  <Link
+                    key={idx}
+                    href={`/calendar?date=${item.date}`}
+                    style={{
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      flex: '0 0 clamp(240px, 80vw, 320px)',
+
+                      // 🔥 카드 고정 폭
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: '#E1F5FE',
+                        borderRadius: '14px',
+                        padding: '14px 16px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <strong style={{ color: '#0277BD' }}>
+                          {item.dateLabel}
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: '#c62828',
+                            padding: '3px 10px',
+                            borderRadius: '999px',
+                            background: '#ffebee',
+                          }}
+                        >
+                          {item.ddayLabel}
+                        </span>
+                      </div>
+                      <p style={{ marginTop: '2px', color: '#555' }}>
+                        {item.event}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* ------------------ 이번 주 일정 ------------------ */}
+        <section style={{ marginBottom: '36px' }}>
+          <h3
+            style={{
+              fontSize: 'clamp(16px, 3vw, 20px)',
+              fontWeight: 700,
+              color: '#4FC3F7',
+              borderBottom: '2px solid #4FC3F7',
+              paddingBottom: '6px',
+              marginBottom: '14px',
+            }}
+          >
+            📅 이번 주 일정
+          </h3>
+
+          {sortedWeekItems.length === 0 ? (
+            <p style={{ color: '#888', fontSize: '14px' }}>
+              이번 주에 등록된 일정이 없습니다.
+            </p>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  overflowX: 'auto', // 🔥 무조건 가로 스크롤
+                  WebkitOverflowScrolling: 'touch', // 🔥 iOS 부드러운 스크롤
+                  paddingBottom: '8px',
+                }}
+              >
+                {sortedWeekItems.map((item, idx) => (
+                  <Link
+                    key={idx}
+                    href={`/calendar?date=${item.date}`}
+                    style={{
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      flex: '0 0 clamp(240px, 80vw, 320px)',
+
+                      // 🔥 카드 고정 폭
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: '#E1F5FE',
+                        borderRadius: '14px',
+                        padding: '14px 16px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <strong style={{ color: '#0277BD' }}>
+                          {item.dateLabel}
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: '#c62828',
+                            padding: '3px 10px',
+                            borderRadius: '999px',
+                            background: '#ffebee',
+                          }}
+                        >
+                          {item.ddayLabel}
+                        </span>
+                      </div>
+                      <p style={{ marginTop: '2px', color: '#555' }}>
+                        {item.event}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* ------------------ 오늘 시간표 ------------------ */}
+        <section style={{ marginBottom: '36px' }}>
+          <h3
+            style={{
+              fontSize: 'clamp(16px, 3vw, 20px)',
+              fontWeight: 700,
+              color: '#4FC3F7',
+              borderBottom: '2px solid #4FC3F7',
+              paddingBottom: '6px',
+              marginBottom: '14px',
+            }}
+          >
+            📚 오늘의 시간표 ({today})
+          </h3>
+
+          <TodayTimetable today={today} />
+        </section>
+
+        {/* ------------------ 주간 시간표 ------------------ */}
+        <TimetablePreview />
+
+        {/* ------------------ 인기 게시물 ------------------ */}
+        <section style={{ marginTop: '36px' }}>
+          <h3
+            style={{
+              fontSize: 'clamp(16px, 3vw, 20px)',
+              fontWeight: 700,
+              color: '#4FC3F7',
+              borderBottom: '2px solid #4FC3F7',
+              paddingBottom: '6px',
+              marginBottom: '14px',
+            }}
+          >
+            🔥 인기 게시물
+          </h3>
+
+          {/* 🔘 게시판 선택 버튼 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: '6px',
+              marginBottom: '14px',
+            }}
+          >
+            {CATEGORY_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setSelectedCategory(tab.key)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  background:
+                    selectedCategory === tab.key ? '#4FC3F7' : '#E1F5FE',
+                  color: selectedCategory === tab.key ? 'white' : '#0277BD',
+                  whiteSpace: 'nowrap', // ⭐ 줄바꿈 방지 (핵심)
+                  flex: '0 0 auto', // ⭐ 버튼 폭 고정
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {popularPosts.length === 0 ? (
+            <p style={{ color: '#888' }}>아직 게시글이 없습니다.</p>
+          ) : (
+            <div
+              style={{
+                maxHeight: '420px', // 🔥 카드 3개 정도 높이
+                overflowY: filteredPopularPosts.length > 3 ? 'auto' : 'visible',
+                paddingRight: '6px',
+              }}
+            >
+              {filteredPopularPosts.map((p) => {
+                const categoryNames: Record<string, string> = {
+                  free: '자유',
+                  promo: '홍보',
+                  club: '동아리',
+                  grade1: '1학년',
+                  grade2: '2학년',
+                  grade3: '3학년',
+                }
+
+                return (
+                  <Link
+                    href={`/board/post/${p.id}`}
+                    key={p.id}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: 'white',
+                        border: '2px solid #E1F5FE',
+                        borderRadius: '12px',
+                        padding: '14px',
+                        marginBottom: '14px',
+                        transition: '0.2s',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor = '#E1F5FE')
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = 'white')
+                      }
+                    >
+                      {/* ⬇️ 기존 카드 내용 그대로 */}
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '4px 10px',
+                          backgroundColor: '#4FC3F7',
+                          color: 'white',
+                          borderRadius: '6px',
+                          fontSize: 'clamp(11px, 2vw, 13px)',
+                          fontWeight: 600,
+                          marginBottom: '8px',
+                        }}
+                      >
+                        {categoryNames[p.category || ''] || '기타'}
+                      </span>
+
+                      <h4
+                        style={{
+                          fontSize: 'clamp(14px, 3vw, 17px)',
+                          fontWeight: 600,
+                          color: '#333',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {p.title}
+                      </h4>
+
+                      <p
+                        style={{
+                          fontSize: 'clamp(12px, 2.3vw, 14px)',
+                          color: '#555',
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {p.content}
+                      </p>
+
+                      <div
+                        style={{
+                          fontSize: 'clamp(11px, 2vw, 13px)',
+                          color: '#777',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginTop: '8px',
+                        }}
+                      >
+                        <span>작성자: {p.author}</span>
+                        <span>💙 {p.likes || 0}</span>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </>
   )
 }
 
@@ -726,18 +1191,18 @@ function TodayTimetable({ today }: { today: string }) {
 
         const { year, semester } = JSON.parse(termRaw)
 
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/timetable?year=${year}&semester=${semester}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-          },
         )
 
         if (!res.ok) return
 
-        const data = await res.json()
+        let data = null
+
+        if (res.headers.get('content-length') !== '0') {
+          data = await res.json()
+        }
+
         if (!Array.isArray(data)) return
 
         const todayShort = today.replace('요일', '') // 월/화/수...

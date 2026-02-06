@@ -51,9 +51,7 @@ export async function POST(req: Request) {
       )
     }
 
-    /* =========================
-       4️⃣ 기존 refreshToken 폐기
-    ========================= */
+    /* 4️⃣ 기존 refreshToken 폐기 */
     await db.query(`UPDATE refresh_tokens SET revoked = true WHERE token = ?`, [
       refreshToken,
     ])
@@ -79,13 +77,14 @@ export async function POST(req: Request) {
        6️⃣ 새 accessToken 발급
     ========================= */
     const [userRows]: any = await db.query(
-      `SELECT school_code FROM users WHERE id = ?`,
+      `SELECT school_code, level FROM users WHERE id = ?`,
       [userId],
     )
 
     const newAccessToken = jwt.sign(
       {
         id: userId,
+        level: userRows[0].level,
         school_code: userRows[0].school_code,
       },
       process.env.JWT_SECRET!,
@@ -95,14 +94,14 @@ export async function POST(req: Request) {
     /* =========================
        7️⃣ 응답 + 쿠키 갱신
     ========================= */
-    const res = NextResponse.json({ ok: true })
-
-    res.headers.set('x-access-token', newAccessToken)
+    const res = NextResponse.json({
+      accessToken: newAccessToken,
+    })
 
     res.cookies.set('refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     })

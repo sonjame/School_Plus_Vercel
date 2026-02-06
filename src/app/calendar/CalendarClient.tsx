@@ -24,6 +24,10 @@ type DBEvent = {
 
 type AddMode = 'single' | 'range'
 
+type RepeatType = 'none' | 'daily' | 'weekly' | 'monthly'
+
+type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
 /* ===============================
    유틸
 ================================ */
@@ -65,6 +69,11 @@ export default function CalendarPage() {
   const [showModal, setShowModal] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [addMode, setAddMode] = useState<AddMode>('single')
+
+  const [repeatType, setRepeatType] = useState<RepeatType>('none')
+  const [repeatUntil, setRepeatUntil] = useState('')
+
+  const [repeatWeekdays, setRepeatWeekdays] = useState<Weekday[]>([])
 
   const [rangeStart, setRangeStart] = useState('')
   const [rangeEnd, setRangeEnd] = useState('')
@@ -164,15 +173,64 @@ export default function CalendarPage() {
   }, [userId, year, month])
 
   /* ===============================
-     일정 추가
+     일정/반복 일정 추가
   ================================ */
+
+  function generateRepeatDates(start: string, end: string, type: RepeatType) {
+    const dates: string[] = []
+    let cur = new Date(start)
+    const until = new Date(end)
+
+    while (cur <= until) {
+      dates.push(formatLocalDate(new Date(cur)))
+
+      if (type === 'daily') cur.setDate(cur.getDate() + 1)
+      else if (type === 'weekly') cur.setDate(cur.getDate() + 7)
+      else if (type === 'monthly') cur.setMonth(cur.getMonth() + 1)
+      else break
+    }
+
+    return dates
+  }
+
+  function generateWeeklyDates(
+    start: string,
+    end: string,
+    weekdays: Weekday[],
+  ) {
+    const results: string[] = []
+    const cur = new Date(start)
+    const until = new Date(end)
+
+    while (cur <= until) {
+      if (weekdays.includes(cur.getDay() as Weekday)) {
+        results.push(formatLocalDate(new Date(cur)))
+      }
+      cur.setDate(cur.getDate() + 1)
+    }
+
+    return results
+  }
 
   async function addEvent() {
     if (!userId || !newTitle.trim()) return
 
-    if (addMode === 'single') {
-      if (!newDate) return
+    let dates: string[] = []
 
+    if (repeatType === 'none') {
+      dates = [newDate]
+    } else {
+      if (!repeatUntil) return
+
+      if (repeatType === 'weekly') {
+        if (repeatWeekdays.length === 0) return
+        dates = generateWeeklyDates(newDate, repeatUntil, repeatWeekdays)
+      } else {
+        dates = generateRepeatDates(newDate, repeatUntil, repeatType)
+      }
+    }
+
+    for (const date of dates) {
       await fetch('/api/calendar-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,30 +241,9 @@ export default function CalendarPage() {
           start_time: newStartTime || null,
           end_time: newEndTime || null,
           color: newColor,
-          event_date: newDate,
+          event_date: date,
         }),
       })
-    } else {
-      if (!rangeStart || !rangeEnd) return
-
-      const start = new Date(rangeStart)
-      const end = new Date(rangeEnd)
-
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        await fetch('/api/calendar-events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            title: newTitle,
-            description: newDesc,
-            start_time: newStartTime || null,
-            end_time: newEndTime || null,
-            color: newColor,
-            event_date: formatLocalDate(d),
-          }),
-        })
-      }
     }
 
     setShowModal(false)
@@ -543,6 +580,62 @@ export default function CalendarPage() {
               </div>
             )}
 
+            {/* 🔁 반복 설정 (🔥 여기!) */}
+            <div className="repeat-row">
+              <label>반복</label>
+              <select
+                value={repeatType}
+                onChange={(e) => setRepeatType(e.target.value as RepeatType)}
+              >
+                <option value="none">반복 없음</option>
+                <option value="weekly">매주</option>
+              </select>
+            </div>
+
+            {/* 📆 매주 요일 선택 */}
+            {repeatType === 'weekly' && (
+              <div className="repeat-row">
+                <label>요일 선택</label>
+                <div className="weekday-select">
+                  {['일', '월', '화', '수', '목', '금', '토'].map(
+                    (day, idx) => {
+                      const d = idx as Weekday
+                      const checked = repeatWeekdays.includes(d)
+
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          className={`weekday-btn ${checked ? 'active' : ''}`}
+                          onClick={() => {
+                            setRepeatWeekdays((prev) =>
+                              checked
+                                ? prev.filter((v) => v !== d)
+                                : [...prev, d],
+                            )
+                          }}
+                        >
+                          {day}
+                        </button>
+                      )
+                    },
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 📅 반복 종료 */}
+            {repeatType !== 'none' && (
+              <div className="repeat-row">
+                <label>반복 종료</label>
+                <input
+                  type="date"
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                />
+              </div>
+            )}
+
             <input
               placeholder="일정 제목"
               value={newTitle}
@@ -871,8 +964,8 @@ export default function CalendarPage() {
           background: #fff;
           border-radius: 12px;
           padding: 16px;
-          width: 400px;
-          height: 450px;
+          width: 600px;
+          height: 630px;
         }
 
         .modal input {
@@ -1040,6 +1133,47 @@ export default function CalendarPage() {
           display: flex;
           align-items: center;
           gap: 6px;
+        }
+
+        /* 🔁 반복 설정 */
+        .repeat-row {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin-top: 8px;
+        }
+
+        .repeat-row label {
+          font-size: 12px;
+          color: #374151;
+        }
+
+        .repeat-row select,
+        .repeat-row input {
+          padding: 8px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+        }
+
+        .weekday-select {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .weekday-btn {
+          padding: 6px 10px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          background: #f9fafb;
+          font-size: 13px;
+          cursor: pointer;
+        }
+
+        .weekday-btn.active {
+          background: #4f46e5;
+          color: #fff;
+          border-color: #4f46e5;
         }
 
         /* 🔥 삭제 확인 모달 */

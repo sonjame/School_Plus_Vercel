@@ -18,9 +18,6 @@ const s3 = new S3Client({
 /* ==============================
    GET : 게시글 상세 조회 (+ 투표)
 ============================== */
-/* ==============================
-   GET : 게시글 상세 조회 (+ 투표)
-============================== */
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -33,8 +30,9 @@ export async function GET(
     ------------------------- */
     const auth = req.headers.get('authorization')
     let userId: number | null = null
-    let newAccessToken: string | null = null
     let decoded: any = null
+    let isAdmin = false
+    let newAccessToken: string | null = null
 
     if (auth) {
       const token = auth.replace('Bearer ', '')
@@ -43,14 +41,11 @@ export async function GET(
         decoded = jwt.verify(token, process.env.JWT_SECRET!)
       } catch (e) {
         if (e instanceof jwt.TokenExpiredError) {
-          // ⭐ 토큰 재발급 시도
           const refreshRes = await fetch(
             new URL('/api/auth/refresh', req.url),
             {
               method: 'POST',
-              headers: {
-                cookie: req.headers.get('cookie') ?? '',
-              },
+              headers: { cookie: req.headers.get('cookie') ?? '' },
             },
           )
 
@@ -60,16 +55,13 @@ export async function GET(
               (await refreshRes.json()).accessToken
 
             decoded = jwt.verify(newAccessToken!, process.env.JWT_SECRET!)
-          } else {
-            decoded = null // 로그인 안 된 상태로 처리
           }
-        } else {
-          throw e
         }
       }
 
       if (decoded) {
         userId = decoded.id
+        isAdmin = decoded.level === 'admin'
       }
     }
 
@@ -78,24 +70,29 @@ export async function GET(
     ------------------------- */
     const [[post]]: any = await db.query(
       `
-      SELECT
-        p.id,
-        p.title,
-        p.content,
-        p.category,
-        p.likes,
-        p.images,
-        p.attachments,
-        DATE_FORMAT(
-          CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
-          '%Y-%m-%d %H:%i:%s'
-        ) AS created_at,
-        p.user_id,
-        COALESCE(u.name, '알 수 없음') AS author
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.id = ?
-      `,
+  SELECT
+    p.id,
+    p.title,
+    p.content,
+    p.category,
+    p.likes,
+    p.images,
+    p.attachments,
+    p.is_hidden,
+    DATE_FORMAT(
+      CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+      '%Y-%m-%d %H:%i:%s'
+    ) AS created_at,
+    p.user_id,
+    CASE
+      WHEN u.level = 'admin' THEN '관리자'
+      ELSE COALESCE(u.name, '알 수 없음')
+    END AS author
+  FROM posts p
+  JOIN users u ON p.user_id = u.id
+  WHERE p.id = ?
+  ${isAdmin ? '' : 'AND p.is_hidden = 0'}
+  `,
       [postId],
     )
 
@@ -249,13 +246,29 @@ export async function PUT(
 
     const userId = decoded.id
 
+    /* 🔥 BAN 체크 */
+    const [[user]]: any = await db.query(
+      `SELECT is_banned FROM users WHERE id = ?`,
+      [userId],
+    )
+
+    if (user?.is_banned) {
+      return NextResponse.json(
+        { message: '정지된 계정입니다.' },
+        { status: 403 },
+      )
+    }
+
     /* 🔒 작성자 확인 */
+
+    const isAdmin = decoded.level === 'admin'
+
     const [[post]]: any = await db.query(
       `SELECT user_id FROM posts WHERE id = ?`,
       [postId],
     )
 
-    if (!post || post.user_id !== userId) {
+    if (!post || (post.user_id !== userId && !isAdmin)) {
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
     }
 
@@ -403,14 +416,30 @@ export async function DELETE(
 
     const userId = decoded.id
 
+    /* 🔥 BAN 체크 */
+    const [[user]]: any = await db.query(
+      `SELECT is_banned FROM users WHERE id = ?`,
+      [userId],
+    )
+
+    if (user?.is_banned) {
+      return NextResponse.json(
+        { message: '정지된 계정입니다.' },
+        { status: 403 },
+      )
+    }
+
     /* 1️⃣ 게시글 + 이미지 조회 */
     const [[post]]: any = await db.query(
       `SELECT user_id, images FROM posts WHERE id = ?`,
       [postId],
     )
 
-    if (!post || post.user_id !== userId)
+    const isAdmin = decoded.level === 'admin'
+
+    if (!post || (post.user_id !== userId && !isAdmin)) {
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
+    }
 
     /* 2️⃣ images JSON 파싱 */
     let images: string[] = []
@@ -452,7 +481,7 @@ export async function DELETE(
     await db.query(`DELETE FROM post_vote_logs WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_vote_options WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM post_votes WHERE post_id = ?`, [postId])
-    await db.query(`DELETE FROM comments WHERE post_id = ?`, [postId])
+    await db.query(`DELETE FROM post_comments WHERE post_id = ?`, [postId])
     await db.query(`DELETE FROM posts WHERE id = ?`, [postId])
 
     const res = NextResponse.json({ success: true })

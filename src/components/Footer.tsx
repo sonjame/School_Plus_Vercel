@@ -88,7 +88,7 @@ export default function WeeklyMealPage() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
 
         /* 모바일 화면 조건 */
-        maxWidth: '900px',
+        maxWidth: '1500px',
         margin: '0 auto',
       }}
     >

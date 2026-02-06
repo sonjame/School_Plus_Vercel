@@ -13,9 +13,13 @@ export async function POST(req: Request) {
       )
     }
 
-    // 1️⃣ 사용자 조회
+    // 1️⃣ 사용자 조회 (탈퇴/정지 안 된 계정만)
     const [rows]: any = await db.query(
-      'SELECT password FROM users WHERE username = ?',
+      `
+      SELECT password, is_banned
+      FROM users
+      WHERE username = ?
+      `,
       [username],
     )
 
@@ -23,6 +27,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { message: '사용자를 찾을 수 없습니다.' },
         { status: 404 },
+      )
+    }
+
+    if (rows[0].is_banned) {
+      return NextResponse.json(
+        { message: '이미 탈퇴했거나 정지된 계정입니다.' },
+        { status: 403 },
       )
     }
 
@@ -35,10 +46,23 @@ export async function POST(req: Request) {
       )
     }
 
-    // 3️⃣ 삭제
-    await db.query('DELETE FROM users WHERE username = ?', [username])
+    // 3️⃣ 🔥 실제 삭제 ❌ → 논리적 탈퇴 ✅
+    await db.query(
+      `
+      UPDATE users
+      SET
+        is_banned = 1,
+        banned_at = NOW(),
+        password = NULL
+      WHERE username = ?
+      `,
+      [username],
+    )
 
-    return NextResponse.json({ message: '회원탈퇴 완료' }, { status: 200 })
+    return NextResponse.json(
+      { message: '회원탈퇴가 완료되었습니다.' },
+      { status: 200 },
+    )
   } catch (err: any) {
     console.error('회원탈퇴 API 오류:', err)
     return NextResponse.json(

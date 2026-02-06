@@ -40,13 +40,10 @@ const fetchSubjectReviews = async (
   semester: '1학기' | '2학기',
   school: string,
 ) => {
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/subject-review?year=${year}&semester=${semester}&school=${encodeURIComponent(
       school,
     )}`,
-    {
-      cache: 'no-store',
-    },
   )
 
   if (!res.ok) return {}
@@ -64,10 +61,8 @@ const postSubjectReview = async (payload: {
   userId: number
   school: string // 🔥 추가
 }) => {
-  await fetch('/api/subject-review', {
+  await apiFetch('/api/subject-review', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
 }
@@ -77,9 +72,8 @@ const deleteSubjectReviewAPI = async (payload: {
   id: number
   userId: number
 }) => {
-  await fetch('/api/subject-review', {
+  await apiFetch('/api/subject-review', {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
 }

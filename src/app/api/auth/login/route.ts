@@ -47,6 +47,17 @@ export async function POST(req: Request) {
       )
     }
 
+    /* 🔥 계정 정지 체크 (비밀번호 검증 후, 토큰 발급 전) */
+    if (user.is_banned) {
+      return NextResponse.json(
+        {
+          message: '계정이 정지되었습니다.',
+          reason: user.banned_reason,
+        },
+        { status: 403 },
+      )
+    }
+
     /* 🔥 ENV 체크 */
     if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
       console.error('❌ JWT env missing')
@@ -57,6 +68,8 @@ export async function POST(req: Request) {
     const accessToken = jwt.sign(
       {
         id: user.id,
+        role: user.role,
+        level: user.level,
         school_code: user.school_code, // ⭐ 이 줄 추가
       },
       process.env.JWT_SECRET,
@@ -100,6 +113,7 @@ export async function POST(req: Request) {
         eduCode: user.edu_code,
         schoolCode: user.school_code,
         classNum: user.class_num,
+        profileImageUrl: user.profile_image_url,
       },
     })
 

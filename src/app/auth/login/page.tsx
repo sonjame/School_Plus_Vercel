@@ -89,12 +89,18 @@ export default function LoginPage() {
     localStorage.setItem('userId', data.user.id.toString())
     localStorage.setItem('userSchool', data.user.school)
 
+    localStorage.setItem('level', data.user.level)
+
     if (data.user.eduCode) localStorage.setItem('eduCode', data.user.eduCode)
     if (data.user.schoolCode)
       localStorage.setItem('schoolCode', data.user.schoolCode)
 
     showAlert('로그인 성공!', () => {
-      window.location.href = '/'
+      if (data.user.level === 'admin') {
+        window.location.href = '/admin'
+      } else {
+        window.location.href = '/'
+      }
     })
   }
 

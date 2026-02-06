@@ -10,6 +10,18 @@ export async function POST(
     const { id: postId } = await context.params
     const { userId } = await req.json()
 
+    const [[user]]: any = await db.query(
+      `SELECT is_banned FROM users WHERE id = ?`,
+      [userId],
+    )
+
+    if (user?.is_banned) {
+      return NextResponse.json(
+        { message: '정지된 계정입니다.' },
+        { status: 403 },
+      )
+    }
+
     if (!userId) {
       return NextResponse.json({ message: 'userId required' }, { status: 400 })
     }

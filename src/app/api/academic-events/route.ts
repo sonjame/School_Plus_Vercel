@@ -34,7 +34,10 @@ export async function GET(req: Request) {
 
   const m = month.padStart(2, '0')
   const from = `${year}-${m}-01`
-  const to = `${year}-${m}-31`
+
+  // 🔥 해당 월의 실제 마지막 날 계산
+  const lastDay = new Date(Number(year), Number(month), 0).getDate()
+  const to = `${year}-${m}-${String(lastDay).padStart(2, '0')}`
 
   // 1️⃣ DB 조회
   const [rows] = await db.query(

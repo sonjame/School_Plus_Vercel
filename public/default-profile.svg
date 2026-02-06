@@ -1,0 +1,30 @@
+<svg
+  width="128"
+  height="128"
+  viewBox="0 0 128 128"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <!-- 부드러운 배경 원 (하늘색 계열) -->
+  <defs>
+    <linearGradient id="avatarBg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8" />
+      <stop offset="1" stop-color="#6366F1" />
+    </linearGradient>
+  </defs>
+
+  <!-- 바깥 동그라미 -->
+  <circle cx="64" cy="64" r="64" fill="url(#avatarBg)" />
+
+  <!-- 안쪽 흰색 원 (여백 느낌) -->
+  <circle cx="64" cy="64" r="50" fill="white" />
+
+  <!-- 얼굴 -->
+  <circle cx="64" cy="50" r="18" fill="#E5E7EB" />
+
+  <!-- 몸통 (살짝 둥근 사각형처럼 보이게) -->
+  <path
+    d="M32 92C34 76 47 66 64 66C81 66 94 76 96 92C96.2 93.7 95 96 92 96H36C33 96 31.8 93.7 32 92Z"
+    fill="#E5E7EB"
+  />
+</svg>

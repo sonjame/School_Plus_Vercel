@@ -20,16 +20,17 @@ export async function GET(
 
     jwt.verify(auth.replace('Bearer ', ''), process.env.JWT_SECRET!)
 
-    // 👥 채팅방 참여자 + 방장 여부
+    // 👥 채팅방 참여자 (🔥 최신 users 기준)
     const [rows]: any = await db.query(
       `
       SELECT
         u.id,
         u.name,
         u.username,
+        u.profile_image_url AS profileImageUrl, -- 🔥 핵심
         CASE
-          WHEN u.grade IS NOT NULL AND u.classNum IS NOT NULL
-          THEN CONCAT(u.grade, '학년 ', u.classNum, '반')
+          WHEN u.grade IS NOT NULL AND u.class_num IS NOT NULL
+          THEN CONCAT(u.grade, u.class_num, '반')
           ELSE NULL
         END AS gradeLabel,
         CASE

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
+import PollMessage from '@/src/components/chat/PollMessage'
 
 /* =========================
    타입 정의
@@ -22,18 +23,60 @@ type ChatMessage = {
   senderName: string
   content: string
   createdAt: string
-  type: 'text' | 'image' | 'file' | 'url'
+  type: 'text' | 'image' | 'file' | 'url' | 'notice' | 'poll'
   fileUrl?: string
   fileName?: string
   readCount?: number
+  pollData?: {
+    title: string
+    options: { id: number; text: string }[]
+    anonymous: boolean
+    closedAt?: string | null
+  }
+
+  pollResult?: {
+    optionId: number
+    count: number
+    voters?: { id: number; name: string }[]
+  }[]
 }
 
 type UserSummary = {
   id: number
   name: string
   username: string
+  profileImageUrl?: string | null
   gradeLabel?: string // 예: "1학년 3반"
   isOwner?: boolean | number
+}
+
+type Friend = {
+  id: number
+  name: string
+  username: string
+  profileImageUrl?: string | null
+  gradeLabel?: string
+}
+
+// 한국 시간
+function formatKST(value: string) {
+  // 이미 사람이 읽는 형식이면 그대로
+  if (/^(오전|오후)/.test(value)) return value
+
+  // 🔥 ISO / UTC 기준으로 명확히 파싱
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Seoul',
+  }).format(date)
 }
 
 /* =========================
@@ -41,6 +84,9 @@ type UserSummary = {
 ========================= */
 
 export default function ChatPage() {
+  // 🚫 전학 / 학교 다름 차단 모달
+  const [blockMessage, setBlockMessage] = useState<string | null>(null)
+
   const [rooms, setRooms] = useState<ChatRoom[]>([])
   const [currentRoomId, setCurrentRoomId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -69,6 +115,69 @@ export default function ChatPage() {
   const [showRoomMenu, setShowRoomMenu] = useState(false)
   const [roomUsers, setRoomUsers] = useState<UserSummary[]>([])
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [pendingImages, setPendingImages] = useState<File[]>([])
+
+  const [showNoticeModal, setShowNoticeModal] = useState(false)
+
+  const [hideNotice, setHideNotice] = useState(false)
+
+  const [showPollModal, setShowPollModal] = useState(false)
+
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [canDownloadPreview, setCanDownloadPreview] = useState(true)
+
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [blockedIds, setBlockedIds] = useState<number[]>([])
+  const [showFriendsModal, setShowFriendsModal] = useState(false)
+
+  const isBlockedChat = Boolean(blockMessage)
+
+  const [isChatBanned, setIsChatBanned] = useState(false)
+
+  const [friendsModalMode, setFriendsModalMode] = useState<'chat' | 'invite'>(
+    'chat',
+  )
+
+  const [reportMode, setReportMode] = useState(false)
+  const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null)
+  const [showReportModal, setShowReportModal] = useState(false)
+
+  // 🔥 최신 공지 1개 추출
+  const latestNotice = [...messages]
+    .filter((m) => m.type === 'notice')
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0]
+
+  const COLORS = {
+    primary: '#4FC3F7',
+    primaryDark: '#2563eb',
+    bg: '#f9fafb',
+    border: '#e5e7eb',
+    text: '#111827',
+    subText: '#6b7280',
+    danger: '#ef4444',
+    noticeBg: '#FEF3C7',
+    noticeText: '#92400E',
+  }
+
+  const EMOJIS = [
+    '😀',
+    '😂',
+    '😍',
+    '🥰',
+    '😎',
+    '😭',
+    '😡',
+    '👍',
+    '👏',
+    '🙏',
+    '🔥',
+    '🎉',
+    '❤️',
+    '💯',
+  ]
 
   async function safeJson<T>(res: Response): Promise<T | null> {
     if (!res.ok) return null
@@ -83,43 +192,21 @@ export default function ChatPage() {
     }
   }
 
+  const [showRoomUsers, setShowRoomUsers] = useState(false)
+
   const fetchRoomUsers = async () => {
     if (!currentRoomId || !currentUser?.token) return
 
-    const res = await fetch(`/api/chat/messages/${currentRoomId}/users`, {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
-    })
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}/users`)
 
     if (!res.ok) {
-      alert('참여자 정보를 불러오지 못했습니다.')
+      setBlockMessage('참여자 정보를 불러오지 못했습니다.')
       return
     }
 
     const data = await res.json()
     setRoomUsers(Array.isArray(data) ? data : [])
-  }
-
-  // 한국 시간
-  function formatKST(value: string) {
-    // 이미 사람이 읽는 형식이면 그대로
-    if (/^(오전|오후)/.test(value)) return value
-
-    // 🔥 ISO / UTC 기준으로 명확히 파싱
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) return value
-
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Seoul',
-    }).format(date)
+    setShowRoomUsers(true)
   }
 
   const handleCreateRoom = async (
@@ -128,12 +215,9 @@ export default function ChatPage() {
   ) => {
     if (!currentUser?.token) return
 
-    const res = await fetch('/api/chat/create-room', {
+    const res = await apiFetch('/api/chat/create-room', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${currentUser.token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         isGroup: mode === 'group',
         name: mode === 'group' ? '새 그룹 채팅' : '1:1 채팅',
@@ -141,21 +225,57 @@ export default function ChatPage() {
       }),
     })
 
-    if (!res.ok) {
-      alert('채팅방 생성 실패')
+    /* 🔥 1️⃣ 채팅 정지 */
+    if (res.status === 403) {
+      const err = await res.json().catch(() => ({}))
+
+      if (err.message === 'CHAT_BANNED') {
+        setBlockMessage(
+          `채팅 이용이 제한되었습니다.\n정지 해제 시간: ${formatKST(err.banUntil)}`,
+        )
+        return
+      }
+
+      if (err.message === 'CHAT_BANNED_PERMANENT') {
+        setBlockMessage('계정이 정지되어 채팅방을 만들 수 없습니다.')
+        return
+      }
+
+      setBlockMessage('채팅 이용이 제한되어 채팅방을 만들 수 없습니다.')
       return
     }
 
+    /* 🔥 2️⃣ 이미 존재하는 1:1 채팅 */
+    if (res.status === 409) {
+      const data = await res.json()
+
+      alert(data.message || '이미 채팅방이 존재합니다.')
+
+      setShowInviteModal(false)
+      setCurrentRoomId(data.roomId)
+
+      const listRes = await apiFetch('/api/chat/rooms')
+      const list = await listRes.json()
+      setRooms(Array.isArray(list) ? list : [])
+
+      return
+    }
+
+    /* 🔥 3️⃣ 기타 에러 */
+    if (!res.ok) {
+      setBlockMessage('채팅방 생성 실패')
+      return
+    }
+
+    /* ✅ 4️⃣ 정상 생성 */
     const data = await res.json()
 
     setShowInviteModal(false)
     setCurrentRoomId(data.roomId)
 
-    // 채팅방 목록 새로고침 (선택)
-    apiFetch('/api/chat/rooms')
-      .then((res) => safeJson<ChatRoom[]>(res))
-      .then((data) => setRooms(Array.isArray(data) ? data : []))
-      .catch(() => setRooms([]))
+    const listRes = await apiFetch('/api/chat/rooms')
+    const list = await listRes.json()
+    setRooms(Array.isArray(list) ? list : [])
   }
 
   // =======================
@@ -171,7 +291,7 @@ export default function ChatPage() {
     })
 
     if (!res.ok) {
-      alert('채팅방 나가기 실패')
+      setBlockMessage('채팅방 나가기 실패')
       return
     }
 
@@ -204,18 +324,15 @@ export default function ChatPage() {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok) {
-      alert(data.message || '채팅방 삭제에 실패했습니다.')
+      setBlockMessage(data.message || '채팅방 삭제에 실패했습니다.')
       return
     }
 
     setCurrentRoomId(null)
     setMessages([])
 
-    const listRes = await fetch('/api/chat/rooms', {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
-    })
+    const listRes = await apiFetch('/api/chat/rooms')
+
     const listData = await listRes.json()
     setRooms(Array.isArray(listData) ? listData : [])
   }
@@ -226,29 +343,23 @@ export default function ChatPage() {
     const newName = prompt('새 채팅방 이름을 입력하세요')
     if (!newName?.trim()) return
 
-    const res = await fetch(`/api/chat/messages/${currentRoomId}/name`, {
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}/name`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${currentUser.token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
     })
 
     const data = await res.json()
 
     if (!res.ok) {
-      alert(data.message || '이름 변경 실패')
+      setBlockMessage(data.message || '이름 변경 실패')
       return
     }
 
     // 🔄 방 목록 갱신
-    const listRes = await fetch('/api/chat/rooms', {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
-    })
-    setRooms(await listRes.json())
+    const listRes = await apiFetch('/api/chat/rooms')
+    const roomsData = await safeJson<ChatRoom[]>(listRes)
+    setRooms(Array.isArray(roomsData) ? roomsData : [])
   }
 
   const handleSendImage = async (file: File) => {
@@ -264,19 +375,16 @@ export default function ChatPage() {
     })
 
     if (!uploadRes.ok) {
-      alert('이미지 업로드 실패')
+      setBlockMessage('이미지 업로드 실패')
       return
     }
 
     const { url, name } = await uploadRes.json()
 
     // 2. 메시지 저장
-    await fetch('/api/chat/messages', {
+    await apiFetch('/api/chat/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${currentUser.token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomId: currentRoomId,
         type: 'image',
@@ -291,6 +399,25 @@ export default function ChatPage() {
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
   }
+
+  useEffect(() => {
+    const setVh = () => {
+      const vh = window.innerHeight * 0.01
+      document.documentElement.style.setProperty('--vh', `${vh}px`)
+    }
+
+    setVh()
+    window.addEventListener('resize', setVh)
+    return () => window.removeEventListener('resize', setVh)
+  }, [])
+
+  useEffect(() => {
+    if (showEmojiPicker) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+  }, [showEmojiPicker])
 
   function isUrl(text: string) {
     try {
@@ -309,6 +436,115 @@ export default function ChatPage() {
     schoolCode?: string
     token?: string
   } | null>(null)
+
+  useEffect(() => {
+    const checkBanStatus = async () => {
+      if (!currentUser?.token) return
+
+      const res = await apiFetch('/api/auth/me')
+
+      // 🔴 정지 상태
+      if (res.status === 403) {
+        const data = await res.json()
+
+        setIsChatBanned(true)
+
+        if (data.type === 'temporary') {
+          setBlockMessage(
+            `채팅 이용이 제한되었습니다.\n${
+              data.reason ?? ''
+            }\n\n정지 해제 시간: ${formatKST(data.banUntil)}`,
+          )
+        } else {
+          setBlockMessage(`계정이 영구 정지되었습니다.\n${data.reason ?? ''}`)
+        }
+        return
+      }
+
+      // ❌ 진짜 인증 실패
+      if (res.status === 401) {
+        alert('로그인이 만료되었습니다.')
+        localStorage.removeItem('loggedInUser')
+        location.href = '/login'
+      }
+    }
+
+    checkBanStatus()
+  }, [currentUser])
+
+  const fetchFriends = async () => {
+    const res = await apiFetch('/api/friends')
+    const data = await safeJson<Friend[]>(res)
+    setFriends(Array.isArray(data) ? data : [])
+  }
+
+  const fetchBlocks = async () => {
+    const res = await apiFetch('/api/friends/blocks')
+    const data = await safeJson<{ blocked_id: number }[]>(res)
+    setBlockedIds(Array.isArray(data) ? data.map((b) => b.blocked_id) : [])
+  }
+
+  useEffect(() => {
+    if (!currentUser?.token) return
+    fetchFriends()
+    fetchBlocks()
+  }, [currentUser])
+
+  const handleAddFriend = async (friendId: number) => {
+    const res = await apiFetch('/api/friends/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friendId }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.message || '친구 추가 실패')
+      return
+    }
+
+    // 🔥 즉시 친구 목록 다시 불러오기
+    await fetchFriends()
+  }
+
+  const handleDeleteFriend = async (friendId: number) => {
+    if (!confirm('친구를 삭제하시겠습니까?')) return
+
+    const res = await apiFetch(`/api/friends/${friendId}`, {
+      method: 'DELETE',
+    })
+
+    if (!res.ok) {
+      alert('친구 삭제 실패')
+      return
+    }
+
+    setFriends((prev) => prev.filter((f) => f.id !== friendId))
+  }
+
+  const handleToggleBlock = async (targetId: number) => {
+    const res = await apiFetch('/api/friends/blocks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blockedId: targetId }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      alert(data.message || '차단 처리 실패')
+      return
+    }
+
+    if (data.blocked) {
+      // 차단됨 → 친구 목록에서도 제거
+      setBlockedIds((prev) => [...prev, targetId])
+      setFriends((prev) => prev.filter((f) => f.id !== targetId))
+    } else {
+      // 차단 해제
+      setBlockedIds((prev) => prev.filter((id) => id !== targetId))
+    }
+  }
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
@@ -393,18 +629,101 @@ export default function ChatPage() {
      현재 방, 메시지 필터링
   ------------------------- */
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || null
-  const roomMessages = messages.filter((m) => m.roomId === currentRoomId)
+  const roomMessages = messages
+    .filter((m) => m.roomId === currentRoomId)
+    .filter((m) => m.type !== 'notice') // 🔥 공지 제외
+
+  const handleSendImagesBulk = async () => {
+    if (isChatBanned) return
+    if (!currentRoomId || !currentUser?.token) return
+
+    const uploaded: { fileUrl: string; fileName: string }[] = []
+
+    // 1️⃣ 이미지 업로드
+    for (const file of pendingImages) {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRes = await fetch('/api/upload/chat', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) continue
+
+      const { url, name } = await uploadRes.json()
+      uploaded.push({ fileUrl: url, fileName: name })
+    }
+
+    if (uploaded.length === 0) return
+
+    // 2️⃣ 메시지 저장 (🔥 여기 핵심)
+    const sendRes = await apiFetch('/api/chat/messages/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId: currentRoomId,
+        images: uploaded,
+      }),
+    })
+
+    /* 🔥 전학 / 학교 다름 차단 */
+    if (!sendRes.ok) {
+      const err = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 403) {
+        if (err?.message === 'CHAT_BANNED') {
+          const until = err.banEnd
+            ? `\n정지 해제 시간: ${formatKST(err.banEnd)}`
+            : ''
+
+          setBlockMessage(`채팅 이용이 제한되었습니다.${until}`)
+        } else {
+          setBlockMessage(
+            err.message ??
+              '학교가 달라져 더 이상 이 채팅방에서 이미지를 보낼 수 없습니다.',
+          )
+        }
+        return
+      }
+
+      // ❗ 업로드 대기 이미지 유지 (사용자가 지울 수 있게)
+      return
+    }
+
+    // 3️⃣ 성공한 경우만 UI 정리
+    setPendingImages([])
+
+    // 4️⃣ 메시지 새로 불러오기
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+    const data = await safeJson<ChatMessage[]>(res)
+    setMessages(Array.isArray(data) ? data : [])
+  }
 
   /* -------------------------
      메시지 전송 핸들러
   ------------------------- */
   const handleSendMessage = async () => {
-    if (!currentRoomId || !inputText.trim()) return
+    if (isChatBanned) return
+    if (!currentRoomId) return
+
+    /* ======================
+     🖼 이미지 먼저 전송
+  ====================== */
+    if (pendingImages.length > 0) {
+      await handleSendImagesBulk()
+      return
+    }
+
+    /* ======================
+     ✏️ 텍스트 메시지
+  ====================== */
+    if (!inputText.trim()) return
 
     const trimmed = inputText.trim()
 
     const newMessage: ChatMessage = {
-      id: `temp-${Date.now()}`,
+      id: Date.now(),
       roomId: currentRoomId,
       senderId: currentUser?.id || 0,
       senderName: currentUser?.name || '나',
@@ -413,15 +732,13 @@ export default function ChatPage() {
       type: isUrl(trimmed) ? 'url' : 'text',
     }
 
-    // 프론트 상태에만 추가 (나중에 /api/chat/send-message로 교체)
+    // 🔹 optimistic UI
     setMessages((prev) => [...prev, newMessage])
     setInputText('')
 
-    await apiFetch('/api/chat/messages', {
+    const sendRes = await apiFetch('/api/chat/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomId: currentRoomId,
         type: newMessage.type,
@@ -429,33 +746,50 @@ export default function ChatPage() {
       }),
     })
 
-    /* 🔥 여기 추가 */
-    const res = await fetch(`/api/chat/messages/${currentRoomId}`, {
-      headers: {
-        Authorization: `Bearer ${currentUser?.token}`,
-      },
-    })
-    const data = await res.json()
+    /* 🔥 전학 등으로 차단된 경우 */
+    if (!sendRes.ok) {
+      const err = await sendRes.json().catch(() => ({}))
+
+      if (sendRes.status === 403) {
+        if (err?.message === 'CHAT_BANNED') {
+          const until = err.banEnd
+            ? `\n정지 해제 시간: ${formatKST(err.banEnd)}`
+            : ''
+
+          setBlockMessage(`채팅 이용이 제한되었습니다.${until}`)
+        } else {
+          setBlockMessage(
+            err.message ??
+              '학교가 달라져 더 이상 이 채팅방에서 메시지를 보낼 수 없습니다.',
+          )
+        }
+
+        // optimistic 메시지 제거
+        setMessages((prev) => prev.filter((m) => m.id !== newMessage.id))
+        return
+      }
+
+      setBlockMessage(err.message || '메시지 전송에 실패했습니다.')
+
+      // 실패 시 optimistic 메시지 제거
+      setMessages((prev) => prev.filter((m) => m.id !== newMessage.id))
+      return
+    }
+
+    /* ✅ 성공한 경우만 메시지 다시 불러오기 */
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+    const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
   }
-  useEffect(() => {
-    if (!currentRoomId || !currentUser?.token) return
 
-    fetch(`/api/chat/messages/${currentRoomId}`, {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          setMessages([])
-          return
-        }
-        const data = await res.json()
-        setMessages(Array.isArray(data) ? data : [])
-      })
+  useEffect(() => {
+    if (!currentRoomId) return
+
+    apiFetch(`/api/chat/messages/${currentRoomId}`)
+      .then((res) => safeJson<ChatMessage[]>(res))
+      .then((data) => setMessages(Array.isArray(data) ? data : []))
       .catch(() => setMessages([]))
-  }, [currentRoomId, currentUser?.token])
+  }, [currentRoomId])
 
   /* -------------------------
      파일 선택 핸들러 (UI만)
@@ -468,8 +802,9 @@ export default function ChatPage() {
     for (const file of files) {
       // 🖼 이미지
       if (file.type.startsWith('image/')) {
-        await handleSendImage(file)
+        setPendingImages((prev) => [...prev, file])
       }
+
       // 📄 문서 파일
       else {
         await handleSendFile(file)
@@ -494,59 +829,54 @@ export default function ChatPage() {
     setShowInviteModal(true)
   }
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = async (messageId: number) => {
     if (!currentUser?.token) return
     if (!confirm('이 메시지를 삭제하시겠습니까?')) return
 
-    const res = await fetch(`/api/chat/messages/delete/${messageId}`, {
+    const res = await await apiFetch(`/api/chat/messages/delete/${messageId}`, {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
     })
 
     if (!res.ok) {
-      alert('메시지 삭제 실패')
+      setBlockMessage('메시지 삭제 실패')
       return
     }
 
     // 🔄 메시지 다시 불러오기
-    const list = await fetch(`/api/chat/messages/${currentRoomId}`, {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
-    })
+    const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
 
     const data = await safeJson<ChatMessage[]>(list)
     setMessages(Array.isArray(data) ? data : [])
   }
 
   const handleSendFile = async (file: File) => {
+    if (isChatBanned) return
     if (!currentRoomId || !currentUser?.token) return
 
     const formData = new FormData()
     formData.append('file', file)
 
-    // 1️⃣ S3 업로드
+    /* =====================
+     1️⃣ S3 업로드
+  ===================== */
     const uploadRes = await fetch('/api/upload/chat', {
       method: 'POST',
       body: formData,
     })
 
     if (!uploadRes.ok) {
-      alert('파일 업로드 실패')
+      setBlockMessage('파일 업로드 실패')
       return
     }
 
     const { url, name } = await uploadRes.json()
 
-    // 2️⃣ 메시지 저장
-    await fetch('/api/chat/messages', {
+    /* =====================
+     2️⃣ 메시지 저장 (🔥 핵심)
+  ===================== */
+    const sendRes = await apiFetch('/api/chat/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${currentUser.token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomId: currentRoomId,
         type: 'file',
@@ -555,20 +885,52 @@ export default function ChatPage() {
       }),
     })
 
-    // 3️⃣ 메시지 갱신
-    const res = await fetch(`/api/chat/messages/${currentRoomId}`, {
-      headers: {
-        Authorization: `Bearer ${currentUser.token}`,
-      },
+    /* 🔥 전학 / 학교 다름 차단 */
+    if (!sendRes.ok) {
+      const err = await sendRes.json().catch(() => ({}))
+
+      if (err?.message === 'CHAT_BANNED') {
+        setBlockMessage(
+          `채팅 이용이 제한되었습니다.\n정지 해제 시간: ${formatKST(err.banEnd)}`,
+        )
+        return
+      }
+
+      setBlockMessage(err.message || '파일 전송에 실패했습니다.')
+      return
+    }
+
+    /* =====================
+     3️⃣ 성공 시 메시지 갱신
+  ===================== */
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+    const data = await safeJson<ChatMessage[]>(res)
+    setMessages(Array.isArray(data) ? data : [])
+  }
+
+  const handleDeleteNotice = async (noticeId: number) => {
+    if (!confirm('이 공지를 삭제하시겠습니까?')) return
+
+    const res = await apiFetch(`/api/chat/notice/${noticeId}`, {
+      method: 'DELETE',
     })
-    setMessages(await res.json())
+
+    if (!res.ok) {
+      setBlockMessage('공지 삭제 실패')
+      return
+    }
+
+    // 🔄 메시지 다시 로드
+    const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+    const data = await safeJson<ChatMessage[]>(list)
+    setMessages(Array.isArray(data) ? data : [])
   }
 
   return (
     <main
       ref={containerRef}
       style={{
-        height: '100vh', // ✅ minHeight ❌ → height ✅
+        height: 'calc(var(--vh, 1vh) * 100)',
         paddingTop: isMobile ? 60 : 0, // 가독성도 좋아짐
         paddingBottom: 0, // ✅ 아래 여백 완전 제거
         background: '#e5f3ff',
@@ -582,7 +944,9 @@ export default function ChatPage() {
         style={{
           width: '100%',
           maxWidth: '100%', // ✅ PC에서도 풀 폭
-          height: isMobile ? 'calc(100vh - 60px)' : '100vh', // ✅ 둘 다 동일하게 (헤더 60px 제외)
+          height: isMobile
+            ? 'calc(var(--vh, 1vh) * 100 - 60px)'
+            : 'calc(var(--vh, 1vh) * 100)',
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
@@ -617,10 +981,30 @@ export default function ChatPage() {
                   fontSize: 16,
                   display: 'flex',
                   justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
                 <span>학교 채팅</span>
+
+                <button
+                  onClick={() => {
+                    setFriendsModalMode('chat')
+                    setShowFriendsModal(true)
+                  }}
+                  style={{
+                    fontSize: 12,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  👥 친구
+                </button>
               </div>
+
               <span style={{ fontSize: 12, color: '#6b7280' }}>
                 {currentUser?.school
                   ? `📚 ${currentUser.school}`
@@ -689,13 +1073,12 @@ export default function ChatPage() {
                     onClick={async () => {
                       setCurrentRoomId(room.id)
 
+                      if (!currentUser?.token) return
+
                       // 🔥 읽음 처리
                       if (currentUser?.token) {
-                        await fetch(`/api/chat/messages/${room.id}/read`, {
+                        await apiFetch(`/api/chat/messages/${room.id}/read`, {
                           method: 'POST',
-                          headers: {
-                            Authorization: `Bearer ${currentUser.token}`,
-                          },
                         })
 
                         // 🔄 방 목록 다시 불러와서 unreadCount 갱신
@@ -706,12 +1089,8 @@ export default function ChatPage() {
                           )
                       }
                       // ✅ 메시지 다시 불러오기 (readCount 즉시 반영)
-                      fetch(`/api/chat/messages/${room.id}`, {
-                        headers: {
-                          Authorization: `Bearer ${currentUser.token}`,
-                        },
-                      })
-                        .then((res) => res.json())
+                      apiFetch(`/api/chat/messages/${room.id}`)
+                        .then((res) => safeJson<ChatMessage[]>(res))
                         .then((data) =>
                           setMessages(Array.isArray(data) ? data : []),
                         )
@@ -960,30 +1339,202 @@ export default function ChatPage() {
                         }}
                       />
                       <MenuItem
-                        label="➕ 초대"
+                        label="📢 공지 작성"
                         onClick={() => {
+                          if (isChatBanned) {
+                            setBlockMessage(
+                              '채팅 이용이 제한되어 공지를 작성할 수 없습니다.',
+                            )
+                            return
+                          }
                           setShowRoomMenu(false)
-                          setInviteMode(
-                            currentRoom.isGroup ? 'group' : 'oneToOne',
-                          )
-                          setShowInviteModal(true)
+                          setShowNoticeModal(true)
                         }}
                       />
+
+                      <MenuItem
+                        label={
+                          currentRoom?.isGroup ? '➕ 초대' : '👥 그룹으로 전환'
+                        }
+                        onClick={() => {
+                          setShowRoomMenu(false)
+                          setFriendsModalMode('invite')
+                          setShowFriendsModal(true)
+                        }}
+                      />
+
+                      <MenuItem
+                        label="🚨 메시지 신고"
+                        danger
+                        onClick={() => {
+                          setShowRoomMenu(false)
+                          setReportMode(true)
+                          alert('신고할 메시지를 선택하세요')
+                        }}
+                      />
+
                       <MenuItem
                         label="🚪 나가기"
                         onClick={() => {
+                          if (isChatBanned) {
+                            setBlockMessage(
+                              '채팅 이용이 제한되어 채팅방 관리를 할 수 없습니다.',
+                            )
+                            return
+                          }
                           setShowRoomMenu(false)
-                          handleLeaveRoom()
+                          handleLeaveRoom() // or handleDeleteRoom()
                         }}
                       />
                       <MenuItem
                         label="🗑 삭제"
                         danger
                         onClick={() => {
+                          if (isChatBanned) {
+                            setBlockMessage(
+                              '채팅 이용이 제한되어 채팅방 관리를 할 수 없습니다.',
+                            )
+                            return
+                          }
                           setShowRoomMenu(false)
-                          handleDeleteRoom()
+                          handleLeaveRoom() // or handleDeleteRoom()
                         }}
                       />
+                    </div>
+                  )}
+
+                  {showNoticeModal && (
+                    <div
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.45)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                      }}
+                      onClick={() => setShowNoticeModal(false)}
+                    >
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '92%',
+                          maxWidth: 420,
+                          background: 'white',
+                          borderRadius: 16,
+                          padding: 20,
+                        }}
+                      >
+                        <h3
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 700,
+                            marginBottom: 10,
+                          }}
+                        >
+                          📢 공지 작성
+                        </h3>
+
+                        <textarea
+                          placeholder="채팅방 공지를 입력하세요"
+                          rows={4}
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '12px -1px',
+                            borderRadius: 10,
+                            border: `2px solid ${COLORS.border}`,
+                            fontSize: 14,
+                            resize: 'none',
+                            outline: 'none',
+                          }}
+                        />
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: 8,
+                            marginTop: 14,
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              setInputText('')
+                              setShowNoticeModal(false)
+                            }}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: 999,
+                              border: `1px solid ${COLORS.border}`,
+                              background: 'white',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            취소
+                          </button>
+
+                          <button
+                            onClick={async () => {
+                              if (!inputText.trim() || !currentRoomId) return
+
+                              const res = await apiFetch('/api/chat/messages', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  roomId: currentRoomId,
+                                  type: 'notice',
+                                  content: inputText.trim(),
+                                }),
+                              })
+
+                              /* 🔥 전학 / 학교 다름 차단 */
+                              if (!res.ok) {
+                                const err = await res.json().catch(() => ({}))
+
+                                if (res.status === 403) {
+                                  setBlockMessage(
+                                    err.message ??
+                                      '학교가 달라져 이 채팅방에는 공지를 작성할 수 없습니다.',
+                                  )
+                                  return
+                                }
+
+                                alert(
+                                  err.message || '공지 등록에 실패했습니다.',
+                                )
+                                return
+                              }
+
+                              /* ✅ 성공한 경우만 */
+                              setInputText('')
+                              setShowNoticeModal(false)
+
+                              const listRes = await apiFetch(
+                                `/api/chat/messages/${currentRoomId}`,
+                              )
+                              const data =
+                                await safeJson<ChatMessage[]>(listRes)
+                              setMessages(Array.isArray(data) ? data : [])
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: 999,
+                              border: 'none',
+                              background: COLORS.primary,
+                              color: 'white',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            등록
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1021,188 +1572,423 @@ export default function ChatPage() {
             <div
               style={{
                 flex: 1,
-                padding: '12px 16px',
                 overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain',
                 background: '#f9fafb',
+                padding: '12px 16px',
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
-              {!currentRoom && (
-                <div
-                  style={{
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#9ca3af',
-                    fontSize: 14,
-                  }}
-                >
-                  왼쪽에서 채팅방을 선택하거나 새 채팅을 시작하세요.
-                </div>
-              )}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent:
+                    !currentRoom || roomMessages.length === 0
+                      ? 'center'
+                      : 'flex-start',
+                }}
+              >
+                {latestNotice && hideNotice && (
+                  <button
+                    onClick={() => setHideNotice(false)}
+                    style={{
+                      marginBottom: 8,
+                      fontSize: 12,
+                      color: '#2563eb',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    📢 공지 펼치기
+                  </button>
+                )}
 
-              {currentRoom &&
-                roomMessages.map((msg) => {
-                  const isMe = msg.senderId === (currentUser?.id || 0)
-                  return (
-                    <div
-                      key={msg.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: isMe ? 'flex-end' : 'flex-start',
-                        marginBottom: 8,
-                      }}
-                    >
-                      <div
+                {/* 📢 상단 고정 공지 (최신 1개) */}
+                {currentRoom && latestNotice && !hideNotice && (
+                  <div
+                    style={{
+                      background: COLORS.noticeBg,
+                      color: COLORS.noticeText,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <span>📢 {latestNotice.content}</span>
+
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {/* 🔥 작성자만 삭제 가능 */}
+                      {latestNotice.senderId === currentUser?.id && (
+                        <button
+                          onClick={() => {
+                            if (isChatBanned) {
+                              setBlockMessage(
+                                '채팅 이용이 제한되어 공지를 삭제할 수 없습니다.',
+                              )
+                              return
+                            }
+                            handleDeleteNotice(latestNotice.id)
+                          }}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#ef4444',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          삭제
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => setHideNotice(true)}
                         style={{
-                          maxWidth: '75%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: isMe ? 'flex-end' : 'flex-start',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          color: COLORS.noticeText,
                         }}
                       >
-                        <span
+                        접기
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!currentRoom && (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      color: '#9ca3af',
+                      fontSize: 14,
+                    }}
+                  >
+                    왼쪽에서 채팅방을 선택하거나 새 채팅을 시작하세요.
+                  </div>
+                )}
+
+                {currentRoom &&
+                  roomMessages.map((msg) => {
+                    const isMe = msg.senderId === (currentUser?.id || 0)
+                    if (msg.type === 'notice') {
+                      const isOwner = msg.senderId === currentUser?.id
+
+                      return (
+                        <div
+                          key={msg.id}
                           style={{
-                            fontSize: 11,
-                            color: '#6b7280',
-                            marginBottom: 2,
-                            paddingRight: 4,
+                            width: '100%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            margin: '14px 0',
                           }}
                         >
-                          {isMe ? '나' : msg.senderName}
-                        </span>
+                          <div
+                            style={{
+                              background: COLORS.noticeBg,
+                              color: COLORS.noticeText,
+                              padding: '8px 14px',
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            📢 {msg.content}
+                            {isOwner && (
+                              <button
+                                onClick={() => {
+                                  if (isChatBanned) {
+                                    setBlockMessage(
+                                      '채팅 이용이 제한되어 공지를 삭제할 수 없습니다.',
+                                    )
+                                    return
+                                  }
+                                  handleDeleteNotice(msg.id)
+                                }}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  fontSize: 11,
+                                  color: '#ef4444',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                삭제
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    if (msg.type === 'poll') {
+                      const isMe = msg.senderId === (currentUser?.id || 0)
+
+                      return (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: isMe ? 'flex-end' : 'flex-start',
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '100%',
+                              maxWidth: 560, // 🔥 핵심: 투표 최대 폭
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: isMe ? 'flex-end' : 'flex-start',
+                            }}
+                          >
+                            {/* 이름 */}
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: '#6b7280',
+                                marginBottom: 2,
+                                paddingRight: 4,
+                              }}
+                            >
+                              {isMe ? '나' : msg.senderName}
+                            </span>
+
+                            <PollMessage
+                              msg={msg}
+                              currentUser={currentUser}
+                              onRefresh={async () => {
+                                const res = await apiFetch(
+                                  `/api/chat/messages/${currentRoomId}`,
+                                )
+                                const data = await safeJson<ChatMessage[]>(res)
+                                setMessages(Array.isArray(data) ? data : [])
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div
+                        key={msg.id}
+                        onClick={() => {
+                          if (!reportMode) return
+                          if (msg.senderId === currentUser?.id) return
+
+                          setReportTarget(msg)
+                          setShowReportModal(true)
+                          setReportMode(false)
+                        }}
+                        style={{
+                          display: 'flex',
+                          justifyContent: isMe ? 'flex-end' : 'flex-start',
+                          marginBottom: 8,
+                          cursor: reportMode && !isMe ? 'pointer' : 'default',
+                          opacity: reportMode && isMe ? 0.4 : 1,
+                        }}
+                      >
                         <div
                           style={{
-                            padding:
-                              msg.type === 'image' || msg.type === 'file'
-                                ? 0
-                                : '10px 14px',
-                            borderRadius:
-                              msg.type === 'image' || msg.type === 'file'
-                                ? 0
-                                : 12,
-                            background:
-                              msg.type === 'image' || msg.type === 'file'
-                                ? 'transparent'
-                                : isMe
-                                  ? '#4FC3F7'
-                                  : 'white',
-                            fontSize: 14,
-                            wordBreak: 'break-word',
-                            maxWidth:
-                              msg.type === 'image' || msg.type === 'file'
-                                ? 'none'
-                                : '75%',
+                            maxWidth: '75%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: isMe ? 'flex-end' : 'flex-start',
                           }}
                         >
-                          {msg.type === 'text' && msg.content}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: '#6b7280',
+                              marginBottom: 2,
+                              paddingRight: 4,
+                            }}
+                          >
+                            {isMe ? '나' : msg.senderName}
+                          </span>
+                          <div
+                            style={{
+                              padding:
+                                msg.type === 'image' || msg.type === 'file'
+                                  ? 0
+                                  : '10px 14px',
+                              borderRadius:
+                                msg.type === 'image' || msg.type === 'file'
+                                  ? 0
+                                  : 12,
+                              background:
+                                msg.type === 'image' || msg.type === 'file'
+                                  ? 'transparent'
+                                  : isMe
+                                    ? '#4FC3F7'
+                                    : 'white',
+                              fontSize: 14,
+                              wordBreak: 'break-word',
+                              maxWidth:
+                                msg.type === 'image' || msg.type === 'file'
+                                  ? 'none'
+                                  : '75%',
+                            }}
+                          >
+                            {msg.type === 'text' && msg.content}
 
-                          {msg.type === 'url' && (
-                            <a
-                              href={msg.content}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                color: isMe ? 'white' : '#2563eb',
-                                textDecoration: 'underline',
-                                wordBreak: 'break-all',
-                              }}
-                            >
-                              {msg.content}
-                            </a>
-                          )}
+                            {msg.type === 'url' && (
+                              <a
+                                href={msg.content}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  color: isMe ? 'white' : '#2563eb',
+                                  textDecoration: 'underline',
+                                  wordBreak: 'break-all',
+                                }}
+                              >
+                                {msg.content}
+                              </a>
+                            )}
 
-                          {msg.type === 'image' && msg.fileUrl && (
-                            <img
-                              src={msg.fileUrl}
-                              alt="uploaded"
-                              style={{
-                                maxWidth: 280, // 🔥 200 → 280 (체감 큼)
-                                maxHeight: 360, // 🔥 세로 제한
-                                borderRadius: 14,
-                                display: 'block',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => setPreviewImage(msg.fileUrl)}
-                            />
-                          )}
+                            {msg.type === 'image' && msg.fileUrl && (
+                              <img
+                                src={msg.fileUrl}
+                                alt="uploaded"
+                                style={{
+                                  maxWidth: 280, // 🔥 200 → 280 (체감 큼)
+                                  maxHeight: 360, // 🔥 세로 제한
+                                  borderRadius: 14,
+                                  display: 'block',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => {
+                                  setCanDownloadPreview(true) // ✅ 메시지 이미지는 다운로드 가능
+                                  setPreviewImage(msg.fileUrl ?? null)
+                                }}
+                              />
+                            )}
 
-                          {msg.type === 'file' && msg.fileUrl && (
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '10px 14px',
-                                borderRadius: 12,
-                                background: isMe ? '#e0f2fe' : '#f3f4f6',
-                                cursor: 'pointer',
-                                maxWidth: 320,
-                              }}
-                              onClick={() => {
-                                const encoded = encodeURIComponent(msg.fileUrl!)
-                                window.open(`/api/chat/download?url=${encoded}`)
-                              }}
-                            >
-                              <span style={{ fontSize: 20 }}>📄</span>
-                              <div style={{ overflow: 'hidden' }}>
-                                <div
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}
-                                >
-                                  {msg.fileName}
-                                </div>
-                                <div style={{ fontSize: 11, color: '#6b7280' }}>
-                                  파일 다운로드
+                            {msg.type === 'file' && msg.fileUrl && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '10px 14px',
+                                  borderRadius: 12,
+                                  background: isMe ? '#e0f2fe' : '#f3f4f6',
+                                  cursor: 'pointer',
+                                  maxWidth: 320,
+                                }}
+                                onClick={() => {
+                                  const encoded = encodeURIComponent(
+                                    msg.fileUrl!,
+                                  )
+                                  window.open(
+                                    `/api/chat/download?url=${encoded}`,
+                                  )
+                                }}
+                              >
+                                <span style={{ fontSize: 20 }}>📄</span>
+                                <div style={{ overflow: 'hidden' }}>
+                                  <div
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {msg.fileName}
+                                  </div>
+                                  <div
+                                    style={{ fontSize: 11, color: '#6b7280' }}
+                                  >
+                                    파일 다운로드
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: '#9ca3af',
+                              marginTop: 2,
+                              display: 'flex',
+                              gap: 6,
+                              alignItems: 'center',
+                            }}
+                          >
+                            {reportMode && !isMe && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: '#ef4444',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                클릭하여 신고
+                              </span>
+                            )}
+
+                            {formatKST(msg.createdAt)}
+
+                            {/* 🔥 모든 메시지에 안 읽은 사람 수 표시 */}
+                            {msg.readCount !== undefined &&
+                              msg.readCount > 0 && (
+                                <span
+                                  style={{ color: '#2563eb', fontWeight: 600 }}
+                                >
+                                  {msg.readCount}
+                                </span>
+                              )}
+                            {isMe && Number.isFinite(Number(msg.id)) && (
+                              <button
+                                onClick={() => {
+                                  if (isChatBanned) {
+                                    setBlockMessage(
+                                      '채팅 이용이 제한되어 메시지를 삭제할 수 없습니다.',
+                                    )
+                                    return
+                                  }
+                                  handleDeleteMessage(msg.id)
+                                }}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#ef4444',
+                                  fontSize: 10,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                삭제
+                              </button>
+                            )}
+                          </span>
                         </div>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            color: '#9ca3af',
-                            marginTop: 2,
-                            display: 'flex',
-                            gap: 6,
-                            alignItems: 'center',
-                          }}
-                        >
-                          {formatKST(msg.createdAt)}
-
-                          {/* 🔥 모든 메시지에 안 읽은 사람 수 표시 */}
-                          {msg.readCount !== undefined && msg.readCount > 0 && (
-                            <span style={{ color: '#2563eb', fontWeight: 600 }}>
-                              {msg.readCount}
-                            </span>
-                          )}
-                          {isMe && Number.isFinite(Number(msg.id)) && (
-                            <button
-                              onClick={() => handleDeleteMessage(msg.id)}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#ef4444',
-                                fontSize: 10,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              삭제
-                            </button>
-                          )}
-                        </span>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
 
-              <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} />
+              </div>
             </div>
 
             {/* 파일 프리뷰 */}
@@ -1255,6 +2041,58 @@ export default function ChatPage() {
               </div>
             )}
 
+            {pendingImages.length > 0 && (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  gap: 8,
+                  overflowX: 'auto',
+                  background: '#f9fafb',
+                }}
+              >
+                {pendingImages.map((file, idx) => {
+                  const url = URL.createObjectURL(file)
+                  return (
+                    <div key={idx} style={{ position: 'relative' }}>
+                      <img
+                        src={url}
+                        style={{
+                          width: 72,
+                          height: 72,
+                          objectFit: 'cover',
+                          borderRadius: 10,
+                        }}
+                      />
+                      <button
+                        onClick={() =>
+                          setPendingImages((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          border: 'none',
+                          background: '#ef4444',
+                          color: 'white',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
             {/* 입력 영역 */}
             <div
               style={{
@@ -1263,6 +2101,9 @@ export default function ChatPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
+                background: 'white',
+                position: 'sticky',
+                bottom: 0,
               }}
             >
               <div style={{ position: 'relative' }}>
@@ -1304,16 +2145,47 @@ export default function ChatPage() {
                       icon="📷"
                       label="사진"
                       onClick={() => {
+                        if (isChatBanned) {
+                          setBlockMessage(
+                            '채팅 이용이 제한되어 사진을 보낼 수 없습니다.',
+                          )
+                          return
+                        }
+
                         setShowAttachMenu(false)
                         imageInputRef.current?.click()
                       }}
                     />
+
                     <AttachItem
                       icon="📄"
                       label="파일"
                       onClick={() => {
+                        if (isChatBanned) {
+                          setBlockMessage(
+                            '채팅 이용이 제한되어 파일을 보낼 수 없습니다.',
+                          )
+                          return
+                        }
+
                         setShowAttachMenu(false)
                         fileInputRef.current?.click()
+                      }}
+                    />
+
+                    {/* 🔥 투표 */}
+                    <AttachItem
+                      icon="📊"
+                      label="투표"
+                      onClick={() => {
+                        if (isChatBanned) {
+                          setBlockMessage(
+                            '채팅 이용이 제한되어 투표를 만들 수 없습니다.',
+                          )
+                          return
+                        }
+                        setShowAttachMenu(false)
+                        setShowPollModal(true)
                       }}
                     />
                   </div>
@@ -1323,19 +2195,21 @@ export default function ChatPage() {
               <input
                 type="text"
                 placeholder={
-                  currentRoom
-                    ? '메시지를 입력하세요…'
-                    : '채팅방을 먼저 선택하세요.'
+                  blockMessage
+                    ? '상대방과의 대화가 제한되어 있습니다.'
+                    : currentRoom
+                      ? '메시지를 입력하세요…'
+                      : '채팅방을 먼저 선택하세요.'
                 }
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey && !blockMessage) {
                     e.preventDefault()
                     handleSendMessage()
                   }
                 }}
-                disabled={!currentRoom}
+                disabled={!currentRoom || isChatBanned}
                 style={{
                   flex: 1,
                   padding: '10px 14px',
@@ -1343,6 +2217,9 @@ export default function ChatPage() {
                   border: '1px solid #d1d5db',
                   fontSize: 14,
                   outline: 'none',
+                  backgroundColor: blockMessage ? '#f3f4f6' : 'white',
+                  color: blockMessage ? '#9ca3af' : '#111827',
+                  cursor: blockMessage ? 'not-allowed' : 'text',
                 }}
               />
 
@@ -1350,6 +2227,7 @@ export default function ChatPage() {
                 ref={imageInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
               />
@@ -1362,10 +2240,95 @@ export default function ChatPage() {
                 onChange={handleFileChange}
               />
 
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 999,
+                    border: '1px solid #d1d5db',
+                    background: '#f9fafb',
+                    fontSize: 18,
+                    cursor: 'pointer',
+                    marginRight: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      transform: 'translateX(-3px) translateY(-1px)', // ⭐ 위로 1px
+                    }}
+                  >
+                    😊
+                  </span>
+                </button>
+                {showEmojiPicker && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 42,
+                      right: 0,
+                      background: 'white',
+                      borderRadius: 12,
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                      padding: 8,
+                      zIndex: 100,
+                      width: 240,
+                    }}
+                  >
+                    {/* 🔹 상단 헤더 */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 6,
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        이모지
+                      </span>
+                      <button
+                        onClick={() => setShowEmojiPicker(false)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          fontSize: 14,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ❌
+                      </button>
+                    </div>
+                    {EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => {
+                          setInputText((prev) => prev + emoji)
+                        }}
+                        style={{
+                          fontSize: 16,
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handleSendMessage}
-                disabled={!currentRoom || !inputText.trim()}
+                disabled={
+                  !currentRoom ||
+                  (!inputText.trim() && pendingImages.length === 0)
+                }
                 style={{
                   width: 70,
                   height: 32,
@@ -1373,11 +2336,24 @@ export default function ChatPage() {
                   border: 'none',
                   fontSize: 14,
                   fontWeight: 600,
+
                   cursor:
-                    currentRoom && inputText.trim() ? 'pointer' : 'default',
+                    currentRoom &&
+                    (inputText.trim() || pendingImages.length > 0)
+                      ? 'pointer'
+                      : 'default',
+
                   background:
-                    currentRoom && inputText.trim() ? '#4FC3F7' : '#e5e7eb',
-                  color: currentRoom && inputText.trim() ? 'white' : '#9ca3af',
+                    currentRoom &&
+                    (inputText.trim() || pendingImages.length > 0)
+                      ? '#4FC3F7'
+                      : '#e5e7eb',
+
+                  color:
+                    currentRoom &&
+                    (inputText.trim() || pendingImages.length > 0)
+                      ? 'white'
+                      : '#9ca3af',
                 }}
               >
                 전송
@@ -1395,13 +2371,32 @@ export default function ChatPage() {
           onClose={() => setShowInviteModal(false)}
           onCreate={handleCreateRoom}
           schoolCode={currentUser?.schoolCode}
-          currentUserId={currentUser?.id}
           token={currentUser?.token}
+          currentUserId={currentUser?.id}
+          friends={friends}
+          onAddFriend={handleAddFriend}
+          onToggleBlock={handleToggleBlock} // ✅ 이 줄 추가
+        />
+      )}
+
+      {showPollModal && currentRoomId && (
+        <PollCreateModal
+          roomId={currentRoomId}
+          onClose={() => setShowPollModal(false)}
+          onCreated={async () => {
+            const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+            const data = await safeJson<ChatMessage[]>(res)
+            setMessages(Array.isArray(data) ? data : [])
+          }}
+          onBlocked={(msg) => {
+            setShowPollModal(false)
+            setBlockMessage(msg)
+          }}
         />
       )}
 
       {/* ================= 참여자 목록 모달 ================= */}
-      {roomUsers.length > 0 && (
+      {showRoomUsers && (
         <div
           style={{
             position: 'fixed',
@@ -1412,7 +2407,7 @@ export default function ChatPage() {
             alignItems: 'center',
             zIndex: 9999,
           }}
-          onClick={() => setRoomUsers([])}
+          onClick={() => setShowRoomUsers(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1432,66 +2427,99 @@ export default function ChatPage() {
               <div
                 key={u.id}
                 style={{
-                  padding: '8px 6px',
+                  padding: '10px 6px',
                   borderBottom: '1px solid #e5e7eb',
                 }}
               >
                 <div
                   style={{
-                    fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 10,
                   }}
                 >
-                  <span>{u.name}</span>
+                  {/* 🔥 프로필 이미지 */}
+                  <img
+                    src={u.profileImageUrl || '/default-profile.svg'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!u.profileImageUrl) return
+                      setCanDownloadPreview(false)
+                      setTimeout(() => {
+                        setPreviewImage(u.profileImageUrl!)
+                      }, 0)
+                    }}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                    }}
+                  />
 
-                  {/* ✅ 나 표시 */}
-                  {u.id === currentUser?.id && (
-                    <span
+                  {/* 텍스트 영역 */}
+                  <div style={{ flex: 1 }}>
+                    <div
                       style={{
-                        fontSize: 11,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        background: '#dbeafe',
-                        color: '#1d4ed8',
-                        fontWeight: 700,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      나
-                    </span>
-                  )}
+                      <span>{u.name}</span>
 
-                  {Boolean(u.isOwner) && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        background: '#fde68a',
-                        color: '#92400e',
-                        fontWeight: 700,
-                      }}
-                    >
-                      방장
-                    </span>
-                  )}
+                      {/* ✅ 나 표시 */}
+                      {u.id === currentUser?.id && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: '2px 6px',
+                            borderRadius: 999,
+                            background: '#dbeafe',
+                            color: '#1d4ed8',
+                            fontWeight: 700,
+                          }}
+                        >
+                          나
+                        </span>
+                      )}
 
-                  <span style={{ fontSize: 11, color: '#6b7280' }}>
-                    @{u.username}
-                  </span>
-                </div>
+                      {/* ✅ 방장 표시 */}
+                      {Boolean(u.isOwner) && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: '2px 6px',
+                            borderRadius: 999,
+                            background: '#fde68a',
+                            color: '#92400e',
+                            fontWeight: 700,
+                          }}
+                        >
+                          방장
+                        </span>
+                      )}
 
-                {u.gradeLabel && (
-                  <div style={{ fontSize: 12, color: '#4b5563' }}>
-                    {u.gradeLabel}
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        @{u.username}
+                      </span>
+                    </div>
+
+                    {u.gradeLabel && (
+                      <div style={{ fontSize: 12, color: '#4b5563' }}>
+                        {u.gradeLabel}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             ))}
 
             <button
-              onClick={() => setRoomUsers([])}
+              onClick={() => setShowRoomUsers(false)}
               style={{
                 marginTop: 12,
                 width: '100%',
@@ -1547,25 +2575,27 @@ export default function ChatPage() {
 
             <div style={{ display: 'flex', gap: 10 }}>
               {/* 다운로드 */}
-              <button
-                type="button"
-                onClick={() => {
-                  const encoded = encodeURIComponent(previewImage!)
-                  window.location.href = `/api/chat/download?url=${encoded}`
-                }}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 999,
-                  background: '#4FC3F7',
-                  color: 'white',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                ⬇️ 다운로드
-              </button>
+              {canDownloadPreview && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const encoded = encodeURIComponent(previewImage!)
+                    window.location.href = `/api/chat/download?url=${encoded}`
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 999,
+                    background: '#4FC3F7',
+                    color: 'white',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⬇️ 다운로드
+                </button>
+              )}
 
               {/* 닫기 */}
               <button
@@ -1586,6 +2616,275 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+
+      {/* ================= 🚫 채팅 차단 안내 모달 ================= */}
+      {blockMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100000,
+          }}
+          onClick={() => setBlockMessage(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '90%',
+              maxWidth: 360,
+              background: 'white',
+              borderRadius: 18,
+              padding: '22px 20px',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            }}
+          >
+            <div style={{ fontSize: 44, marginBottom: 10 }}>🚫</div>
+
+            <h3
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                marginBottom: 8,
+                color: '#111827',
+              }}
+            >
+              메시지를 보낼 수 없습니다
+            </h3>
+
+            <p
+              style={{
+                fontSize: 14,
+                color: '#4b5563',
+                lineHeight: 1.5,
+                marginBottom: 18,
+                whiteSpace: 'pre-line',
+              }}
+            >
+              {blockMessage}
+            </p>
+
+            <button
+              onClick={() => setBlockMessage(null)}
+              style={{
+                width: '100%',
+                padding: '10px 0',
+                borderRadius: 999,
+                border: 'none',
+                background: '#4FC3F7',
+                color: 'white',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showReportModal && reportTarget && (
+        <ReportModal
+          message={reportTarget}
+          roomId={currentRoomId!}
+          onClose={() => {
+            setShowReportModal(false)
+            setReportTarget(null)
+          }}
+        />
+      )}
+
+      {/* ================= 👥 친구 목록 모달 ================= */}
+      {showFriendsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowFriendsModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '90%',
+              maxWidth: 420,
+              background: 'white',
+              borderRadius: 16,
+              padding: 16,
+            }}
+          >
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              👥 친구 목록
+            </h3>
+
+            {friendsModalMode === 'chat' && (
+              <button
+                onClick={() => {
+                  setShowFriendsModal(false)
+                  setInviteMode('oneToOne')
+                  setShowInviteModal(true)
+                }}
+                style={{
+                  fontSize: 12,
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#4FC3F7',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                ➕ 친구 추가
+              </button>
+            )}
+
+            {friends.length === 0 ? (
+              <p
+                style={{ fontSize: 13, color: '#6b7280', textAlign: 'center' }}
+              >
+                친구가 없습니다.
+              </p>
+            ) : (
+              friends.map((f) => (
+                <div
+                  key={f.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 6px',
+                    borderBottom: '1px solid #e5e7eb',
+                  }}
+                >
+                  <img
+                    src={f.profileImageUrl || '/default-profile.svg'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+
+                      if (!f.profileImageUrl) return
+
+                      setCanDownloadPreview(false) // 🔒 프로필 사진은 다운로드 막기
+                      setPreviewImage(f.profileImageUrl)
+                    }}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '1px solid #e5e7eb',
+                      cursor: 'pointer', // ✅ 클릭 가능 표시
+                    }}
+                  />
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{f.name}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      @{f.username} · {f.gradeLabel}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      setShowFriendsModal(false)
+
+                      if (friendsModalMode === 'invite' && currentRoomId) {
+                        // 🔥 현재 채팅방에 초대
+                        const res = await apiFetch(
+                          `/api/chat/messages/${currentRoomId}/invite`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userIds: [f.id] }),
+                          },
+                        )
+
+                        if (!res.ok) {
+                          alert('채팅방 초대 실패')
+                          return
+                        }
+                      } else {
+                        // 기존 동작: 1:1 채팅
+                        handleCreateRoom('oneToOne', [f.id])
+                      }
+
+                      // 모드 초기화 (중요)
+                      setFriendsModalMode('chat')
+                    }}
+                    style={{
+                      fontSize: 12,
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#4FC3F7',
+                      color: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {friendsModalMode === 'invite' ? '➕ 초대' : '💬 채팅'}
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteFriend(f.id)}
+                    style={{
+                      fontSize: 12,
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#f3f4f6',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🗑
+                  </button>
+
+                  <button
+                    onClick={() => handleToggleBlock(f.id)}
+                    style={{
+                      fontSize: 12,
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#fee2e2',
+                      color: '#b91c1c',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🚫
+                  </button>
+                </div>
+              ))
+            )}
+
+            <button
+              onClick={() => setShowFriendsModal(false)}
+              style={{
+                marginTop: 12,
+                width: '100%',
+                padding: '8px 0',
+                borderRadius: 999,
+                border: 'none',
+                background: '#4FC3F7',
+                color: 'white',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -1602,25 +2901,36 @@ function InviteModal({
   onClose,
   onCreate,
   schoolCode,
-  currentUserId, // ✅ 추가
-  token, // ✅
+  token,
+  currentUserId,
+  friends,
+  onAddFriend,
+  onToggleBlock, // ✅ 추가
 }: {
   mode: 'oneToOne' | 'group'
   roomId: number | null
   onClose: () => void
   onCreate: (mode: 'oneToOne' | 'group', userIds: number[]) => Promise<void>
-
   schoolCode?: string
-  currentUserId?: number // ✅ 추가
   token?: string
+  currentUserId?: number
+  friends: Friend[]
+  onAddFriend: (friendId: number) => Promise<void>
+  onToggleBlock: (targetId: number) => Promise<void> // ✅ 추가
 }) {
-  const [tab, setTab] = useState<'name' | 'class'>('name')
+  const [tab, setTab] = useState<'friends' | 'name' | 'class'>('friends')
   const [nameKeyword, setNameKeyword] = useState('')
   const [grade, setGrade] = useState<'1' | '2' | '3'>('1')
   const [classNum, setClassNum] = useState('')
   const [results, setResults] = useState<UserSummary[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
   const [selectedUsers, setSelectedUsers] = useState<UserSummary[]>([])
+
+  const friendIdSet = new Set(friends.map((f) => f.id))
+
+  const isFriend = (userId: number) => friendIdSet.has(userId)
+
+  const isInvite = Boolean(roomId)
 
   const toggleSelect = (user: UserSummary) => {
     setSelectedUserIds((prev) =>
@@ -1640,7 +2950,7 @@ function InviteModal({
     if (!nameKeyword.trim()) return
     if (!schoolCode) return
 
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/chat/search/users?name=${encodeURIComponent(nameKeyword)}&schoolCode=${schoolCode}`,
     )
 
@@ -1668,7 +2978,7 @@ function InviteModal({
     if (!classNum.trim()) return
     if (!schoolCode) return
 
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/chat/search/users?grade=${grade}&classNum=${classNum}&schoolCode=${schoolCode}`,
     )
 
@@ -1688,8 +2998,6 @@ function InviteModal({
   }
 
   const handleCreateChat = async () => {
-    if (!currentUserId) return
-
     if (mode === 'oneToOne' && selectedUserIds.length !== 1) {
       alert('1:1 채팅은 한 명만 선택해야 합니다.')
       return
@@ -1700,29 +3008,12 @@ function InviteModal({
       return
     }
 
-    // ✅ 기존 방 + 그룹 채팅 → 초대
-    if (roomId && mode === 'group') {
-      await fetch(`/api/chat/messages/${roomId}/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userIds: selectedUserIds,
-        }),
-      })
-
-      onClose()
-      return
-    }
-
     // ❌ 그 외 경우만 새 채팅 생성
-    await onCreate(mode, [...selectedUserIds, currentUserId])
+    await onCreate(mode, selectedUserIds)
 
     // 🔥 방 목록 강제 새로고침 (이게 핵심)
     if (token) {
-      const res = await fetch('/api/chat/rooms', {
+      const res = await apiFetch('/api/chat/rooms', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1798,6 +3089,19 @@ function InviteModal({
           }}
         >
           <button
+            onClick={() => setTab('friends')}
+            style={{
+              flex: 1,
+              border: 'none',
+              borderRadius: 999,
+              padding: '6px 0',
+              fontWeight: 600,
+              background: tab === 'friends' ? 'white' : 'transparent',
+            }}
+          >
+            친구
+          </button>
+          <button
             type="button"
             onClick={() => setTab('name')}
             style={{
@@ -1834,6 +3138,98 @@ function InviteModal({
         </div>
 
         {/* 탭 내용 */}
+        {tab === 'friends' && (
+          <div
+            style={{
+              maxHeight: 220,
+              overflowY: 'auto',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              padding: 6,
+              background: '#f9fafb',
+              marginBottom: 10,
+            }}
+          >
+            {friends.length === 0 ? (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: '#9ca3af',
+                  textAlign: 'center',
+                  padding: '20px 0',
+                }}
+              >
+                친구가 없습니다.
+              </p>
+            ) : (
+              friends.map((friend) => {
+                const checked = selectedUserIds.includes(friend.id)
+
+                return (
+                  <label
+                    key={friend.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      background: 'white',
+                      marginBottom: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        toggleSelect({
+                          id: friend.id,
+                          name: friend.name,
+                          username: friend.username,
+                          profileImageUrl: friend.profileImageUrl,
+                          gradeLabel: friend.gradeLabel,
+                        })
+                      }
+                    />
+
+                    <img
+                      src={friend.profileImageUrl || '/default-profile.svg'}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    />
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>
+                        {friend.name}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#6b7280',
+                            marginLeft: 4,
+                          }}
+                        >
+                          @{friend.username}
+                        </span>
+                      </div>
+
+                      {friend.gradeLabel && (
+                        <div style={{ fontSize: 11, color: '#4b5563' }}>
+                          {friend.gradeLabel}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                )
+              })
+            )}
+          </div>
+        )}
         {tab === 'name' && (
           <div style={{ marginBottom: 10 }}>
             <label
@@ -1849,7 +3245,7 @@ function InviteModal({
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 type="text"
-                placeholder="예: 김민수"
+                placeholder="예: 홍길동"
                 value={nameKeyword}
                 onChange={(e) => setNameKeyword(e.target.value)}
                 style={{
@@ -1952,129 +3348,201 @@ function InviteModal({
         )}
 
         {/* 검색 결과 리스트 */}
-        <div
-          style={{
-            maxHeight: 220,
-            overflowY: 'auto',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
-            padding: 6,
-            background: '#f9fafb',
-            marginBottom: 10,
-          }}
-        >
-          {/* ✅ 선택된 사용자 미리보기 */}
-          {selectedUserIds.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 6,
-                marginBottom: 10,
-              }}
-            >
-              {selectedUsers.map((u) => (
-                <span
-                  key={u.id}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 8px',
-                    background: '#e0f2fe',
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: '#0369a1',
-                  }}
-                >
-                  {u.name}
-                  <button
-                    type="button"
-                    onClick={() => toggleSelect(u)}
+        {tab !== 'friends' && (
+          <div
+            style={{
+              maxHeight: 220,
+              overflowY: 'auto',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              padding: 6,
+              background: '#f9fafb',
+              marginBottom: 10,
+            }}
+          >
+            {/* ✅ 선택된 사용자 미리보기 */}
+            {selectedUserIds.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  marginBottom: 10,
+                }}
+              >
+                {selectedUsers.map((u) => (
+                  <span
+                    key={u.id}
                     style={{
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 8px',
+                      background: '#e0f2fe',
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 600,
                       color: '#0369a1',
                     }}
                   >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {results.length === 0 ? (
-            <p
-              style={{
-                fontSize: 12,
-                color: '#9ca3af',
-                textAlign: 'center',
-                padding: '20px 0',
-              }}
-            >
-              검색 결과가 없습니다.
-            </p>
-          ) : (
-            results.map((user) => {
-              const checked = selectedUserIds.includes(user.id)
-              return (
-                <label
-                  key={user.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 8px',
-                    borderRadius: 8,
-                    background: 'white',
-                    marginBottom: 4,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleSelect(user)}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div
+                    {u.name}
+                    <button
+                      type="button"
+                      onClick={() => toggleSelect(u)}
                       style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: '#111827',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        color: '#0369a1',
                       }}
                     >
-                      {user.name}
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {results.length === 0 ? (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: '#9ca3af',
+                  textAlign: 'center',
+                  padding: '20px 0',
+                }}
+              >
+                검색 결과가 없습니다.
+              </p>
+            ) : (
+              results.map((user) => {
+                const checked = selectedUserIds.includes(user.id)
+                const isMe = user.id === currentUserId
+                const alreadyFriend = isFriend(user.id)
+                const isBlocked = Boolean((user as any).isBlocked)
+
+                return (
+                  <label
+                    key={user.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      background: 'white',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSelect(user)}
+                    />
+
+                    <img
+                      src={user.profileImageUrl || '/default-profile.svg'}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    />
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>
+                        {user.name}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#6b7280',
+                            marginLeft: 4,
+                          }}
+                        >
+                          @{user.username}
+                        </span>
+                      </div>
+
+                      {user.gradeLabel && (
+                        <div style={{ fontSize: 11, color: '#4b5563' }}>
+                          {user.gradeLabel}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 🔥 여기 추가 */}
+                    {/* 🚫 차단된 사용자 */}
+                    {!isMe && isBlocked && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          await onToggleBlock(user.id)
+                          await handleSearchByName()
+                        }}
+                        style={{
+                          fontSize: 12,
+                          padding: '6px 8px',
+                          borderRadius: 999,
+                          border: 'none',
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        🚫 차단 해제
+                      </button>
+                    )}
+
+                    {/* ➕ 친구 추가 */}
+                    {!isMe && !alreadyFriend && !isBlocked && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          await onAddFriend(user.id)
+                          await handleSearchByName()
+                        }}
+                        style={{
+                          fontSize: 12,
+                          padding: '6px 8px',
+                          borderRadius: 999,
+                          border: 'none',
+                          background: '#4FC3F7',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ➕ 친구
+                      </button>
+                    )}
+
+                    {/* 이미 친구 */}
+                    {!isMe && alreadyFriend && !isBlocked && (
                       <span
                         style={{
                           fontSize: 11,
-                          color: '#6b7280',
-                          marginLeft: 4,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: '#e5e7eb',
+                          color: '#374151',
+                          fontWeight: 600,
                         }}
                       >
-                        @{user.username}
+                        친구
                       </span>
-                    </div>
-                    {user.gradeLabel && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: '#4b5563',
-                        }}
-                      >
-                        {user.gradeLabel}
-                      </div>
                     )}
-                  </div>
-                </label>
-              )
-            })
-          )}
-        </div>
+                  </label>
+                )
+              })
+            )}
+          </div>
+        )}
 
         {/* 하단 버튼 */}
         <div
@@ -2100,7 +3568,13 @@ function InviteModal({
           </button>
           <button
             type="button"
-            onClick={handleCreateChat}
+            onClick={() => {
+              if ((window as any).isChatBanned) {
+                alert('채팅 이용이 제한되어 채팅을 시작할 수 없습니다.')
+                return
+              }
+              handleCreateChat()
+            }}
             style={{
               padding: '8px 16px',
               borderRadius: 999,
@@ -2182,5 +3656,518 @@ function MenuItem({
     >
       {label}
     </button>
+  )
+}
+
+function PollCreateModal({
+  roomId,
+  onClose,
+  onCreated,
+  onBlocked, // ✅ 추가
+}: {
+  roomId: number
+  onClose: () => void
+  onCreated: () => Promise<void>
+  onBlocked: (message: string) => void // ✅ 추가
+}) {
+  const [title, setTitle] = useState('')
+  const [options, setOptions] = useState(['', ''])
+  const [anonymous, setAnonymous] = useState(false)
+  const [closedAt, setClosedAt] = useState<string>('') // ⏰ 마감 시간
+
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false)
+
+  const [deadlineDate, setDeadlineDate] = useState('') // YYYY-MM-DD
+  const [ampm, setAmpm] = useState<'AM' | 'PM'>('PM')
+  const [hour, setHour] = useState('12')
+  const [minute, setMinute] = useState('00')
+
+  const addOption = () => setOptions((o) => [...o, ''])
+  const removeOption = (i: number) =>
+    setOptions((o) => o.filter((_, idx) => idx !== i))
+
+  const handleSubmit = async () => {
+    if (!title.trim()) return alert('투표 제목을 입력하세요')
+    if (options.filter((o) => o.trim()).length < 2)
+      return alert('선택지는 최소 2개입니다')
+
+    let finalClosedAt: string | null = null
+
+    if (deadlineDate) {
+      let h = parseInt(hour, 10)
+
+      if (ampm === 'PM' && h !== 12) h += 12
+      if (ampm === 'AM' && h === 12) h = 0
+
+      finalClosedAt = new Date(
+        `${deadlineDate}T${String(h).padStart(2, '0')}:${minute}:00`,
+      ).toISOString()
+    }
+
+    const res = await apiFetch('/api/chat/poll/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId,
+        title,
+        options: options.filter((o) => o.trim()),
+        anonymous,
+        closedAt: finalClosedAt,
+      }),
+    })
+
+    /* 🔥 전학 / 학교 다름 차단 */
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+
+      if (res.status === 403) {
+        if (err?.message === 'CHAT_BANNED') {
+          onBlocked(
+            `채팅 이용이 제한되었습니다.\n정지 해제 시간: ${formatKST(err.banEnd)}`,
+          )
+          return
+        }
+
+        onBlocked(err.message || '투표 생성이 제한되었습니다.')
+        return
+      }
+
+      onBlocked(err.message || '투표 생성에 실패했습니다.')
+      return
+    }
+
+    /* ✅ 성공한 경우만 */
+    await onCreated()
+    onClose()
+  }
+
+  return (
+    <>
+      {/* ================= 투표 만들기 모달 ================= */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+          zIndex: 9999,
+        }}
+        onClick={onClose}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '92%',
+            maxWidth: 500,
+            background: 'white',
+            borderRadius: 16,
+            padding: 20,
+            maxHeight: 'calc(100vh - 100px)',
+            overflowY: 'auto',
+          }}
+        >
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>📊 투표 만들기</h3>
+
+          <input
+            placeholder="투표 제목"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{
+              width: '100%',
+              marginTop: 10,
+              padding: '10px 0px',
+              borderRadius: 8,
+              border: '1px solid #d1d5db',
+            }}
+          />
+
+          {options.map((opt, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <input
+                value={opt}
+                onChange={(e) =>
+                  setOptions((o) =>
+                    o.map((v, idx) => (idx === i ? e.target.value : v)),
+                  )
+                }
+                placeholder={`선택지 ${i + 1}`}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #d1d5db',
+                }}
+              />
+              {options.length > 2 && (
+                <button onClick={() => removeOption(i)}>✕</button>
+              )}
+            </div>
+          ))}
+
+          <button onClick={addOption} style={{ marginTop: 8 }}>
+            + 선택지 추가
+          </button>
+
+          <label style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+            <input
+              type="checkbox"
+              checked={anonymous}
+              onChange={() => setAnonymous((v) => !v)}
+            />
+            익명 투표
+          </label>
+
+          <label style={{ display: 'block', marginTop: 12, fontSize: 13 }}>
+            ⏰ 투표 마감 시간 (선택)
+          </label>
+
+          <button
+            type="button"
+            onClick={() => setShowDeadlineModal(true)}
+            style={{
+              width: '100%',
+              marginTop: 6,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid #d1d5db',
+              background: 'white',
+              textAlign: 'left',
+              fontSize: 14,
+            }}
+          >
+            {deadlineDate
+              ? `⏰ ${deadlineDate} ${ampm === 'AM' ? '오전' : '오후'} ${hour}:${minute}`
+              : '⏰ 투표 마감 시간 선택'}
+          </button>
+
+          <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            설정하지 않으면 방장이 직접 마감해야 합니다.
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              marginTop: 14,
+            }}
+          >
+            <button onClick={onClose}>취소</button>
+            <button
+              onClick={handleSubmit}
+              style={{
+                background: '#4FC3F7',
+                color: 'white',
+                padding: '8px 14px',
+                borderRadius: 999,
+                border: 'none',
+                fontWeight: 600,
+              }}
+            >
+              생성
+            </button>
+          </div>
+        </div>
+      </div>
+      )
+      {showDeadlineModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setShowDeadlineModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '90%',
+              maxWidth: 360,
+              background: 'white',
+              borderRadius: 16,
+              padding: 16,
+            }}
+          >
+            <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+              ⏰ 투표 마감 시간
+            </h4>
+
+            {/* 날짜 */}
+            <label style={{ fontSize: 13, fontWeight: 600 }}>날짜</label>
+            <input
+              type="date"
+              value={deadlineDate}
+              onChange={(e) => setDeadlineDate(e.target.value)}
+              style={{
+                width: '100%',
+                marginTop: 4,
+                padding: '8px 0px',
+                borderRadius: 8,
+                border: '1px solid #d1d5db',
+              }}
+            />
+
+            {/* 시간 */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <select
+                value={ampm}
+                onChange={(e) => setAmpm(e.target.value as any)}
+              >
+                <option value="AM">오전</option>
+                <option value="PM">오후</option>
+              </select>
+
+              <select value={hour} onChange={(e) => setHour(e.target.value)}>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                  <option key={h} value={String(h).padStart(2, '0')}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={minute}
+                onChange={(e) => setMinute(e.target.value)}
+              >
+                {['00', '10', '20', '30', '40', '50'].map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 14,
+              }}
+            >
+              <button onClick={() => setShowDeadlineModal(false)}>취소</button>
+              <button
+                onClick={() => setShowDeadlineModal(false)}
+                style={{
+                  background: '#4FC3F7',
+                  color: 'white',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  border: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ReportModal({
+  message,
+  roomId,
+  onClose,
+}: {
+  message: ChatMessage
+  roomId: number
+  onClose: () => void
+}) {
+  const REASONS = [
+    '욕설 / 비방',
+    '성희롱 / 음란물',
+    '괴롭힘 / 따돌림',
+    '스팸 / 광고',
+    '기타',
+  ]
+
+  const [selectedReason, setSelectedReason] = useState<string>('')
+  const [customReason, setCustomReason] = useState('')
+
+  const submitReport = async () => {
+    if (!selectedReason) {
+      alert('신고 사유를 선택하세요')
+      return
+    }
+
+    if (selectedReason === '기타' && !customReason.trim()) {
+      alert('기타 사유를 입력하세요')
+      return
+    }
+
+    const finalReason =
+      selectedReason === '기타' ? customReason.trim() : selectedReason
+
+    const res = await apiFetch('/api/chat/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId,
+        messageId: message.id,
+        reportedUserId: message.senderId,
+        reason: finalReason,
+      }),
+    })
+
+    if (!res.ok) {
+      alert('신고 접수 실패')
+      return
+    }
+
+    alert('신고가 접수되었습니다')
+    onClose()
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '90%',
+          maxWidth: 420,
+          background: 'white',
+          borderRadius: 16,
+          padding: 20,
+        }}
+      >
+        <h3 style={{ fontSize: 16, fontWeight: 700 }}>🚨 메시지 신고</h3>
+
+        {/* 🔹 신고 대상 메시지 */}
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            background: '#f3f4f6',
+            borderRadius: 8,
+            fontSize: 13,
+          }}
+        >
+          <strong>{message.senderName}</strong>
+          <div style={{ marginTop: 4 }}>{message.content}</div>
+        </div>
+
+        {/* 🔹 신고 사유 선택 */}
+        <div style={{ marginTop: 14 }}>
+          {REASONS.map((r) => (
+            <label
+              key={r}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 14,
+                marginBottom: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="radio"
+                name="report-reason"
+                value={r}
+                checked={selectedReason === r}
+                onChange={() => setSelectedReason(r)}
+              />
+              {r}
+            </label>
+          ))}
+        </div>
+
+        {/* 🔹 기타 선택 시 입력 */}
+        {selectedReason === '기타' && (
+          <textarea
+            placeholder="기타 신고 사유를 입력하세요"
+            value={customReason}
+            onChange={(e) => setCustomReason(e.target.value)}
+            rows={3}
+            style={{
+              width: '95%',
+              marginTop: 8,
+              padding: 10,
+              borderRadius: 8,
+              border: '1px solid #d1d5db',
+              fontSize: 14,
+            }}
+          />
+        )}
+
+        {/* 🔹 버튼 */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 8,
+            marginTop: 14,
+          }}
+        >
+          {/* 취소 버튼 */}
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 999,
+              border: '1px solid #d1d5db',
+              background: '#f9fafb',
+              color: '#374151',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f3f4f6'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f9fafb'
+            }}
+          >
+            취소
+          </button>
+
+          {/* 신고 버튼 */}
+          <button
+            onClick={submitReport}
+            style={{
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: 999,
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#dc2626'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ef4444'
+            }}
+          >
+            신고하기
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

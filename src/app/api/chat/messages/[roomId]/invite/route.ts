@@ -4,10 +4,15 @@ import jwt from 'jsonwebtoken'
 
 export async function POST(
   req: Request,
-  context: { params: Promise<{ roomId: string }> },
+  context: { params: Promise<{ roomId: string }> }, // ⭐ Promise
 ) {
+  // ⭐ 반드시 await
   const { roomId } = await context.params
   const roomIdNum = Number(roomId)
+
+  if (!Number.isFinite(roomIdNum)) {
+    return NextResponse.json({ error: 'INVALID_ROOM_ID' }, { status: 400 })
+  }
 
   try {
     /* =========================
@@ -23,7 +28,19 @@ export async function POST(
     const userId = decoded.id
 
     /* =========================
-       2️⃣ 방 멤버인지 확인 (🔥 FROM 추가)
+       2️⃣ 방 존재 확인
+    ========================= */
+    const [[room]]: any = await db.query(
+      `SELECT id, is_group FROM chat_rooms WHERE id = ?`,
+      [roomIdNum],
+    )
+
+    if (!room) {
+      return NextResponse.json({ error: 'ROOM_NOT_FOUND' }, { status: 404 })
+    }
+
+    /* =========================
+       3️⃣ 방 멤버 확인
     ========================= */
     const [[member]]: any = await db.query(
       `
@@ -40,7 +57,7 @@ export async function POST(
     }
 
     /* =========================
-       3️⃣ 초대할 유저 목록
+       4️⃣ 초대 유저
     ========================= */
     const body = await req.json()
     const userIds: number[] = Array.isArray(body.userIds) ? body.userIds : []
@@ -49,9 +66,6 @@ export async function POST(
       return NextResponse.json({ error: 'NO_USERS' }, { status: 400 })
     }
 
-    /* =========================
-       4️⃣ 초대 유저 추가
-    ========================= */
     for (const uid of userIds) {
       if (uid === userId) continue
 
@@ -65,16 +79,13 @@ export async function POST(
     }
 
     /* =========================
-       5️⃣ 1:1 → 그룹 자동 전환
+       5️⃣ 1:1 → 그룹 전환
     ========================= */
-    await db.query(
-      `
-      UPDATE chat_rooms
-      SET is_group = 1
-      WHERE id = ?
-      `,
-      [roomIdNum],
-    )
+    if (!room.is_group) {
+      await db.query(`UPDATE chat_rooms SET is_group = 1 WHERE id = ?`, [
+        roomIdNum,
+      ])
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {

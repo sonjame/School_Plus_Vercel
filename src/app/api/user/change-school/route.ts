@@ -12,27 +12,41 @@ export async function POST(req: Request) {
       )
     }
 
+    /* 🔥 학교명으로 level 자동 판별 */
+    let level = 'middle'
+
+    if (school.includes('고등학교')) level = '고등학교'
+    else if (school.includes('중학교')) level = '중학교'
+    else if (school.includes('초등학교')) level = '초등학교'
+
+    /* ✅ users 테이블 업데이트 */
     await db.query(
-      `UPDATE users 
-   SET school = ?, edu_code = ?, school_code = ?
-   WHERE username = ?`,
-      [school, eduCode, schoolCode, username],
+      `
+      UPDATE users
+      SET
+        school = ?,
+        edu_code = ?,
+        school_code = ?,
+        level = ?
+      WHERE username = ?
+      `,
+      [school, eduCode, schoolCode, level, username],
     )
 
-    // ✅ 반드시 JSON 반환
+    /* ✅ 프론트에서 바로 반영 가능하게 level 포함 */
     return NextResponse.json(
       {
         message: '학교 변경 완료',
         school,
         eduCode,
         schoolCode,
+        level,
       },
       { status: 200 },
     )
   } catch (err) {
     console.error('학교 변경 API 오류:', err)
 
-    // ✅ 에러여도 JSON 반환
     return NextResponse.json(
       { message: '서버 오류가 발생했습니다.' },
       { status: 500 },

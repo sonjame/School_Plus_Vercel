@@ -67,4 +67,18 @@ credentials/
 *.json
 *.key
 
+# Next.js
+.next/
+out/
+
+# env
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OAuth / html dump
+*_files/
 

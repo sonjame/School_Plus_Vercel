@@ -28,6 +28,7 @@ export default function BoardMainPage() {
       { key: 'grade2', title: '2학년게시판', icon: '2️⃣' },
       { key: 'grade3', title: '3학년게시판', icon: '3️⃣' },
       { key: 'graduate', title: '졸업생게시판', icon: '🧭' },
+      { key: 'admin', title: '관리자 게시판', icon: '🛠️' },
     ]
 
     async function load() {
@@ -147,4 +148,3 @@ const miniPost: React.CSSProperties = {
   borderRadius: '6px',
   marginTop: '4px',
 }
-

@@ -31,36 +31,46 @@ export async function GET(req: Request) {
     /* 2️⃣ DB 조회 */
     const [rows] = await db.query(
       `
-      SELECT
-        r.id,
-        r.name,
-        r.is_group AS isGroup,
+  SELECT
+    r.id,
+    r.name,
+    r.is_group AS isGroup,
+    r.is_self AS isSelf, 
 
-        -- 마지막 메시지
-        (
-          SELECT m.content
-          FROM chat_messages m
-          WHERE m.room_id = r.id
-          ORDER BY m.id DESC
-          LIMIT 1
-        ) AS lastMessage,
+    (
+      SELECT m.content
+      FROM chat_messages m
+      WHERE m.room_id = r.id
+      ORDER BY m.id DESC
+      LIMIT 1
+    ) AS lastMessage,
 
-        -- 안 읽은 메시지 수 (내가 보낸 메시지 제외)
-        (
-          SELECT COUNT(*)
-          FROM chat_messages m
-          WHERE m.room_id = r.id
-            AND m.sender_id != ?
-            AND m.id > COALESCE(rm.last_read_message_id, 0)
-        ) AS unreadCount
+    (
+      SELECT COUNT(*)
+      FROM chat_messages m
+      WHERE m.room_id = r.id
+        AND m.sender_id != ?
+        AND m.id > COALESCE(rm.last_read_message_id, 0)
+        AND m.sender_id NOT IN (
+          SELECT blocked_id
+          FROM blocks
+          WHERE user_id = ?
+        )
+    ) AS unreadCount
 
-      FROM chat_rooms r
-      JOIN chat_room_members rm
-        ON rm.room_id = r.id
-      WHERE rm.user_id = ?
-      ORDER BY r.id DESC
-      `,
-      [userId, userId],
+  FROM chat_rooms r
+  JOIN chat_room_members rm
+    ON rm.room_id = r.id
+  WHERE rm.user_id = ?
+  ORDER BY
+    r.is_self DESC,
+    r.id DESC
+  `,
+      [
+        userId, // m.sender_id != ?
+        userId, // blocks.user_id = ?
+        userId, // rm.user_id = ?
+      ],
     )
 
     return NextResponse.json(rows)

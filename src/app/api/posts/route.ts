@@ -35,28 +35,52 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const category = searchParams.get('category')
 
-    let query = `
-      SELECT
-        p.id,
-        p.title,
-        p.content,
-        p.category,
-        p.images,
-        p.attachments,
-        u.name AS author,
-        p.likes,
-        COUNT(DISTINCT c.id) AS commentCount,
-        DATE_FORMAT(
-          CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
-          '%Y-%m-%d %H:%i:%s'
-        ) AS created_at
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      LEFT JOIN post_comments c ON p.id = c.post_id
-      WHERE p.school_code = ?
-    `
+    const isAdmin = decoded.level === 'admin'
 
-    const params: any[] = [schoolCode]
+    let query = `
+ SELECT
+  p.id,
+  p.title,
+  p.content,
+  p.category,
+  p.images,
+  p.attachments,
+  CASE
+    WHEN u.level = 'admin' THEN '관리자'
+    ELSE u.name
+  END AS author,
+  p.likes,
+  COUNT(DISTINCT c.id) AS commentCount,
+  DATE_FORMAT(
+    CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
+    '%Y-%m-%d %H:%i:%s'
+  ) AS created_at
+FROM posts p
+JOIN users u ON p.user_id = u.id
+LEFT JOIN post_comments c ON p.id = c.post_id
+  WHERE 1=1
+`
+
+    const params: any[] = []
+
+    // 🔥 학생만 학교 + 숨김 필터 적용
+    if (!isAdmin) {
+      if (category !== 'admin') {
+        // 🔹 일반 게시판 → 같은 학교 + 숨김 제외
+        query += ` AND p.school_code = ? AND p.is_hidden = 0`
+        params.push(decoded.school_code)
+      } else {
+        // 🔥 관리자 게시판 핵심 로직
+        query += `
+      AND p.is_hidden = 0
+      AND (
+        u.level = 'admin'         -- 관리자 공지 (전국 공개)
+        OR p.school_code = ?      -- 학생 문의 (자기 학교만)
+      )
+    `
+        params.push(decoded.school_code)
+      }
+    }
 
     if (category) {
       query += ` AND p.category = ?`
@@ -142,6 +166,41 @@ export async function POST(req: Request) {
     const userId = decoded.id
     const schoolCode = decoded.school_code
 
+    /* 🔥 BAN 체크 */
+    const [[user]]: any = await db.query(
+      `SELECT is_banned, banned_at, banned_reason FROM users WHERE id = ?`,
+      [userId],
+    )
+
+    // 🔴 영구 정지
+    if (user?.is_banned) {
+      return NextResponse.json(
+        { message: '영구 정지된 계정입니다.' },
+        { status: 403 },
+      )
+    }
+
+    // 🟡 기간 정지
+    if (user?.banned_at) {
+      const bannedAt = new Date(user.banned_at).getTime()
+      const now = Date.now()
+
+      const durations: Record<string, number> = {
+        '24h': 24 * 60 * 60 * 1000,
+        '72h': 72 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+      }
+
+      const duration = durations[user.banned_reason] ?? durations['24h']
+
+      if (now < bannedAt + duration) {
+        return NextResponse.json(
+          { message: '일시 정지된 계정입니다.' },
+          { status: 403 },
+        )
+      }
+    }
+
     const {
       title,
       content,
@@ -194,21 +253,24 @@ export async function POST(req: Request) {
     /* ==============================
        게시글 INSERT
     ============================== */
+    const authorName = decoded.level === 'admin' ? '관리자' : decoded.name
+
     await db.query(
       `
-      INSERT INTO posts (
-        id,
-        user_id,
-        category,
-        title,
-        content,
-        images,
-        attachments,
-        likes,
-        school_code
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
-      `,
+  INSERT INTO posts (
+    id,
+    user_id,
+    category,
+    title,
+    content,
+    images,
+    attachments,
+    likes,
+    school_code,
+    author
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+  `,
       [
         postId,
         userId,
@@ -218,8 +280,67 @@ export async function POST(req: Request) {
         JSON.stringify(finalImages),
         JSON.stringify(attachments ?? []),
         schoolCode,
+        authorName,
       ],
     )
+
+    /* ==============================
+   🔔 관리자 공지 알림 생성 (⭐ 여기!)
+============================== */
+    if (category === 'admin' && decoded.level === 'admin') {
+      // 🔹 관리자 제외한 전체 사용자
+      const [users]: any = await db.query(`
+    SELECT id FROM users WHERE level != 'admin'
+  `)
+
+      if (users.length > 0) {
+        const values = users.map((u: any) => [
+          u.id,
+          'admin_notice',
+          '📢 관리자 공지사항',
+          title,
+          `/board/post/${postId}`,
+        ])
+
+        await db.query(
+          `
+      INSERT INTO notifications
+        (user_id, type, title, message, link)
+      VALUES ?
+      `,
+          [values],
+        )
+      }
+    }
+
+    /* ==============================
+   🔔 관리자 문의 알림 생성
+============================== */
+    if (category === 'admin' && decoded.level !== 'admin') {
+      // 🔹 모든 관리자 계정
+      const [admins]: any = await db.query(`
+    SELECT id FROM users WHERE level = 'admin'
+  `)
+
+      if (admins.length > 0) {
+        const values = admins.map((a: any) => [
+          a.id,
+          'admin_question',
+          '📩 새 관리자 문의',
+          `${decoded.name || '학생'}님이 관리자 문의를 등록했습니다.`,
+          `/board/post/${postId}`,
+        ])
+
+        await db.query(
+          `
+      INSERT INTO notifications
+        (user_id, type, title, message, link)
+      VALUES ?
+      `,
+          [values],
+        )
+      }
+    }
 
     /* ==============================
        투표

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { apiFetch } from '@/src/lib/apiFetch'
 
 type ClassPeriod = {
   day: string
@@ -48,13 +49,8 @@ export default function TimetablePreview() {
         const term = getSavedTerm()
         if (!term) return
 
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/timetable?year=${term.year}&semester=${term.semester}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-          },
         )
 
         if (!res.ok) return

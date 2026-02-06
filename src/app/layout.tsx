@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 export default function RootLayout({
   children,
@@ -11,6 +12,7 @@ export default function RootLayout({
   const [user, setUser] = useState<any>(null)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true)
   const [isPC, setIsPC] = useState<boolean>(true)
+  const [banRemainMs, setBanRemainMs] = useState<number | null>(null)
 
   // ⭐ 모달 상태
   const [modal, setModal] = useState({
@@ -23,6 +25,59 @@ export default function RootLayout({
 
   // 🔥 게시판 드롭다운
   const [dropOpen, setDropOpen] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const loadBanStatus = async () => {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (res.status !== 403) {
+        setBanRemainMs(null)
+        return
+      }
+
+      const data = await res.json()
+
+      // ⭐⭐⭐ 핵심: banUntil 사용
+      if (typeof data.banUntil === 'number') {
+        const remain = data.banUntil - Date.now()
+        if (remain > 0) {
+          setBanRemainMs(remain)
+        } else {
+          setBanRemainMs(null)
+        }
+      }
+    }
+
+    loadBanStatus()
+  }, [])
+
+  useEffect(() => {
+    if (banRemainMs === null) return
+
+    const timer = setInterval(() => {
+      setBanRemainMs((prev) => {
+        if (prev === null) return null
+        if (prev <= 1000) return null
+        return prev - 1000
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [banRemainMs])
+
+  function formatRemain(ms: number) {
+    const totalSeconds = Math.floor(ms / 1000)
+    const h = Math.floor(totalSeconds / 3600)
+    const m = Math.floor((totalSeconds % 3600) / 60)
+    const s = totalSeconds % 60
+
+    return `${h}시간 ${m}분 ${s}초`
+  }
 
   // ⭐ 로그인 정보 불러오기 & 업데이트 반영
   useEffect(() => {
@@ -104,13 +159,48 @@ export default function RootLayout({
   // ⭐ 로그아웃
   const handleLogout = () => {
     showConfirm('정말 로그아웃 하시겠습니까?', () => {
+      // 🔥 로그인 정보 제거
       localStorage.removeItem('loggedInUser')
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('userId')
+
+      // ✅ sessionStorage만 초기화 (OK)
+      sessionStorage.removeItem('banModalShown')
+      sessionStorage.removeItem('unbanModalShown')
+
+      // ❗ banStatus는 절대 지우지 말 것
+      // localStorage.removeItem('banStatus')
+
       setUser(null)
 
       showAlert('로그아웃 되었습니다.', () => {
         window.location.href = '/'
       })
     })
+  }
+
+  /* 메뉴 섹션 UI */
+  function dropdownItem(href: string, label: string) {
+    return (
+      <Link
+        href={href}
+        onClick={() => setDropOpen(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '10px 16px',
+          fontSize: 14,
+          fontWeight: 500,
+          color: '#111827',
+          textDecoration: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        {label}
+      </Link>
+    )
   }
 
   return (
@@ -174,7 +264,10 @@ export default function RootLayout({
             left: sidebarOpen ? 0 : isPC ? 0 : '-260px',
             width: isPC ? '220px' : '240px',
             height: '100vh',
-            background: '#4DB8FF',
+            background:
+              user?.level === 'admin'
+                ? 'linear-gradient(180deg, #0F172A, #020617)'
+                : '#4DB8FF',
 
             /* ✅ padding 분해 */
             paddingTop: '20px',
@@ -202,19 +295,21 @@ export default function RootLayout({
               marginBottom: '12px',
             }}
           >
-            {/* 학교 이름 */}
-            <Link
-              href="/"
-              style={{
-                fontSize: '20px',
-                fontWeight: 700,
-                color: 'white',
-                textDecoration: 'none',
-                lineHeight: 1.2,
-              }}
-            >
-              {user?.school ? `🏫 ${user.school}` : 'School Plus'}
-            </Link>
+            {/* 학교 이름 (관리자일 때 숨김) */}
+            {user?.level !== 'admin' && (
+              <Link
+                href="/"
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: 'white',
+                  textDecoration: 'none',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user?.school ? `🏫 ${user.school}` : 'School Plus'}
+              </Link>
+            )}
 
             {/* 모바일 X 버튼 */}
             {!isPC && (
@@ -235,79 +330,139 @@ export default function RootLayout({
             )}
           </div>
 
-          {/* 메뉴 */}
-          <MenuItem icon="👤" label="내정보" href="/my-info" />
-
-          <div
-            style={{ position: 'relative' }}
-            onMouseEnter={() => isPC && setDropOpen(true)}
-            onMouseLeave={() => isPC && setDropOpen(false)}
-            onClick={() => {
-              if (!isPC) setDropOpen((prev) => !prev)
-            }}
-          >
-            {/* ================================ */}
-            {/*        게시판 드롭다운 메뉴        */}
-            {/* ================================ */}
+          {banRemainMs !== null && (
             <div
-              style={{ position: 'relative' }}
-              onMouseEnter={() => isPC && setDropOpen(true)} // PC: hover → open
-              onMouseLeave={() => isPC && setDropOpen(false)} // PC: leave → close
+              style={{
+                background: '#FEE2E2',
+                color: '#B91C1C',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                lineHeight: 1.4,
+                marginBottom: '8px',
+              }}
             >
-              {/* 게시판 버튼 — 페이지 이동 없음 */}
+              🚫 계정 이용 제한 중<br />⏳ 해제까지{' '}
+              <strong>{formatRemain(banRemainMs)}</strong>
+            </div>
+          )}
+
+          {/* 메뉴 */}
+          {/* ========================= */}
+          {/* 사이드바 메뉴 */}
+          {/* ========================= */}
+
+          {user?.level === 'admin' ? (
+            <>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.25)',
-                  color: 'white',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  border: '1px solid rgba(255,255,255,0.4)',
-                  cursor: 'pointer',
+                  fontSize: 25,
+                  fontWeight: 700,
+                  color: '#E0F2FE',
+                  marginBottom: 6,
                 }}
               >
-                <span style={{ fontSize: '18px' }}>📋</span>
-                게시판
+                🛡 관리자
               </div>
 
-              {/* ▼ 드롭다운 박스 */}
-              {dropOpen && (
+              <AdminMenuItem
+                icon="🔔"
+                label="관리자 알림"
+                href="/admin/notifications"
+              />
+              <AdminMenuItem icon="🚨" label="신고된 게시글" href="/admin" />
+              <AdminMenuItem
+                icon="👥"
+                label="신고자 관리"
+                href="/admin/reporters"
+              />
+              <AdminMenuItem
+                icon="🛠"
+                label="관리자 게시판"
+                href="/board/admin"
+              />
+              <AdminMenuItem
+                icon="💬"
+                label="채팅 신고 관리"
+                href="/admin/chat-report"
+              />
+            </>
+          ) : (
+            <>
+              {/* 👤 학생 전용 메뉴 그대로 */}
+
+              <MenuItem icon="👤" label="내정보" href="/my-info" />
+
+              {/* 게시판 드롭다운 */}
+              <div
+                style={{
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
+              >
                 <div
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDropOpen((prev) => !prev)
+                  }}
                   style={{
-                    position: 'absolute',
-                    top: '48px',
-                    left: '0',
-                    width: '180px',
-                    background: 'white',
-                    borderRadius: '10px',
-                    padding: '10px 0',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                     display: 'flex',
-                    flexDirection: 'column',
-                    zIndex: 9999,
-                    animation: 'fadein 0.2s',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.25)',
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    border: '1px solid rgba(255,255,255,0.4)',
+                    cursor: 'pointer',
                   }}
                 >
-                  {dropdownItem('/board', '📚 전체 게시판')}
-                  {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
-                  {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                  <span style={{ fontSize: '18px' }}>📋</span>
+                  게시판
                 </div>
-              )}
-            </div>
-          </div>
 
-          <MenuItem icon="💬" label="채팅" href="/chat" />
-          <MenuItem icon="📅" label="일정" href="/calendar" />
-          <MenuItem icon="⏰" label="시간표" href="/timetable" />
-          <MenuItem icon="📊" label="모의고사" href="/scores" />
-          <MenuItem icon="📊" label="내신점수" href="/grade" />
-          <MenuItem icon="🍚" label="급식표" href="/meal" />
-          <MenuItem icon="📚" label="도서관" href="/Library" />
-          <MenuItem icon="🏫" label="학교인증" href="/school_certification" />
+                {dropOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 8,
+
+                      width: 190,
+                      background: '#ffffff',
+                      borderRadius: 12,
+
+                      padding: '6px 0',
+                      boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+
+                      zIndex: 9999,
+                    }}
+                  >
+                    {dropdownItem('/board', '📚 전체 게시판')}
+                    {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
+                    {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                  </div>
+                )}
+              </div>
+
+              <MenuItem icon="💬" label="채팅" href="/chat" />
+              <MenuItem icon="📅" label="일정" href="/calendar" />
+              <MenuItem icon="⏰" label="시간표" href="/timetable" />
+              <MenuItem icon="📊" label="모의고사" href="/mockscores" />
+              <MenuItem icon="📊" label="내신점수" href="/schooltest" />
+              <MenuItem icon="🍚" label="급식표" href="/meal" />
+              <MenuItem icon="📚" label="도서관" href="/Library" />
+              <MenuItem
+                icon="🏫"
+                label="학교인증"
+                href="/school_certification"
+              />
+            </>
+          )}
 
           {/* 로그인/로그아웃 */}
           <div style={{ marginTop: 'auto' }}>
@@ -318,16 +473,35 @@ export default function RootLayout({
                     color: 'white',
                     marginBottom: '10px',
                     fontWeight: 600,
+                    fontSize: 14,
                   }}
                 >
-                  👋 {user.name || user.username} 님
+                  👋 {user.name || user.username}님
+                  {user?.level === 'admin' && (
+                    <span
+                      style={{
+                        marginLeft: 4,
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: '#93C5FD',
+                      }}
+                    >
+                      (관리자)
+                    </span>
+                  )}
                 </div>
+
                 <button
                   onClick={handleLogout}
                   style={{
                     width: '100%',
                     padding: '10px',
-                    background: '#FF6B6B',
+
+                    background:
+                      user?.level === 'admin'
+                        ? '#1E293B' // 다크 네이비 (관리자)
+                        : '#FF6B6B', // 빨강 (학생)
+
                     color: 'white',
                     borderRadius: '8px',
                     border: 'none',
@@ -458,24 +632,6 @@ export default function RootLayout({
   )
 }
 
-/* 메뉴 섹션 UI */
-function dropdownItem(href: string, label: string) {
-  return (
-    <Link
-      href={href}
-      style={{
-        padding: '10px 16px',
-        fontSize: '14px',
-        color: '#333',
-        textDecoration: 'none',
-        cursor: 'pointer',
-      }}
-    >
-      {label}
-    </Link>
-  )
-}
-
 function MenuItem({
   icon,
   label,
@@ -503,6 +659,41 @@ function MenuItem({
       }}
     >
       <span style={{ fontSize: '18px' }}>{icon}</span>
+      {label}
+    </Link>
+  )
+}
+function AdminMenuItem({
+  icon,
+  label,
+  href,
+}: {
+  icon: string
+  label: string
+  href: string
+}) {
+  const pathname = usePathname()
+  const active = pathname === href
+
+  return (
+    <Link
+      href={href}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '12px 14px',
+        borderRadius: 10,
+        background: active ? '#FFFFFF' : 'rgba(255,255,255,0.08)',
+        color: active ? '#0F172A' : '#E5E7EB',
+        fontWeight: 700,
+        fontSize: 15,
+        textDecoration: 'none',
+        boxShadow: active ? '0 6px 16px rgba(0,0,0,0.15)' : 'none',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <span style={{ fontSize: 18 }}>{icon}</span>
       {label}
     </Link>
   )

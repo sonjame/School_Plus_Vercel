@@ -241,15 +241,17 @@ export default function WritePage() {
           {/* 카테고리 */}
           <label style={label}>카테고리</label>
           <div style={{ ...inputBox, background: '#ECEFF1', fontWeight: 600 }}>
-            {category === 'graduate'
-              ? '🎓 졸업생 게시판'
-              : category === 'free'
-                ? '자유게시판'
-                : category === 'promo'
-                  ? '홍보게시판'
-                  : category === 'club'
-                    ? '동아리게시판'
-                    : `${category.replace('grade', '')}학년 게시판`}
+            {category === 'admin'
+              ? '🛠 관리자 게시판'
+              : category === 'graduate'
+                ? '🎓 졸업생 게시판'
+                : category === 'free'
+                  ? '자유게시판'
+                  : category === 'promo'
+                    ? '홍보게시판'
+                    : category === 'club'
+                      ? '동아리게시판'
+                      : `${category.replace('grade', '')}학년 게시판`}
           </div>
 
           {/* 제목 */}
