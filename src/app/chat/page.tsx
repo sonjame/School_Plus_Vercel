@@ -342,7 +342,7 @@ export default function ChatPage() {
   const handleDeleteRoom = async () => {
     if (!currentRoomId || !currentUser?.token) return
 
-    if (!confirm('채팅방을 삭제하면 복구할 수 없습니다.')) return
+    if (!window.confirm('채팅방을 삭제하면 복구할 수 없습니다.')) return
 
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}/delete`, {
       method: 'DELETE',
