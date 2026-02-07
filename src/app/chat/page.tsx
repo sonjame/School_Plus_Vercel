@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
 import PollMessage from '@/src/components/chat/PollMessage'
+import AlertModal from '@/src/components/common/AlertModal'
+import ConfirmModal from '@/src/components/common/ConfirmModal'
 
 /* =========================
    타입 정의
@@ -142,6 +144,20 @@ export default function ChatPage() {
   const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
 
+  const [alert, setAlert] = useState<{
+    open: boolean
+    title?: string
+    message: string
+  }>({ open: false, message: '' })
+
+  const [confirm, setConfirm] = useState<{
+    open: boolean
+    title?: string
+    message: string
+    danger?: boolean
+    onConfirm?: () => void
+  }>({ open: false, message: '' })
+
   // 🔥 최신 공지 1개 추출
   const latestNotice = [...messages]
     .filter((m) => m.type === 'notice')
@@ -249,14 +265,21 @@ export default function ChatPage() {
     if (res.status === 409) {
       const data = await res.json()
 
-      alert(data.message || '이미 채팅방이 존재합니다.')
+      setConfirm({
+        open: true,
+        title: '이미 채팅방이 존재합니다',
+        message:
+          data.message ||
+          '이미 해당 사용자와의 채팅방이 있습니다.\n기존 채팅방으로 이동할까요?',
+        onConfirm: async () => {
+          setShowInviteModal(false)
+          setCurrentRoomId(data.roomId)
 
-      setShowInviteModal(false)
-      setCurrentRoomId(data.roomId)
-
-      const listRes = await apiFetch('/api/chat/rooms')
-      const list = await listRes.json()
-      setRooms(Array.isArray(list) ? list : [])
+          const listRes = await apiFetch('/api/chat/rooms')
+          const list = await listRes.json()
+          setRooms(Array.isArray(list) ? list : [])
+        },
+      })
 
       return
     }
@@ -284,23 +307,33 @@ export default function ChatPage() {
   const handleLeaveRoom = async () => {
     if (!currentRoomId || !currentUser?.token) return
 
-    if (!confirm('채팅방을 나가시겠습니까?')) return
+    setConfirm({
+      open: true,
+      title: '채팅방 나가기',
+      message: '채팅방을 나가시겠습니까?',
+      onConfirm: async () => {
+        const res = await apiFetch(
+          `/api/chat/messages/${currentRoomId}/leave`,
+          { method: 'POST' },
+        )
 
-    const res = await apiFetch(`/api/chat/messages/${currentRoomId}/leave`, {
-      method: 'POST',
+        if (!res.ok) {
+          setAlert({
+            open: true,
+            title: '오류',
+            message: '채팅방 나가기 실패',
+          })
+          return
+        }
+
+        setCurrentRoomId(null)
+        setMessages([])
+
+        const listRes = await apiFetch('/api/chat/rooms')
+        const data = await safeJson<ChatRoom[]>(listRes)
+        setRooms(Array.isArray(data) ? data : [])
+      },
     })
-
-    if (!res.ok) {
-      setBlockMessage('채팅방 나가기 실패')
-      return
-    }
-
-    setCurrentRoomId(null)
-    setMessages([])
-
-    const listRes = await apiFetch('/api/chat/rooms')
-    const data = await safeJson<ChatRoom[]>(listRes)
-    setRooms(Array.isArray(data) ? data : [])
   }
 
   // =======================
@@ -463,7 +496,12 @@ export default function ChatPage() {
 
       // ❌ 진짜 인증 실패
       if (res.status === 401) {
-        alert('로그인이 만료되었습니다.')
+        setAlert({
+          open: true,
+          title: '로그인 만료',
+          message: '로그인이 만료되었습니다.\n다시 로그인해주세요.',
+        })
+
         localStorage.removeItem('loggedInUser')
         location.href = '/login'
       }
@@ -499,7 +537,12 @@ export default function ChatPage() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      alert(err.message || '친구 추가 실패')
+
+      setAlert({
+        open: true,
+        title: '친구 추가 실패',
+        message: err.message || '친구 추가에 실패했습니다.',
+      })
       return
     }
 
@@ -508,18 +551,28 @@ export default function ChatPage() {
   }
 
   const handleDeleteFriend = async (friendId: number) => {
-    if (!confirm('친구를 삭제하시겠습니까?')) return
+    setConfirm({
+      open: true,
+      title: '친구 삭제',
+      message: '친구를 삭제하시겠습니까?',
+      danger: true,
+      onConfirm: async () => {
+        const res = await apiFetch(`/api/friends/${friendId}`, {
+          method: 'DELETE',
+        })
 
-    const res = await apiFetch(`/api/friends/${friendId}`, {
-      method: 'DELETE',
+        if (!res.ok) {
+          setAlert({
+            open: true,
+            title: '오류',
+            message: '친구 삭제 실패',
+          })
+          return
+        }
+
+        setFriends((prev) => prev.filter((f) => f.id !== friendId))
+      },
     })
-
-    if (!res.ok) {
-      alert('친구 삭제 실패')
-      return
-    }
-
-    setFriends((prev) => prev.filter((f) => f.id !== friendId))
   }
 
   const handleToggleBlock = async (targetId: number) => {
@@ -532,7 +585,11 @@ export default function ChatPage() {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok) {
-      alert(data.message || '차단 처리 실패')
+      setAlert({
+        open: true,
+        title: '차단 처리 실패',
+        message: data.message || '차단 처리에 실패했습니다.',
+      })
       return
     }
 
@@ -830,23 +887,30 @@ export default function ChatPage() {
   }
 
   const handleDeleteMessage = async (messageId: number) => {
-    if (!currentUser?.token) return
-    if (!confirm('이 메시지를 삭제하시겠습니까?')) return
+    setConfirm({
+      open: true,
+      title: '메시지 삭제',
+      message: '이 메시지를 삭제하시겠습니까?',
+      danger: true,
+      onConfirm: async () => {
+        const res = await apiFetch(`/api/chat/messages/delete/${messageId}`, {
+          method: 'DELETE',
+        })
 
-    const res = await await apiFetch(`/api/chat/messages/delete/${messageId}`, {
-      method: 'DELETE',
+        if (!res.ok) {
+          setAlert({
+            open: true,
+            title: '오류',
+            message: '메시지 삭제 실패',
+          })
+          return
+        }
+
+        const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+        const data = await safeJson<ChatMessage[]>(list)
+        setMessages(Array.isArray(data) ? data : [])
+      },
     })
-
-    if (!res.ok) {
-      setBlockMessage('메시지 삭제 실패')
-      return
-    }
-
-    // 🔄 메시지 다시 불러오기
-    const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
-
-    const data = await safeJson<ChatMessage[]>(list)
-    setMessages(Array.isArray(data) ? data : [])
   }
 
   const handleSendFile = async (file: File) => {
@@ -909,21 +973,30 @@ export default function ChatPage() {
   }
 
   const handleDeleteNotice = async (noticeId: number) => {
-    if (!confirm('이 공지를 삭제하시겠습니까?')) return
+    setConfirm({
+      open: true,
+      title: '공지 삭제',
+      message: '이 공지를 삭제하시겠습니까?',
+      danger: true,
+      onConfirm: async () => {
+        const res = await apiFetch(`/api/chat/notice/${noticeId}`, {
+          method: 'DELETE',
+        })
 
-    const res = await apiFetch(`/api/chat/notice/${noticeId}`, {
-      method: 'DELETE',
+        if (!res.ok) {
+          setAlert({
+            open: true,
+            title: '오류',
+            message: '공지 삭제 실패',
+          })
+          return
+        }
+
+        const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+        const data = await safeJson<ChatMessage[]>(list)
+        setMessages(Array.isArray(data) ? data : [])
+      },
     })
-
-    if (!res.ok) {
-      setBlockMessage('공지 삭제 실패')
-      return
-    }
-
-    // 🔄 메시지 다시 로드
-    const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
-    const data = await safeJson<ChatMessage[]>(list)
-    setMessages(Array.isArray(data) ? data : [])
   }
 
   return (
@@ -1369,7 +1442,12 @@ export default function ChatPage() {
                         onClick={() => {
                           setShowRoomMenu(false)
                           setReportMode(true)
-                          alert('신고할 메시지를 선택하세요')
+
+                          setAlert({
+                            open: true,
+                            title: '메시지 신고',
+                            message: '신고할 메시지를 선택하세요.',
+                          })
                         }}
                       />
 
@@ -1504,9 +1582,12 @@ export default function ChatPage() {
                                   return
                                 }
 
-                                alert(
-                                  err.message || '공지 등록에 실패했습니다.',
-                                )
+                                setAlert({
+                                  open: true,
+                                  title: '공지 등록 실패',
+                                  message:
+                                    err.message || '공지 등록에 실패했습니다.',
+                                })
                                 return
                               }
 
@@ -2810,7 +2891,12 @@ export default function ChatPage() {
                         )
 
                         if (!res.ok) {
-                          alert('채팅방 초대 실패')
+                          setAlert({
+                            open: true,
+                            title: '초대 실패',
+                            message:
+                              '채팅방 초대에 실패했습니다.\n잠시 후 다시 시도해주세요.',
+                          })
                           return
                         }
                       } else {
@@ -2885,6 +2971,24 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+      <AlertModal
+        open={alert.open}
+        title={alert.title}
+        message={alert.message}
+        onClose={() => setAlert({ open: false, message: '' })}
+      />
+
+      <ConfirmModal
+        open={confirm.open}
+        title={confirm.title}
+        message={confirm.message}
+        danger={confirm.danger}
+        onClose={() => setConfirm({ open: false, message: '' })}
+        onConfirm={() => {
+          confirm.onConfirm?.()
+          setConfirm({ open: false, message: '' })
+        }}
+      />
     </main>
   )
 }
