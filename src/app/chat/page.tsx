@@ -339,35 +339,43 @@ export default function ChatPage() {
   // =======================
   // 채팅방 삭제
   // =======================
-  const handleDeleteRoom = async () => {
+  const handleDeleteRoom = () => {
     if (!currentRoomId || !currentUser?.token) return
 
-    if (!window.confirm('채팅방을 삭제하면 복구할 수 없습니다.')) return
+    setConfirm({
+      open: true,
+      title: '채팅방 삭제',
+      message: '채팅방을 삭제하면 복구할 수 없습니다.\n정말 삭제하시겠습니까?',
+      danger: true,
+      onConfirm: async () => {
+        const res = await apiFetch(
+          `/api/chat/messages/${currentRoomId}/delete`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              roomId: currentRoomId,
+            }),
+          },
+        )
 
-    const res = await apiFetch(`/api/chat/messages/${currentRoomId}/delete`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
+        const data = await res.json().catch(() => ({}))
+
+        if (!res.ok) {
+          setBlockMessage(data.message || '채팅방 삭제에 실패했습니다.')
+          return
+        }
+
+        setCurrentRoomId(null)
+        setMessages([])
+
+        const listRes = await apiFetch('/api/chat/rooms')
+        const listData = await listRes.json()
+        setRooms(Array.isArray(listData) ? listData : [])
       },
-      body: JSON.stringify({
-        roomId: currentRoomId,
-      }),
     })
-
-    const data = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      setBlockMessage(data.message || '채팅방 삭제에 실패했습니다.')
-      return
-    }
-
-    setCurrentRoomId(null)
-    setMessages([])
-
-    const listRes = await apiFetch('/api/chat/rooms')
-
-    const listData = await listRes.json()
-    setRooms(Array.isArray(listData) ? listData : [])
   }
 
   const handleRenameRoom = async () => {
