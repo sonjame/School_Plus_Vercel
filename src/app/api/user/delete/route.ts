@@ -13,10 +13,10 @@ export async function POST(req: Request) {
       )
     }
 
-    // 1️⃣ 사용자 조회 (탈퇴/정지 안 된 계정만)
+    // 1️⃣ 사용자 조회
     const [rows]: any = await db.query(
       `
-      SELECT password, is_banned
+      SELECT password, is_banned, provider, social_id, email
       FROM users
       WHERE username = ?
       `,
@@ -30,23 +30,50 @@ export async function POST(req: Request) {
       )
     }
 
-    if (rows[0].is_banned) {
+    const user = rows[0]
+
+    if (user.is_banned) {
       return NextResponse.json(
         { message: '이미 탈퇴했거나 정지된 계정입니다.' },
         { status: 403 },
       )
     }
 
-    // 2️⃣ 비밀번호 확인
-    const isMatch = await bcrypt.compare(password, rows[0].password)
-    if (!isMatch) {
-      return NextResponse.json(
-        { message: '비밀번호가 일치하지 않습니다.' },
-        { status: 401 },
-      )
+    // 2️⃣ 비밀번호 확인 (email 계정만)
+    if (user.provider === 'email') {
+      const isMatch = await bcrypt.compare(password, user.password)
+      if (!isMatch) {
+        return NextResponse.json(
+          { message: '비밀번호가 일치하지 않습니다.' },
+          { status: 401 },
+        )
+      }
     }
 
-    // 3️⃣ 🔥 실제 삭제 ❌ → 논리적 탈퇴 ✅
+    // 3️⃣ deleted_users 기록 (🔥 핵심)
+    await db.query(
+      `
+  INSERT INTO deleted_users (
+    username,
+    email,
+    provider,
+    social_id,
+    deleted_at,
+    rejoin_available_at,
+    admin_override,
+    ban_type
+  )
+  VALUES (?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 0, 'temporary')
+  `,
+      [
+        username,
+        user.provider === 'email' ? user.email : null,
+        user.provider,
+        user.social_id,
+      ],
+    )
+
+    // 4️⃣ users 논리적 탈퇴
     await db.query(
       `
       UPDATE users
