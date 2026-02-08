@@ -37,12 +37,38 @@ export default function SignupPage() {
 
   const [verifiedEmail, setVerifiedEmail] = useState('')
 
+  // 🔐 관리자 승인 필요 여부
+  const [needAdminApproval, setNeedAdminApproval] = useState(false)
+
+  const approved = searchParams.get('approved')
+
+  // 🔐 모달 타입 (추가)
+  const [modalType, setModalType] = useState<
+    'WAIT' | 'NEED_ADMIN_APPROVAL' | null
+  >(null)
+
   useEffect(() => {
     const email = searchParams.get('email')
     if (email) {
       setVerifiedEmail(email)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (approved === '1') {
+      if (typeof window === 'undefined') return // ✅ 이 줄 추가
+
+      if (sessionStorage.getItem('rejoinApprovedShown')) return
+
+      sessionStorage.setItem('rejoinApprovedShown', '1')
+
+      setModalMessage(
+        '✅ 해당 계정은\n관리자에 의해 재가입 승인이 완료되었습니다.\n\n이제 회원가입을 진행할 수 있습니다.',
+      )
+      setModalType(null)
+      setShowModal(true)
+    }
+  }, [approved])
 
   // 🔐 비밀번호 검증 함수 (여기에 추가)
   const validatePassword = (pw: string) => {
@@ -302,9 +328,32 @@ export default function SignupPage() {
         window.location.href = '/auth/login'
       }, 1500)
     } else {
-      const err = await res.json()
-      console.error(err)
-      showAlert(err.message || '회원가입 실패')
+      try {
+        const err = await res.json()
+
+        // 🛡 관리자 승인 필요
+        if (err.status === 'WAIT') {
+          setModalMessage(
+            `탈퇴 후 30일 이내에는 재가입할 수 없습니다.\n\n재가입 가능일:\n${err.rejoinAvailableAt}`,
+          )
+          setModalType('WAIT')
+          setShowModal(true)
+          return
+        }
+
+        if (err.status === 'NEED_ADMIN_APPROVAL') {
+          setModalMessage(
+            '이 계정은 탈퇴 이력이 있어\n관리자 승인이 필요합니다.',
+          )
+          setModalType('NEED_ADMIN_APPROVAL')
+          setShowModal(true)
+          return
+        }
+
+        showAlert(err.message || '회원가입 실패')
+      } catch {
+        showAlert('회원가입 실패')
+      }
     }
   }
 
@@ -727,6 +776,42 @@ export default function SignupPage() {
               </Link>
             </p>
 
+            {/* 🔐 관리자 승인 요청 영역 */}
+            {needAdminApproval && (
+              <div
+                style={{
+                  marginTop: '16px',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: '#FFF3E0',
+                  border: '1px solid #FFB74D',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '14px', marginBottom: '10px' }}>
+                  ⚠️ 이 계정은 탈퇴 이력이 있어
+                  <br />
+                  <strong>관리자 승인 후 재가입</strong>이 가능합니다.
+                </p>
+
+                <Link
+                  href="/support/rejoin-request"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: '#FF9800',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  관리자 승인 요청하기
+                </Link>
+              </div>
+            )}
+
             {/* 학년 확인 모달 */}
             {showConfirm && (
               <div className="confirm-backdrop">
@@ -754,8 +839,62 @@ export default function SignupPage() {
         {showModal && (
           <div className="modal-backdrop">
             <div className="modal-box">
-              <div className="modal-icon">✔</div>
-              <p>{modalMessage}</p>
+              <div className="modal-icon">⚠️</div>
+
+              <p style={{ whiteSpace: 'pre-line' }}>{modalMessage}</p>
+
+              {/* ⏳ 30일 대기 */}
+              {modalType === 'WAIT' && (
+                <button
+                  className="ok-btn"
+                  style={{ marginTop: '16px', width: '100%' }}
+                  onClick={() => {
+                    setShowModal(false)
+                    setModalType(null)
+                  }}
+                >
+                  확인
+                </button>
+              )}
+
+              {/* 🛡 관리자 승인 필요 */}
+              {modalType === 'NEED_ADMIN_APPROVAL' && (
+                <div
+                  style={{ display: 'flex', gap: '10px', marginTop: '16px' }}
+                >
+                  <button
+                    className="cancel-btn"
+                    onClick={() => {
+                      setShowModal(false)
+                      setModalType(null)
+                    }}
+                  >
+                    취소
+                  </button>
+
+                  <button
+                    className="ok-btn"
+                    onClick={() => {
+                      window.location.href = '/support/rejoin-request'
+                    }}
+                  >
+                    관리자 승인 요청하기
+                  </button>
+                </div>
+              )}
+
+              {/* ✅ 승인 완료 (approved=1) */}
+              {modalType === null && (
+                <button
+                  className="ok-btn"
+                  style={{ marginTop: '16px', width: '100%' }}
+                  onClick={() => {
+                    setShowModal(false)
+                  }}
+                >
+                  확인
+                </button>
+              )}
             </div>
           </div>
         )}
