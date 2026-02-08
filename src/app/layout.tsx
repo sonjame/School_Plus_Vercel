@@ -387,6 +387,11 @@ export default function RootLayout({
                 label="채팅 신고 관리"
                 href="/admin/chat-report"
               />
+              <AdminMenuItem
+                icon="♻️"
+                label="재가입 승인"
+                href="/admin/rejoin-requests"
+              />
             </>
           ) : (
             <>
