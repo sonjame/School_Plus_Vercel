@@ -102,6 +102,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer',
   },
+
+  previewWrapper: {
+    width: '100%',
+    height: 'clamp(260px, 45vw, 440px)', // uploadArea와 동일
+    marginTop: 16,
+    borderRadius: 18,
+    background: '#f1f5f9',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    border: '1px solid #e5e7eb',
+  },
+
+  previewImgFit: {
+    maxWidth: '100%',
+    maxHeight: '100%',
+    objectFit: 'contain', // ⭐ 가로/세로 핵심
+    borderRadius: 12,
+  },
 }
 
 const SchoolAuthPage: React.FC = () => {
@@ -113,12 +133,20 @@ const SchoolAuthPage: React.FC = () => {
   const [schoolInput, setSchoolInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  const [birthDate, setBirthDate] = useState('') // YYYY-MM-DD
+  const [validFrom, setValidFrom] = useState('') // 시작일
+  const [validTo, setValidTo] = useState('') // 종료일
+
   const handleRemoveImage = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
     setFile(null)
     setNameInput('')
     setSchoolInput('')
+    setBirthDate('')
+    setValidFrom('')
+    setValidTo('')
+
     setError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -144,6 +172,9 @@ const SchoolAuthPage: React.FC = () => {
       const parsed = parseStudentCard(text)
       setNameInput(parsed.name ?? '')
       setSchoolInput(parsed.school ?? '')
+      setBirthDate(parsed.birthDate ?? '')
+      setValidFrom(parsed.validFrom ?? '')
+      setValidTo(parsed.validTo ?? '')
     } catch {
       setError('학생증을 다시 촬영해 주세요.')
     }
@@ -157,6 +188,9 @@ const SchoolAuthPage: React.FC = () => {
       .trim()
 
     let name: string | null = null
+    let birthDate: string | null = null
+    let validFrom: string | null = null
+    let validTo: string | null = null
 
     const LAST_NAMES =
       '김이박최정강조윤장임한오서신권황안송전홍유고문양손'.split('')
@@ -187,9 +221,42 @@ const SchoolAuthPage: React.FC = () => {
     /* ✅ 학교 */
     const schoolMatch = normalized.match(/([가-힣]{2,}(중학교|고등학교))/)
 
+    /* ✅ 생년월일 (키워드 기반) */
+    const birthMatch = normalized.match(
+      /생년월일\s*(19|20\d{2})\s*(\d{1,2})\s*(\d{1,2})/,
+    )
+
+    if (birthMatch) {
+      const y = birthMatch[1]
+      const m = birthMatch[2].padStart(2, '0')
+      const d = birthMatch[3].padStart(2, '0')
+      birthDate = `${y}-${m}-${d}`
+    }
+
+    /* ✅ 유효기간 (시작일 ~ 종료일) */
+    const validMatch = normalized.match(
+      /유효기간\s*(\d{2})\s*(\d{2})\s*(\d{2})\s*(\d{2})\s*(\d{2})\s*(\d{2})/,
+    )
+
+    if (validMatch) {
+      const startYear = `20${validMatch[1]}`
+      const startMonth = validMatch[2].padStart(2, '0')
+      const startDay = validMatch[3].padStart(2, '0')
+
+      const endYear = `20${validMatch[4]}`
+      const endMonth = validMatch[5].padStart(2, '0')
+      const endDay = validMatch[6].padStart(2, '0')
+
+      validFrom = `${startYear}-${startMonth}-${startDay}`
+      validTo = `${endYear}-${endMonth}-${endDay}`
+    }
+
     return {
       name,
       school: schoolMatch ? schoolMatch[1] : null,
+      birthDate,
+      validFrom,
+      validTo,
     }
   }
 
@@ -242,16 +309,89 @@ const SchoolAuthPage: React.FC = () => {
 
           {previewUrl && (
             <>
-              <img src={previewUrl} alt="미리보기" style={styles.previewImg} />
-              <button style={styles.deleteBtn} onClick={handleRemoveImage}>
-                사진 삭제
-              </button>
+              <div style={styles.previewWrapper}>
+                <img
+                  src={previewUrl}
+                  alt="학생증 미리보기"
+                  style={styles.previewImgFit}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginTop: 10,
+                }}
+              >
+                <button style={styles.deleteBtn} onClick={handleRemoveImage}>
+                  사진 삭제
+                </button>
+              </div>
             </>
           )}
 
           <button style={styles.nextBtn} onClick={handleNext}>
             다음 단계
           </button>
+
+          {(nameInput || schoolInput) && (
+            <div
+              style={{
+                marginTop: 20,
+                padding: 16,
+                borderRadius: 16,
+                background: '#eef2ff',
+                border: '1px solid #c7d2fe',
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  marginBottom: 10,
+                  fontSize: 15,
+                  color: '#3730a3',
+                }}
+              >
+                ✅ 인식된 학생 정보
+              </div>
+
+              <div style={{ fontSize: 14, marginBottom: 6 }}>
+                👤 이름:{' '}
+                <strong>{nameInput ? nameInput : '인식되지 않음'}</strong>
+              </div>
+
+              <div style={{ fontSize: 14 }}>
+                🏫 학교:{' '}
+                <strong>{schoolInput ? schoolInput : '인식되지 않음'}</strong>
+              </div>
+
+              <div style={{ fontSize: 14, marginBottom: 6 }}>
+                🎂 생년월일: <strong>{birthDate || '미입력'}</strong>
+              </div>
+
+              <div style={{ fontSize: 14 }}>
+                🪪 학생증 유효기간:{' '}
+                <strong>
+                  {validFrom && validTo
+                    ? `${validFrom} ~ ${validTo}`
+                    : '미입력'}
+                </strong>
+              </div>
+
+              <p
+                style={{
+                  marginTop: 10,
+                  fontSize: 12,
+                  color: '#6b7280',
+                }}
+              >
+                위 정보로 학교 인증이 진행됩니다.
+                <br />
+                잘못 인식된 경우 직접 수정할 수 있습니다.
+              </p>
+            </div>
+          )}
 
           {(nameInput || schoolInput) && (
             <div style={{ marginTop: 20 }}>
@@ -261,7 +401,7 @@ const SchoolAuthPage: React.FC = () => {
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   style={{
-                    width: '100%',
+                    width: '98%',
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
@@ -276,7 +416,55 @@ const SchoolAuthPage: React.FC = () => {
                   value={schoolInput}
                   onChange={(e) => setSchoolInput(e.target.value)}
                   style={{
-                    width: '100%',
+                    width: '98%',
+                    padding: 10,
+                    marginTop: 6,
+                    borderRadius: 8,
+                    border: '1px solid #ccc',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                🎂 생년월일
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  style={{
+                    width: '98%',
+                    padding: 10,
+                    marginTop: 6,
+                    borderRadius: 8,
+                    border: '1px solid #ccc',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                🪪 학생증 유효기간 (시작)
+                <input
+                  type="date"
+                  value={validFrom}
+                  onChange={(e) => setValidFrom(e.target.value)}
+                  style={{
+                    width: '98%',
+                    padding: 10,
+                    marginTop: 6,
+                    borderRadius: 8,
+                    border: '1px solid #ccc',
+                  }}
+                />
+              </div>
+
+              <div>
+                🪪 학생증 유효기간 (종료)
+                <input
+                  type="date"
+                  value={validTo}
+                  onChange={(e) => setValidTo(e.target.value)}
+                  style={{
+                    width: '98%',
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
