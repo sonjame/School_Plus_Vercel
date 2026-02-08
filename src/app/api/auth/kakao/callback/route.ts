@@ -81,6 +81,23 @@ if (!tokenData.access_token) {
     )
   }
 
+    /* ===============================
+   🔔 카카오 재가입 승인 여부 체크
+=============================== */
+  const [deletedRows]: any = await db.query(
+    `
+  SELECT admin_override
+  FROM deleted_users
+  WHERE provider = 'kakao'
+    AND social_id = ?
+  LIMIT 1
+  `,
+    [kakaoId],
+  )
+
+  const isApproved =
+    deletedRows.length > 0 && deletedRows[0].admin_override === 1
+
   /* 🧾 회원가입 / 로그인 */
   return NextResponse.redirect(
     `${baseUrl}/auth/signup` +
@@ -88,6 +105,7 @@ if (!tokenData.access_token) {
       `&provider=kakao` +
       `&social_id=${kakaoId}` +
       `&name=${encodeURIComponent(name)}` +
-      `&email=${encodeURIComponent(email)}`,
+      `&email=${encodeURIComponent(email)}` +
+      (isApproved ? `&approved=1` : ''),
   )
 }
