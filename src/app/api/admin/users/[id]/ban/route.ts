@@ -31,6 +31,7 @@ export async function POST(
 
     /* 🔴 영구 정지 */
     if (type === 'permanent') {
+      // 1. users 업데이트
       await db.query(
         `
     UPDATE users
@@ -41,6 +42,38 @@ export async function POST(
     WHERE id = ?
     `,
         [reason, userId],
+      )
+
+      // 2️⃣ deleted_users 기록 (🔥 핵심)
+      await db.query(
+        `
+  INSERT INTO deleted_users (
+    user_id,
+    username,
+    email,
+    provider,
+    social_id,
+    ban_type,
+    deleted_at,
+    rejoin_available_at
+  )
+  SELECT
+    id,
+    username,
+    email,
+    provider,
+    social_id,
+    'permanent',
+    NOW(),
+    NULL
+  FROM users
+  WHERE id = ?
+  ON DUPLICATE KEY UPDATE
+    ban_type = 'permanent',
+    deleted_at = NOW(),
+    rejoin_available_at = NULL
+  `,
+        [userId],
       )
 
       return NextResponse.json({ success: true, status: 'permanent' })
@@ -107,6 +140,16 @@ export async function DELETE(
         banned_at = NULL,
         banned_reason = NULL
       WHERE id = ?
+      `,
+      [userId],
+    )
+
+    /* 2️⃣ deleted_users 기록 제거 (🔥 핵심) */
+    await db.query(
+      `
+      DELETE FROM deleted_users
+      WHERE user_id = ?
+        AND ban_type = 'permanent'
       `,
       [userId],
     )
