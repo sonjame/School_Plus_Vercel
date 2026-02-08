@@ -59,6 +59,118 @@ export async function POST(req: Request) {
     const finalSocialId = authProvider === 'email' ? null : social_id
 
     /* ===============================
+🚫 영구정지 계정 재가입 차단 (FIX)
+=============================== */
+
+    let banCheckQuery = ''
+    let banCheckParams: any[] = []
+
+    if (authProvider === 'email') {
+      if (!email) {
+        return NextResponse.json(
+          { message: '이메일 정보가 없습니다.' },
+          { status: 400 },
+        )
+      }
+
+      banCheckQuery = `
+    SELECT ban_type
+    FROM deleted_users
+    WHERE provider = 'email'
+      AND email = ?
+    LIMIT 1
+  `
+      banCheckParams = [email]
+    } else {
+      banCheckQuery = `
+    SELECT ban_type
+    FROM deleted_users
+    WHERE provider = ?
+      AND social_id = ?
+    LIMIT 1
+  `
+      banCheckParams = [authProvider, finalSocialId]
+    }
+
+    const [banRows]: any = await db.query(banCheckQuery, banCheckParams)
+
+    if (banRows.length > 0 && banRows[0].ban_type === 'permanent') {
+      return NextResponse.json(
+        { message: '해당 계정은 영구 정지되어 회원가입이 불가능합니다.' },
+        { status: 403 },
+      )
+    }
+
+    /* ===============================
+  🚫 탈퇴 후 30일 재가입 제한 + 관리자 override
+  =============================== */
+
+    let deletedQuery = ''
+    let deletedParams: any[] = []
+
+    if (authProvider === 'email') {
+      if (!email) {
+        return NextResponse.json(
+          { message: '이메일 정보가 없습니다.' },
+          { status: 400 },
+        )
+      }
+
+      deletedQuery = `
+    SELECT rejoin_available_at, admin_override
+    FROM deleted_users
+    WHERE provider = 'email'
+      AND email = ?
+    LIMIT 1
+  `
+      deletedParams = [email]
+    } else {
+      deletedQuery = `
+    SELECT rejoin_available_at, admin_override
+    FROM deleted_users
+    WHERE provider = ?
+      AND social_id = ?
+    LIMIT 1
+  `
+      deletedParams = [authProvider, finalSocialId]
+    }
+
+    const [deletedRows]: any = await db.query(deletedQuery, deletedParams)
+
+    if (deletedRows.length > 0) {
+      const { rejoin_available_at, admin_override } = deletedRows[0]
+      const now = new Date()
+      const rejoinAt = new Date(rejoin_available_at)
+
+      // ✅ 관리자 승인 있으면 즉시 통과
+      if (!admin_override) {
+        // ⏳ 관리자 승인 없을 때만 30일 제한
+        if (now < rejoinAt) {
+          return NextResponse.json(
+            {
+              message: '탈퇴 후 30일 이내에는 재가입할 수 없습니다.',
+              status: 'WAIT',
+              rejoinAvailableAt: rejoin_available_at,
+            },
+            { status: 403 },
+          )
+        }
+
+        // ❌ 30일은 지났지만 승인 없음
+        return NextResponse.json(
+          {
+            message: '재가입을 위해 관리자 승인이 필요합니다.',
+            status: 'NEED_ADMIN_APPROVAL',
+          },
+          { status: 403 },
+        )
+      }
+
+      // 👉 여기까지 왔다는 건
+      // admin_override === 1 → 가입 허용
+    }
+
+    /* ===============================
        4️⃣ INSERT
     =============================== */
     await db.query(
@@ -81,6 +193,29 @@ export async function POST(req: Request) {
         authProvider,
       ],
     )
+
+    /* ===============================
+   5️⃣ 재가입 성공 → 탈퇴 기록 삭제
+  =============================== */
+    if (authProvider === 'email') {
+      await db.query(
+        `
+    DELETE FROM deleted_users
+    WHERE provider = 'email'
+      AND email = ?
+    `,
+        [email],
+      )
+    } else {
+      await db.query(
+        `
+    DELETE FROM deleted_users
+    WHERE provider = ?
+      AND social_id = ?
+    `,
+        [authProvider, finalSocialId],
+      )
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
