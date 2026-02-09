@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://school-plus-vercel.vercel.app
+
+# Sitemaps
+Sitemap: https://school-plus-vercel.vercel.app/sitemap.xml
