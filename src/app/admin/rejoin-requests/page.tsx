@@ -20,6 +20,14 @@ export default function AdminRejoinPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTargetId, setConfirmTargetId] = useState<number | null>(null)
 
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelTargetId, setCancelTargetId] = useState<number | null>(null)
+
+  function openCancelModal(id: number) {
+    setCancelTargetId(id)
+    setCancelOpen(true)
+  }
+
   const adminId = 'admin_master'
 
   async function loadList() {
@@ -63,6 +71,30 @@ export default function AdminRejoinPage() {
     // 모달 닫기
     setConfirmOpen(false)
     setConfirmTargetId(null)
+  }
+
+  async function confirmCancel() {
+    if (!cancelTargetId) return
+
+    const res = await apiFetch('/api/admin/cancel-rejoin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deletedUserId: cancelTargetId,
+      }),
+    })
+
+    if (!res.ok) {
+      alert('승인 취소 실패')
+      return
+    }
+
+    alert('승인 취소 완료')
+
+    setList((prev) => prev.filter((u) => u.id !== cancelTargetId))
+
+    setCancelOpen(false)
+    setCancelTargetId(null)
   }
 
   if (loading) return <p style={{ padding: 40 }}>불러오는 중...</p>
@@ -140,9 +172,23 @@ export default function AdminRejoinPage() {
                         color: '#16A34A',
                         fontWeight: 700,
                         cursor: 'pointer',
+                        marginRight: 12,
                       }}
                     >
                       승인
+                    </button>
+
+                    <button
+                      onClick={() => openCancelModal(u.id)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#DC2626',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      승인 취소
                     </button>
                   </td>
                 </tr>
@@ -162,6 +208,19 @@ export default function AdminRejoinPage() {
           setConfirmTargetId(null)
         }}
         onConfirm={confirmApprove}
+      />
+
+      <AdminConfirmModal
+        open={cancelOpen}
+        title="승인 취소"
+        message="이 계정의 재가입 승인을 취소하시겠습니까?"
+        confirmText="취소 확정"
+        danger={true}
+        onClose={() => {
+          setCancelOpen(false)
+          setCancelTargetId(null)
+        }}
+        onConfirm={confirmCancel}
       />
     </div>
   )
