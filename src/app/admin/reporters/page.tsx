@@ -11,6 +11,9 @@ export default function AdminReportersPage() {
 
   const [banTarget, setBanTarget] = useState<any>(null)
 
+  const [search, setSearch] = useState('')
+  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest')
+
   async function load() {
     const res = await apiFetch('/api/admin/reporters')
     const data = await res.json()
@@ -27,6 +30,15 @@ export default function AdminReportersPage() {
     load()
   }, [])
 
+  const filteredAndSorted = reporters
+    .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const aDate = new Date(a.last_reported_at).getTime()
+      const bDate = new Date(b.last_reported_at).getTime()
+
+      return sortOrder === 'latest' ? bDate - aDate : aDate - bDate
+    })
+
   return (
     <div
       style={{
@@ -38,6 +50,43 @@ export default function AdminReportersPage() {
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
         🚨 신고자 관리
       </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          marginBottom: 20,
+          flexWrap: 'wrap',
+        }}
+      >
+        <input
+          type="text"
+          placeholder="이름 검색"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: 200,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #E5E7EB',
+          }}
+        />
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #E5E7EB',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="latest">최신 신고순</option>
+          <option value="oldest">오래된 신고순</option>
+        </select>
+      </div>
 
       <div
         style={{
@@ -59,7 +108,7 @@ export default function AdminReportersPage() {
           </thead>
 
           <tbody>
-            {reporters.map((r) => (
+            {filteredAndSorted.map((r) => (
               <tr key={r.user_id}>
                 <td style={td}>{r.name}</td>
 
