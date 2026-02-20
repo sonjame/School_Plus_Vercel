@@ -333,9 +333,22 @@ export default function SignupPage() {
 
         // 🛡 관리자 승인 필요
         if (err.status === 'WAIT') {
-          setModalMessage(
-            `탈퇴 후 30일 이내에는 재가입할 수 없습니다.\n\n재가입 가능일:\n${err.rejoinAvailableAt}`,
+          const formattedDate = new Date(err.rejoinAvailableAt).toLocaleString(
+            'ko-KR',
+            {
+              timeZone: 'Asia/Seoul',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            },
           )
+
+          setModalMessage(
+            `탈퇴 후 30일 이내에는 재가입할 수 없습니다.\n\n재가입 가능일:\n${formattedDate}`,
+          )
+
           setModalType('WAIT')
           setShowModal(true)
           return
@@ -845,16 +858,37 @@ export default function SignupPage() {
 
               {/* ⏳ 30일 대기 */}
               {modalType === 'WAIT' && (
-                <button
-                  className="ok-btn"
-                  style={{ marginTop: '16px', width: '100%' }}
-                  onClick={() => {
-                    setShowModal(false)
-                    setModalType(null)
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginTop: '16px',
                   }}
                 >
-                  확인
-                </button>
+                  {/* 취소 버튼 */}
+                  <button
+                    className="cancel-btn"
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      setShowModal(false)
+                      setModalType(null)
+                    }}
+                  >
+                    취소
+                  </button>
+
+                  {/* 확인 버튼 */}
+                  <button
+                    className="ok-btn"
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      setShowModal(false)
+                      setModalType(null)
+                    }}
+                  >
+                    관리자 요청하기
+                  </button>
+                </div>
               )}
 
               {/* 🛡 관리자 승인 필요 */}
