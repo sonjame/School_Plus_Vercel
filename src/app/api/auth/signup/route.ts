@@ -156,6 +156,32 @@ export async function POST(req: Request) {
           )
         }
 
+        /* ===============================
+    🔔 관리자에게 재가입 승인 요청 알림
+    =============================== */
+
+        // 모든 관리자 조회
+        const [admins]: any = await db.query(
+          `SELECT id FROM users WHERE level = 'admin'`,
+        )
+
+        for (const admin of admins) {
+          await db.query(
+            `
+      INSERT INTO notifications
+      (user_id, type, title, message, link, is_read, created_at)
+      VALUES (?, ?, ?, ?, ?, 0, NOW())
+      `,
+            [
+              admin.id,
+              'admin_rejoin_requested',
+              '재가입 승인 요청',
+              `${username} 님이 재가입 승인을 요청했습니다.`,
+              '/admin/rejoin-requests',
+            ],
+          )
+        }
+
         // ❌ 30일은 지났지만 승인 없음
         return NextResponse.json(
           {
