@@ -36,6 +36,12 @@ type ChatMessage = {
     closedAt?: string | null
   }
 
+  preview?: {
+    title?: string
+    description?: string
+    image?: string
+  }
+
   pollResult?: {
     optionId: number
     count: number
@@ -79,6 +85,137 @@ function formatKST(value: string) {
     hour12: true,
     timeZone: 'Asia/Seoul',
   }).format(date)
+}
+
+function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
+  const [preview, setPreview] = useState<any>(null)
+
+  useEffect(() => {
+    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+      .then((res) => res.json())
+      .then(setPreview)
+      .catch(() => {})
+  }, [url])
+
+  const isMap = preview?.type === 'map'
+
+  let mapTitle = preview?.title || ''
+  let mapAddress = preview?.description || ''
+
+  if (isMap && mapAddress) {
+    const parts = mapAddress.split('·')
+    if (parts.length > 1) {
+      mapAddress = parts[parts.length - 1].trim()
+    }
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        textDecoration: 'none',
+        display: 'block',
+        maxWidth: 300,
+      }}
+    >
+      <div
+        style={{
+          borderRadius: 14,
+          overflow: 'hidden',
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}
+      >
+        {preview?.image && (
+          <div
+            style={{
+              width: '100%',
+              height: 180,
+              background: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={preview.image}
+              style={{
+                width: '100%',
+                height: 180,
+                objectFit: 'cover',
+              }}
+            />
+          </div>
+        )}
+
+        <div style={{ padding: 12 }}>
+          {/* 지도 전용 뱃지 */}
+          {isMap && (
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#2563eb',
+                marginBottom: 6,
+              }}
+            >
+              📍 위치 정보
+            </div>
+          )}
+
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 15,
+              marginBottom: 6,
+              color: '#111827',
+            }}
+          >
+            {isMap ? mapTitle : preview?.title || url}
+          </div>
+
+          {isMap
+            ? mapAddress && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    lineHeight: 1.4,
+                    marginBottom: 6,
+                  }}
+                >
+                  {mapAddress}
+                </div>
+              )
+            : preview?.description && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    lineHeight: 1.4,
+                    marginBottom: 6,
+                  }}
+                >
+                  {preview.description}
+                </div>
+              )}
+
+          {/* 도메인 표시 */}
+          <div
+            style={{
+              fontSize: 11,
+              color: '#9ca3af',
+            }}
+          >
+            {new URL(url).hostname}
+          </div>
+        </div>
+      </div>
+    </a>
+  )
 }
 
 /* =========================
@@ -1014,7 +1151,7 @@ export default function ChatPage() {
         height: 'calc(var(--vh, 1vh) * 100)',
         paddingTop: isMobile ? 60 : 0, // 가독성도 좋아짐
         paddingBottom: 0, // ✅ 아래 여백 완전 제거
-        background: '#e5f3ff',
+        background: '#ffffff',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'stretch',
@@ -1916,15 +2053,21 @@ export default function ChatPage() {
                           <div
                             style={{
                               padding:
-                                msg.type === 'image' || msg.type === 'file'
+                                msg.type === 'image' ||
+                                msg.type === 'file' ||
+                                msg.type === 'url'
                                   ? 0
                                   : '10px 14px',
                               borderRadius:
-                                msg.type === 'image' || msg.type === 'file'
+                                msg.type === 'image' ||
+                                msg.type === 'file' ||
+                                msg.type === 'url'
                                   ? 0
                                   : 12,
                               background:
-                                msg.type === 'image' || msg.type === 'file'
+                                msg.type === 'image' ||
+                                msg.type === 'file' ||
+                                msg.type === 'url'
                                   ? 'transparent'
                                   : isMe
                                     ? '#4FC3F7'
@@ -1940,18 +2083,7 @@ export default function ChatPage() {
                             {msg.type === 'text' && msg.content}
 
                             {msg.type === 'url' && (
-                              <a
-                                href={msg.content}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  color: isMe ? 'white' : '#2563eb',
-                                  textDecoration: 'underline',
-                                  wordBreak: 'break-all',
-                                }}
-                              >
-                                {msg.content}
-                              </a>
+                              <LinkPreview url={msg.content} isMe={isMe} />
                             )}
 
                             {msg.type === 'image' && msg.fileUrl && (
