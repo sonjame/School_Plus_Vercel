@@ -169,6 +169,29 @@ export async function GET(req: Request) {
   }
 
   try {
+    // =========================
+    // 🔥 YouTube는 OEmbed API 사용 (Vercel 대응)
+    // =========================
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      try {
+        const oembed = await axios.get(
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(
+            url,
+          )}&format=json`,
+        )
+
+        return NextResponse.json({
+          title: oembed.data.title,
+          description: 'YouTube',
+          image: oembed.data.thumbnail_url,
+          url,
+          type: 'link',
+          provider: 'youtube',
+        })
+      } catch {
+        // 실패하면 아래 일반 크롤링으로 진행
+      }
+    }
     const { data, request } = await axios.get(url, {
       timeout: 5000,
       maxRedirects: 5,
