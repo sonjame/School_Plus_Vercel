@@ -45,7 +45,8 @@ export async function GET(req: Request) {
   'admin_post_reply',        
   'admin_question_followup',
   'admin_reply',
-  'admin_comment_reply'
+  'admin_comment_reply',
+  'admin_rejoin_requested'
 )
   ORDER BY created_at DESC
   LIMIT 50
