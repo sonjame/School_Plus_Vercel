@@ -17,6 +17,10 @@ export default function AdminPage() {
     onConfirm: () => Promise<void>
   } | null>(null)
 
+  const [search, setSearch] = useState('')
+
+  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest')
+
   async function load() {
     const res = await apiFetch('/api/admin/reports/posts')
     const data = await res.json()
@@ -26,6 +30,24 @@ export default function AdminPage() {
   useEffect(() => {
     load()
   }, [])
+
+  const filteredReports = reports
+    .filter((r) => {
+      if (!search.trim()) return true
+
+      const keyword = search.toLowerCase()
+
+      const authorMatch = r.author_name?.toLowerCase().includes(keyword)
+      const reporterMatch = r.reporter_names?.toLowerCase().includes(keyword)
+
+      return authorMatch || reporterMatch
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.last_reported_at).getTime()
+      const bDate = new Date(b.last_reported_at).getTime()
+
+      return sortOrder === 'latest' ? bDate - aDate : aDate - bDate
+    })
 
   return (
     <div
@@ -38,6 +60,43 @@ export default function AdminPage() {
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
         🚨 신고된 게시글
       </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          marginBottom: 20,
+          alignItems: 'center',
+        }}
+      >
+        <input
+          type="text"
+          placeholder="작성자 또는 신고자 검색"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #E5E7EB',
+          }}
+        />
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #E5E7EB',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <option value="latest">최신 신고순</option>
+          <option value="oldest">오래된 신고순</option>
+        </select>
+      </div>
 
       {/* ✅ 테이블 카드 컨테이너 */}
       <div
@@ -64,7 +123,7 @@ export default function AdminPage() {
           </thead>
 
           <tbody>
-            {reports.map((r) => (
+            {filteredReports.map((r) => (
               <tr
                 key={`${r.target_type}-${r.target_id}`}
                 style={{
