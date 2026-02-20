@@ -38,7 +38,7 @@ async function fetchGooglePlaceData(query: string) {
 
   const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(
     query,
-  )}&inputtype=textquery&fields=place_id,name,formatted_address,rating,photos&key=${apiKey}`
+  )}&inputtype=textquery&fields=place_id,name,formatted_address,rating,photos&language=ko&region=kr&key=${apiKey}`
 
   const res = await axios.get(searchUrl)
   const place = res.data.candidates?.[0]
@@ -51,7 +51,7 @@ async function fetchGooglePlaceData(query: string) {
     const photoRef = place.photos[0].photo_reference
 
     // 🔥 더 안정적인 photo URL
-    photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference=${photoRef}&key=${apiKey}`
+    photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference=${photoRef}&language=ko&key=${apiKey}`
   }
 
   return {
