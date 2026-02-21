@@ -1979,6 +1979,14 @@ export default function MyInfoPagePreview() {
                   setThemeSetting(updated)
                   saveThemeSetting(updated)
 
+                  // 🔥 RootLayout에 알려주기
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(
+                      new CustomEvent('theme-change', { detail: updated }),
+                    )
+                  }
+
+                  // (선택) documentElement에 dark 클래스도 유지하고 싶으면 그대로
                   if (updated.darkMode) {
                     document.documentElement.classList.add('dark')
                   } else {
