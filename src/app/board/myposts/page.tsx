@@ -55,7 +55,6 @@ export default function MyPostsPage() {
       style={{
         minHeight: '100vh',
         background: darkMode ? '#0f172a' : '#f8fafc',
-        transition: 'all 0.25s ease',
       }}
     >
       <div
@@ -66,7 +65,6 @@ export default function MyPostsPage() {
           minHeight: '100vh',
           background: darkMode ? '#0f172a' : '#f8fafc',
           color: darkMode ? '#f1f5f9' : '#111827',
-          transition: 'all 0.25s ease',
         }}
       >
         <h2
@@ -132,7 +130,6 @@ const getCardStyle = (darkMode: boolean): React.CSSProperties => ({
     ? '0 4px 14px rgba(0,0,0,0.35)'
     : '0 2px 8px rgba(0,0,0,0.06)',
   marginBottom: 16,
-  transition: '0.25s',
 })
 
 const header: React.CSSProperties = {
