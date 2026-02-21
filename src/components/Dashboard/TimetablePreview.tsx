@@ -42,6 +42,26 @@ export default function TimetablePreview() {
   const [selectedDay, setSelectedDay] = useState(days[todayIndex - 1] || '월')
   const [timetable, setTimetable] = useState<ClassPeriod[]>([])
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setDarkMode(!!parsed.darkMode)
+      }
+    } catch {}
+
+    const handleThemeChange = (e: any) => {
+      if (!e?.detail) return
+      setDarkMode(!!e.detail.darkMode)
+    }
+
+    window.addEventListener('theme-change', handleThemeChange)
+    return () => window.removeEventListener('theme-change', handleThemeChange)
+  }, [])
+
   /* ✅ 서버에서 시간표 불러오기 */
   useEffect(() => {
     const load = async () => {
@@ -97,9 +117,19 @@ export default function TimetablePreview() {
             style={{
               padding: '5px 12px',
               borderRadius: '8px',
-              border: '1px solid #4FC3F7',
-              backgroundColor: selectedDay === day ? '#4FC3F7' : 'white',
-              color: selectedDay === day ? 'white' : '#0277BD',
+              border: darkMode ? '1px solid #334155' : '1px solid #4FC3F7',
+              backgroundColor:
+                selectedDay === day
+                  ? '#4FC3F7'
+                  : darkMode
+                    ? '#1e293b'
+                    : 'white',
+              color:
+                selectedDay === day
+                  ? 'white'
+                  : darkMode
+                    ? '#cbd5e1'
+                    : '#0277BD',
               cursor: 'pointer',
               fontWeight: 600,
               transition: '0.2s',
@@ -113,7 +143,7 @@ export default function TimetablePreview() {
       {/* 시간표 내용 */}
       <div
         style={{
-          backgroundColor: '#E1F5FE',
+          backgroundColor: darkMode ? '#1e293b' : '#E1F5FE',
           borderRadius: '10px',
           padding: '16px',
           display: 'grid',
@@ -122,7 +152,9 @@ export default function TimetablePreview() {
         }}
       >
         {filtered.length === 0 ? (
-          <p style={{ color: '#777' }}>등록된 수업이 없습니다.</p>
+          <p style={{ color: darkMode ? '#cbd5e1' : '#777' }}>
+            등록된 수업이 없습니다.
+          </p>
         ) : (
           filtered.map((c, i) => {
             const colorKey = Object.keys(subjectColors).find((k) =>
@@ -144,10 +176,20 @@ export default function TimetablePreview() {
               >
                 <div style={{ fontWeight: 700 }}>{c.period}교시</div>
                 <div>{c.subject}</div>
-                <div style={{ fontSize: '13px', color: '#555' }}>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    color: darkMode ? '#e2e8f0' : '#555',
+                  }}
+                >
                   👨‍🏫 {c.teacher || '미입력'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#777' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: darkMode ? '#cbd5e1' : '#777',
+                  }}
+                >
                   🏫 {c.room || '미지정'}
                 </div>
               </div>
