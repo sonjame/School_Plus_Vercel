@@ -48,16 +48,19 @@ export default function BoardMainPage() {
     ]
 
     async function load() {
-      const result: BoardSection[] = []
+      try {
+        const results = await Promise.all(
+          boards.map(async (b) => {
+            const res = await apiFetch(`/api/posts?category=${b.key}`)
+            const posts = res.ok ? await res.json() : []
+            return { ...b, posts }
+          }),
+        )
 
-      for (const b of boards) {
-        const res = await apiFetch(`/api/posts?category=${b.key}`)
-
-        const posts = res.ok ? await res.json() : []
-        result.push({ ...b, posts })
+        setSections(results)
+      } catch (e) {
+        console.error('게시판 로드 실패', e)
       }
-
-      setSections(result)
     }
 
     load()
