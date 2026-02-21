@@ -641,8 +641,32 @@ export default function RootLayout({
 
           {/* 모달 */}
           {modal.show && (
-            <div className="modal-backdrop">
-              <div className="modal-box">
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: darkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 9999,
+              }}
+            >
+              <div
+                style={{
+                  background: darkMode ? '#0f172a' : '#ffffff',
+                  padding: '22px 28px',
+                  borderRadius: '12px',
+                  border: darkMode
+                    ? '1px solid rgba(148,163,184,0.4)'
+                    : '2px solid #4fc3f7',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+                  textAlign: 'center',
+                  animation: 'fadeIn 0.25s ease-out',
+                  color: darkMode ? '#e5e7eb' : '#111827',
+                }}
+              >
                 <div className="modal-icon">✔</div>
                 <p>{modal.message}</p>
 
@@ -655,12 +679,33 @@ export default function RootLayout({
                   }}
                 >
                   {modal.type === 'confirm' && (
-                    <button className="modal-cancel" onClick={modal.onCancel}>
+                    <button
+                      onClick={modal.onCancel}
+                      style={{
+                        padding: '8px 14px',
+                        background: darkMode ? '#334155' : '#ddd',
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
                       취소
                     </button>
                   )}
 
-                  <button className="modal-confirm" onClick={modal.onConfirm}>
+                  <button
+                    onClick={modal.onConfirm}
+                    style={{
+                      padding: '8px 14px',
+                      background: darkMode ? '#2563EB' : '#4fc3f7',
+                      color: 'white',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
                     확인
                   </button>
                 </div>
@@ -670,46 +715,11 @@ export default function RootLayout({
 
           {/* 모달 CSS */}
           <style jsx>{`
-            .modal-backdrop {
-              position: fixed;
-              inset: 0;
-              background: rgba(0, 0, 0, 0.35);
-              backdrop-filter: blur(4px);
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              z-index: 9999;
-            }
-            .modal-box {
-              background: #ffffff;
-              padding: 22px 28px;
-              border-radius: 12px;
-              border: 2px solid #4fc3f7;
-              box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-              text-align: center;
-              animation: fadeIn 0.25s ease-out;
-            }
             .modal-icon {
               color: #4fc3f7;
               font-size: 32px;
               font-weight: bold;
               margin-bottom: 8px;
-            }
-            .modal-confirm {
-              padding: 8px 14px;
-              background: #4fc3f7;
-              color: white;
-              border-radius: 6px;
-              border: none;
-              cursor: pointer;
-              font-weight: 600;
-            }
-            .modal-cancel {
-              padding: 8px 14px;
-              background: #ddd;
-              border-radius: 6px;
-              border: none;
-              cursor: pointer;
             }
             @keyframes fadeIn {
               from {
