@@ -12,15 +12,18 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-const getScoreStorageKey = (grade: number) => {
+const getScoreStorageKey = (grade: number, year: number) => {
   const userId = localStorage.getItem('userId')
   if (!userId) return null
-  return `mock_scores_user_${userId}_grade_${grade}`
+  return `mock_scores_user_${userId}_year_${year}_grade_${grade}`
 }
 
 type SubjectKey =
-  | 'korean'
-  | 'math'
+  | 'korean_hw'
+  | 'korean_em'
+  | 'math_stat'
+  | 'math_calc'
+  | 'math_geo'
   | 'english'
   | 'history'
   | 'explore1'
@@ -29,13 +32,19 @@ type SubjectKey =
 
 interface SavedEntry {
   korean?: number | null
+  koreanType?: string | null
+
   math?: number | null
+  mathType?: string | null
+
   english?: number | null
   history?: number | null
+
   explore1?: number | null
   explore1Name?: string | null
   explore2?: number | null
   explore2Name?: string | null
+
   secondLang?: number | null
   secondLangName?: string | null
 }
@@ -70,6 +79,10 @@ export default function ScoresPage() {
   const [secondLang, setSecondLang] = useState('')
   const [secondLangScore, setSecondLangScore] = useState('')
 
+  // 고3 선택과목
+  const [koreanType, setKoreanType] = useState('')
+  const [mathType, setMathType] = useState('')
+
   // 저장된 점수 (현재 학년 기준, 월 → SavedEntry)
   const [savedData, setSavedData] = useState<Record<string, SavedEntry>>({})
 
@@ -81,6 +94,18 @@ export default function ScoresPage() {
 
   // 그래프 보기: 꺽은선 형식, 막대 형식 버튼 선택
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
+
+  // ---------------------------------------------
+  // ⭐ 년도 선택 (2026 ~ 2032)
+  // ---------------------------------------------
+  const yearRange = Array.from({ length: 7 }, (_, i) => 2026 + i)
+
+  // 현재 연도 기본값 (자동 증가 대응)
+  const currentYear = new Date().getFullYear()
+  const defaultYear =
+    currentYear >= 2026 && currentYear <= 2032 ? currentYear : 2026
+
+  const [year, setYear] = useState<number>(defaultYear)
 
   // ---------------------------------------------
   // ⭐ 탐구 과목 리스트 (학년별)
@@ -240,8 +265,8 @@ export default function ScoresPage() {
   // ---------------------------------------------
   // ⭐ 저장된 점수 로드 (학년 변경/초기)
   // ---------------------------------------------
-  const loadSavedScores = (g: number) => {
-    const key = getScoreStorageKey(g)
+  const loadSavedScores = (g: number, y: number) => {
+    const key = getScoreStorageKey(g, y)
     if (!key) return
 
     const raw = localStorage.getItem(key)
@@ -263,7 +288,7 @@ export default function ScoresPage() {
     setSecondLang('')
     setSecondLangScore('')
     setSelectedSubject(null)
-    loadSavedScores(g)
+    loadSavedScores(g, year)
   }
 
   // ⭐ 월 변경 시 전체 초기화
@@ -272,7 +297,7 @@ export default function ScoresPage() {
 
     if (!grade) return
 
-    const key = getScoreStorageKey(grade)
+    const key = getScoreStorageKey(grade, year)
     if (!key) return
     const raw = localStorage.getItem(key)
     const parsed: Record<string, SavedEntry> = raw ? JSON.parse(raw) : {}
@@ -322,7 +347,7 @@ export default function ScoresPage() {
 
     // 1️⃣ 프론트 localStorage 저장 (기존 유지)
     // -----------------------------
-    const key = getScoreStorageKey(grade)
+    const key = getScoreStorageKey(grade, year)
     if (!key) return
     const raw = localStorage.getItem(key)
     const parsed = raw ? JSON.parse(raw) : {}
@@ -340,7 +365,10 @@ export default function ScoresPage() {
     parsed[selectedMonth] = {
       // 필수
       korean: scores.korean ? Number(scores.korean) : null,
+      koreanType: grade === 3 ? koreanType : null,
+
       math: scores.math ? Number(scores.math) : null,
+      mathType: grade === 3 ? mathType : null,
       english: scores.english ? Number(scores.english) : null,
       history: scores.history ? Number(scores.history) : null,
 
@@ -365,8 +393,21 @@ export default function ScoresPage() {
     // -----------------------------
     const payload: Record<string, number> = {}
 
-    if (scores.korean) payload['국어'] = Number(scores.korean)
-    if (scores.math) payload['수학'] = Number(scores.math)
+    if (scores.korean) {
+      if (grade === 3 && koreanType) {
+        payload[`국어_${koreanType}`] = Number(scores.korean)
+      } else {
+        payload['국어'] = Number(scores.korean)
+      }
+    }
+
+    if (scores.math) {
+      if (grade === 3 && mathType) {
+        payload[`수학_${mathType}`] = Number(scores.math)
+      } else {
+        payload['수학'] = Number(scores.math)
+      }
+    }
     if (scores.english) payload['영어'] = Number(scores.english)
     if (scores.history) payload['한국사'] = Number(scores.history)
 
@@ -401,6 +442,7 @@ export default function ScoresPage() {
         Authorization: `Bearer ${token}`, // ✅ 수정 완료
       },
       body: JSON.stringify({
+        year,
         grade,
         month: selectedMonth,
         scores: payload,
@@ -415,22 +457,40 @@ export default function ScoresPage() {
   // ⭐ 과목별 색상
   // ---------------------------------------------
   const subjectColors: Record<SubjectKey, string> = {
-    korean: '#e74c3c', // 빨강
-    math: '#3498db', // 파랑
-    english: '#2ecc71', // 초록
-    history: '#9b59b6', // 보라
-    explore1: '#e67e22', // 주황
-    explore2: '#f1c40f', // 노랑
-    secondLang: '#1abc9c', // 청록
+    korean_hw: '#e74c3c',
+    korean_em: '#c0392b',
+
+    math_stat: '#3498db',
+    math_calc: '#2980b9',
+    math_geo: '#1f5f8b',
+
+    english: '#2ecc71',
+    history: '#9b59b6',
+    explore1: '#e67e22',
+    explore2: '#f1c40f',
+    secondLang: '#1abc9c',
   }
 
   // ---------------------------------------------
   // ⭐ 그래프용 과목 버튼 목록
   // ---------------------------------------------
   const subjectButtons: { key: SubjectKey; label: string }[] = []
+  if (grade === 3) {
+    subjectButtons.push(
+      { key: 'korean_hw', label: '국어-화법과작문' },
+      { key: 'korean_em', label: '국어-언어와매체' },
+      { key: 'math_stat', label: '수학-확률과통계' },
+      { key: 'math_calc', label: '수학-미적분' },
+      { key: 'math_geo', label: '수학-기하' },
+    )
+  } else {
+    subjectButtons.push(
+      { key: 'korean_hw', label: '국어' },
+      { key: 'math_stat', label: '수학' },
+    )
+  }
+
   subjectButtons.push(
-    { key: 'korean', label: '국어' },
-    { key: 'math', label: '수학' },
     { key: 'english', label: '영어' },
     { key: 'history', label: '한국사' },
   )
@@ -474,29 +534,62 @@ export default function ScoresPage() {
 
             let value: number | null = null
             switch (selectedSubject.key) {
-              case 'korean':
-                value = entry.korean ?? null
+              case 'korean_hw':
+                if (
+                  entry.koreanType === '화법과작문' ||
+                  selectedSubject.label === '국어'
+                ) {
+                  value = entry.korean ?? null
+                }
                 break
-              case 'math':
-                value = entry.math ?? null
+
+              case 'korean_em':
+                if (entry.koreanType === '언어와매체') {
+                  value = entry.korean ?? null
+                }
                 break
+
+              case 'math_stat':
+                if (
+                  entry.mathType === '확률과통계' ||
+                  selectedSubject.label === '수학'
+                ) {
+                  value = entry.math ?? null
+                }
+                break
+
+              case 'math_calc':
+                if (entry.mathType === '미적분') {
+                  value = entry.math ?? null
+                }
+                break
+
+              case 'math_geo':
+                if (entry.mathType === '기하') {
+                  value = entry.math ?? null
+                }
+                break
+
               case 'english':
                 value = entry.english ?? null
                 break
+
               case 'history':
                 value = entry.history ?? null
                 break
+
               case 'explore1':
-                // 같은 과목 이름일 때만 포함
                 if (entry.explore1Name === selectedSubject.label) {
                   value = entry.explore1 ?? null
                 }
                 break
+
               case 'explore2':
                 if (entry.explore2Name === selectedSubject.label) {
                   value = entry.explore2 ?? null
                 }
                 break
+
               case 'secondLang':
                 if (entry.secondLangName === selectedSubject.label) {
                   value = entry.secondLang ?? null
@@ -514,6 +607,32 @@ export default function ScoresPage() {
     <div className="page-wrap">
       <h1 className="title">모의고사 성적 계산기</h1>
       <p className="subtitle">원점수 기준 등급을 확인하세요</p>
+
+      {/* 년도 선택 (드롭다운) */}
+      <div style={{ marginTop: 15 }}>
+        <label style={{ marginRight: 10, fontWeight: 600 }}>년도 선택</label>
+
+        <select
+          value={year}
+          onChange={(e) => {
+            const selectedYear = Number(e.target.value)
+            setYear(selectedYear)
+            if (grade) loadSavedScores(grade, selectedYear)
+          }}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 6,
+            border: '1px solid #ccc',
+            fontSize: 14,
+          }}
+        >
+          {yearRange.map((y) => (
+            <option key={y} value={y}>
+              {y}년
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* 학년 선택 */}
       <div className="grade-tabs">
@@ -561,7 +680,38 @@ export default function ScoresPage() {
 
             <div className="input-group">
               <div className="input-box">
-                <label>국어 (100점)</label>
+                <label>
+                  국어 (100점)
+                  {grade === 3 && koreanType && ` - ${koreanType}`}
+                </label>
+
+                {grade === 3 && (
+                  <>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                      {['화법과작문', '언어와매체'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setKoreanType(type)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: 8,
+                            border:
+                              koreanType === type
+                                ? '2px solid #e74c3c'
+                                : '1px solid #ccc',
+                            background:
+                              koreanType === type ? '#fdecea' : '#fff',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 <input
                   type="number"
                   value={scores.korean}
@@ -572,7 +722,37 @@ export default function ScoresPage() {
               </div>
 
               <div className="input-box">
-                <label>수학 (100점)</label>
+                <label>
+                  수학 (100점)
+                  {grade === 3 && mathType && ` - ${mathType}`}
+                </label>
+
+                {grade === 3 && (
+                  <>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                      {['확률과통계', '미적분', '기하'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setMathType(type)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: 8,
+                            border:
+                              mathType === type
+                                ? '2px solid #3498db'
+                                : '1px solid #ccc',
+                            background: mathType === type ? '#eaf4ff' : '#fff',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 <input
                   type="number"
                   value={scores.math}
