@@ -109,16 +109,6 @@ export default function BoardTemplate({
   }, [])
 
   useEffect(() => {
-    const raw = localStorage.getItem('theme_settings')
-    if (!raw) return
-
-    try {
-      const parsed = JSON.parse(raw)
-      setDarkMode(parsed.darkMode)
-    } catch {}
-  }, [])
-
-  useEffect(() => {
     router.prefetch(`/board/write?category=${category}`)
   }, [category])
 
