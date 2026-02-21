@@ -183,6 +183,33 @@ export default function MyInfoPagePreview() {
   // 회원탈퇴 완료 모달 디자인
   const [showDeleteDoneModal, setShowDeleteDoneModal] = useState(false)
 
+  // 🔔 알림 설정
+  type NotificationSettings = {
+    chat: boolean
+    postComment: boolean
+    commentReply: boolean
+  }
+
+  const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+    chat: true,
+    postComment: true,
+    commentReply: true,
+  }
+
+  const getNotificationSettings = (): NotificationSettings => {
+    const raw = localStorage.getItem('notification_settings')
+    if (!raw) return DEFAULT_NOTIFICATION_SETTINGS
+    return JSON.parse(raw)
+  }
+
+  const saveNotificationSettings = (settings: NotificationSettings) => {
+    localStorage.setItem('notification_settings', JSON.stringify(settings))
+  }
+
+  const [showNotificationModal, setShowNotificationModal] = useState(false)
+  const [notificationSettings, setNotificationSettings] =
+    useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS)
+
   useEffect(() => {
     const stored = localStorage.getItem('loggedInUser')
     if (!stored) return
@@ -219,6 +246,11 @@ export default function MyInfoPagePreview() {
     } catch {
       setUser(null)
     }
+  }, [])
+
+  useEffect(() => {
+    const settings = getNotificationSettings()
+    setNotificationSettings(settings)
   }, [])
 
   const handlePasswordChange = async () => {
@@ -773,6 +805,23 @@ export default function MyInfoPagePreview() {
         >
           내 정보
         </h1>
+
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <button
+            onClick={() => setShowNotificationModal(true)}
+            style={{
+              background: 'transparent',
+              border: '1px solid #e5e7eb',
+              padding: '6px 14px',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            ⚙ 알림 설정
+          </button>
+        </div>
 
         <Field label="이름" value={user.name || ''} />
         <Field label="아이디" value={user.username} />
@@ -1714,6 +1763,129 @@ export default function MyInfoPagePreview() {
           </div>
         )}
       </div>
+
+      {showNotificationModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: 16,
+              padding: 24,
+              width: '90%',
+              maxWidth: 360,
+            }}
+          >
+            <h3 style={{ fontWeight: 700, marginBottom: 16 }}>🔔 알림 설정</h3>
+
+            {[
+              { key: 'chat', label: '채팅 알림' },
+              { key: 'postComment', label: '내 게시글 댓글 알림' },
+              { key: 'commentReply', label: '내 댓글 답글 알림' },
+            ].map((item) => (
+              <div
+                key={item.key}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 14,
+                }}
+              >
+                <span>{item.label}</span>
+
+                <div
+                  onClick={() => {
+                    const key = item.key as keyof NotificationSettings
+                    const updated = {
+                      ...notificationSettings,
+                      [key]: !notificationSettings[key],
+                    }
+                    setNotificationSettings(updated)
+                    saveNotificationSettings(updated)
+                  }}
+                  style={{
+                    width: 60,
+                    height: 26,
+                    borderRadius: 999,
+                    background: notificationSettings[
+                      item.key as keyof NotificationSettings
+                    ]
+                      ? '#4FC3F7'
+                      : '#e5e7eb',
+                    position: 'relative',
+                    cursor: 'pointer',
+                    transition: 'all 0.25s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0 6px',
+                    boxSizing: 'border-box',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: notificationSettings[
+                      item.key as keyof NotificationSettings
+                    ]
+                      ? 'white'
+                      : '#6b7280',
+                    justifyContent: notificationSettings[
+                      item.key as keyof NotificationSettings
+                    ]
+                      ? 'flex-start'
+                      : 'flex-end',
+                  }}
+                >
+                  {notificationSettings[item.key as keyof NotificationSettings]
+                    ? 'ON'
+                    : 'OFF'}
+
+                  <div
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      background: 'white',
+                      position: 'absolute',
+                      top: 2,
+                      left: notificationSettings[
+                        item.key as keyof NotificationSettings
+                      ]
+                        ? 34
+                        : 2,
+                      transition: 'all 0.25s ease',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setShowNotificationModal(false)}
+              style={{
+                marginTop: 12,
+                width: '100%',
+                padding: '8px 0',
+                borderRadius: 999,
+                border: 'none',
+                background: '#4FC3F7',
+                color: 'white',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {showDeleteDoneModal && (
         <div
