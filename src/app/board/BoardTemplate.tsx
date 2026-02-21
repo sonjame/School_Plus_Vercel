@@ -83,7 +83,17 @@ export default function BoardTemplate({
     return false // ✅ 정상
   }
 
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return false
+      return JSON.parse(raw).darkMode ?? false
+    } catch {
+      return false
+    }
+  })
 
   const [isMobile, setIsMobile] = useState(false)
 
@@ -107,6 +117,10 @@ export default function BoardTemplate({
       setDarkMode(parsed.darkMode)
     } catch {}
   }, [])
+
+  useEffect(() => {
+    router.prefetch(`/board/write?category=${category}`)
+  }, [category])
 
   useEffect(() => {
     async function load() {
@@ -154,7 +168,6 @@ export default function BoardTemplate({
       style={{
         minHeight: '100vh',
         background: darkMode ? '#0f172a' : '#f1f5f9',
-        transition: '0.25s',
       }}
     >
       {/* 🚫 계정 정지 모달 */}
@@ -353,7 +366,7 @@ export default function BoardTemplate({
               onClick={async () => {
                 const banned = await checkBanAndAlert()
                 if (banned) return
-                router.push(`/board/write?category=${category}`)
+                router.replace(`/board/write?category=${category}`)
               }}
               style={{
                 height: 44,
