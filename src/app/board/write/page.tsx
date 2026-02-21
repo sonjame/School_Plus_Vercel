@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type React from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function WritePage() {
   const [category, setCategory] = useState('free')
@@ -49,17 +50,19 @@ export default function WritePage() {
     })
   }
 
-  const [darkMode, setDarkMode] = useState(false)
-
-  useEffect(() => {
-    const raw = localStorage.getItem('theme_settings')
-    if (!raw) return
+  const [darkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
 
     try {
-      const parsed = JSON.parse(raw)
-      setDarkMode(parsed.darkMode)
-    } catch {}
-  }, [])
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return false
+      return JSON.parse(raw).darkMode ?? false
+    } catch {
+      return false
+    }
+  })
+
+  const router = useRouter()
 
   /* 카테고리 로드 */
   useEffect(() => {
@@ -89,7 +92,7 @@ export default function WritePage() {
 
     if (!canWrite) {
       showAlert('해당 게시판에는 글을 작성할 수 없습니다.', () => {
-        window.location.href = `/board/${category}`
+        router.replace(`/board/${category}`)
       })
     }
   }, [category])
@@ -163,12 +166,12 @@ export default function WritePage() {
       voteOptions.some((v) => v.trim())
 
     if (!hasContent) {
-      window.location.href = `/board/${category}`
+      router.replace(`/board/${category}`)
       return
     }
 
     showAlert('작성 중인 내용이 삭제됩니다.\n정말 취소할까요?', () => {
-      window.location.href = `/board/${category}`
+      router.replace(`/board/${category}`)
     })
   }
 
@@ -218,7 +221,7 @@ export default function WritePage() {
     }
 
     showAlert('작성 완료!', () => {
-      window.location.href = `/board/${category}`
+      router.replace(`/board/${category}`)
     })
   }
 
@@ -764,7 +767,6 @@ const pageWrap = (darkMode: boolean): React.CSSProperties => ({
   justifyContent: 'center',
   alignItems: 'flex-start',
   fontFamily: 'Inter, sans-serif',
-  transition: '0.25s',
 })
 
 const card = (darkMode: boolean): React.CSSProperties => ({
@@ -778,7 +780,6 @@ const card = (darkMode: boolean): React.CSSProperties => ({
     : '0 6px 18px rgba(0,0,0,0.06)',
   border: darkMode ? '1px solid #334155' : '1px solid #E3EAF3',
   marginTop: 10,
-  transition: '0.25s',
 })
 
 const titleStyle: React.CSSProperties = {
