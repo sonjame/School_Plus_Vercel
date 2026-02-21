@@ -10,6 +10,9 @@ export default function EditPostPage() {
   const postId = params.id
   const router = useRouter()
 
+  const [darkMode, setDarkMode] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
   const boardKeys = [
     'board_free',
     'board_promo',
@@ -72,6 +75,19 @@ export default function EditPostPage() {
       onCancel: () => setModal((m) => ({ ...m, show: false })),
     })
   }
+
+  useEffect(() => {
+    setMounted(true)
+
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      setDarkMode(parsed.darkMode ?? false)
+    } catch {
+      // 무시
+    }
+  }, [])
 
   /* ------------------------------
      게시글 로드
@@ -200,6 +216,9 @@ export default function EditPostPage() {
     })
   }
 
+  // 🔥 SSR hydration mismatch 방지
+  if (!mounted) return null
+
   if (!post) return <p style={{ padding: 20 }}>게시글을 찾을 수 없습니다.</p>
 
   return (
@@ -213,8 +232,23 @@ export default function EditPostPage() {
         rel="stylesheet"
       />
 
-      <div style={pageWrap}>
-        <div style={card}>
+      <div
+        style={{
+          ...pageWrap,
+          background: darkMode ? '#0f172a' : '#F3F6FA',
+          color: darkMode ? '#f1f5f9' : '#111827',
+        }}
+      >
+        <div
+          style={{
+            ...card,
+            background: darkMode ? '#1e293b' : '#fff',
+            border: darkMode ? '1px solid #334155' : '1px solid #E3EAF3',
+            boxShadow: darkMode
+              ? '0 10px 30px rgba(15,23,42,0.7)'
+              : '0 4px 20px rgba(0,0,0,0.06)',
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -239,7 +273,7 @@ export default function EditPostPage() {
                 })
               }
               style={{
-                background: '#ECEFF1',
+                background: darkMode ? '#0b1220' : '#ECEFF1',
                 border: 'none',
                 borderRadius: '50%',
                 width: 36,
@@ -248,7 +282,7 @@ export default function EditPostPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#546E7A',
+                color: darkMode ? '#e2e8f0' : '#546E7A',
               }}
               aria-label="수정 취소"
             >
@@ -262,22 +296,47 @@ export default function EditPostPage() {
           </div>
 
           {/* 제목 */}
-          <label style={label}>제목</label>
+          <label
+            style={{
+              ...label,
+              color: darkMode ? '#cbd5e1' : '#37474F',
+            }}
+          >
+            제목
+          </label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목을 입력하세요"
-            style={inputBox}
+            style={{
+              ...inputBox,
+              background: darkMode ? '#0b1220' : '#F9FAFB',
+              color: darkMode ? '#e2e8f0' : '#111827',
+              border: darkMode ? '1px solid #334155' : '1px solid #CFD8DC',
+            }}
           />
 
           {/* 내용 */}
-          <label style={label}>내용</label>
+          {/* 내용 */}
+          <label
+            style={{
+              ...label,
+              color: darkMode ? '#cbd5e1' : '#37474F',
+            }}
+          >
+            내용
+          </label>
           <textarea
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="내용을 입력하세요"
-            style={textArea}
+            style={{
+              ...textArea,
+              background: darkMode ? '#0b1220' : '#F9FAFB',
+              color: darkMode ? '#e2e8f0' : '#111827',
+              border: darkMode ? '1px solid #334155' : '1px solid #CFD8DC',
+            }}
           />
 
           {/* 이미지 업로드 */}
@@ -289,7 +348,15 @@ export default function EditPostPage() {
             onChange={handleImageUpload}
           />
 
-          <label htmlFor="uploadImage" style={uploadBtn}>
+          <label
+            htmlFor="uploadImage"
+            style={{
+              ...uploadBtn,
+              background: darkMode ? '#0b1220' : '#E3F2FD',
+              color: darkMode ? '#e0f2fe' : '#0277BD',
+              border: darkMode ? '1px solid #334155' : 'none',
+            }}
+          >
             <span className="material-symbols-rounded" style={uploadBtnIcon}>
               image
             </span>
@@ -327,7 +394,12 @@ export default function EditPostPage() {
           )}
 
           {/* 🔗 첨부 링크 / 영상 수정 */}
-          <hr style={{ margin: '20px 0', borderColor: '#ddd' }} />
+          <hr
+            style={{
+              margin: '20px 0',
+              borderColor: darkMode ? '#1f2937' : '#ddd',
+            }}
+          />
 
           <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
             🔗 첨부 링크 / 영상
@@ -353,7 +425,9 @@ export default function EditPostPage() {
                 style={{
                   padding: '10px',
                   borderRadius: 8,
-                  border: '1px solid #ccc',
+                  border: darkMode ? '1px solid #334155' : '1px solid #ccc',
+                  background: darkMode ? '#020617' : '#fff',
+                  color: darkMode ? '#e2e8f0' : '#111827',
                 }}
               >
                 <option value="link">링크</option>
@@ -376,8 +450,10 @@ export default function EditPostPage() {
                   flex: 1,
                   minWidth: 0,
                   padding: '10px',
-                  border: '1px solid #ccc',
                   borderRadius: 8,
+                  border: darkMode ? '1px solid #334155' : '1px solid #ccc',
+                  background: darkMode ? '#020617' : '#fff',
+                  color: darkMode ? '#e2e8f0' : '#111827',
                 }}
               />
 
@@ -408,12 +484,13 @@ export default function EditPostPage() {
             style={{
               width: '100%',
               padding: '10px',
-              background: '#E3F2FD',
-              border: '1px solid #90CAF9',
+              background: darkMode ? '#020617' : '#E3F2FD',
+              border: darkMode ? '1px solid #334155' : '1px solid #90CAF9',
               borderRadius: 8,
               cursor: 'pointer',
               fontWeight: 600,
               marginBottom: 10,
+              color: darkMode ? '#e0f2fe' : '#0277BD',
             }}
           >
             + 첨부 추가
@@ -451,7 +528,14 @@ export default function EditPostPage() {
           {voteEnabled && (
             <div style={{ paddingLeft: 8 }}>
               {/* 옵션 수정 */}
-              <label style={label}>투표 옵션</label>
+              <label
+                style={{
+                  ...label,
+                  color: darkMode ? '#cbd5e1' : '#37474F',
+                }}
+              >
+                투표 옵션
+              </label>
 
               {voteOptions.map((opt, idx) => (
                 <div
@@ -469,8 +553,10 @@ export default function EditPostPage() {
                     style={{
                       flex: 1,
                       padding: '10px',
-                      border: '1px solid #ccc',
                       borderRadius: 8,
+                      border: darkMode ? '1px solid #334155' : '1px solid #ccc',
+                      background: darkMode ? '#020617' : '#fff',
+                      color: darkMode ? '#e2e8f0' : '#111827',
                     }}
                   />
 
@@ -498,33 +584,45 @@ export default function EditPostPage() {
                 style={{
                   width: '100%',
                   padding: '10px',
-                  background: '#E3F2FD',
-                  border: '1px solid #90CAF9',
+                  background: darkMode ? '#020617' : '#E3F2FD',
+                  border: darkMode ? '1px solid #334155' : '1px solid #90CAF9',
                   borderRadius: 8,
                   cursor: 'pointer',
                   fontWeight: 600,
                   marginBottom: 14,
+                  color: darkMode ? '#e0f2fe' : '#0277BD',
                 }}
               >
                 + 옵션 추가
               </button>
 
               {/* 마감 시간 */}
-              <label style={label}>투표 마감 시간</label>
+              <label
+                style={{
+                  ...label,
+                  color: darkMode ? '#cbd5e1' : '#37474F',
+                }}
+              >
+                투표 마감 시간
+              </label>
               <input
                 type="datetime-local"
                 value={voteEndAt}
                 onChange={(e) => setVoteEndAt(e.target.value)}
+                className={darkMode ? 'datetime-input dark' : 'datetime-input'} // 🔥 추가
                 style={{
                   width: '100%',
                   height: '46px',
                   padding: '0 14px',
-                  border: '1.5px solid #CFD8DC',
                   borderRadius: '10px',
                   fontSize: '15px',
-                  background: '#FFFFFF',
                   boxSizing: 'border-box',
-                  marginBottom: '18px', // 🔥 여백 추가 (이 줄만 추가!)
+                  marginBottom: '18px',
+                  border: darkMode
+                    ? '1.5px solid #334155'
+                    : '1.5px solid #CFD8DC',
+                  background: darkMode ? '#020617' : '#FFFFFF',
+                  color: darkMode ? '#e2e8f0' : '#111827',
                 }}
               />
             </div>
@@ -540,7 +638,13 @@ export default function EditPostPage() {
       {/* 모달 */}
       {modal.show && (
         <div className="modal-backdrop">
-          <div className="modal-box">
+          <div
+            className="modal-box"
+            style={{
+              background: darkMode ? '#1e293b' : '#ffffff',
+              color: darkMode ? '#e2e8f0' : '#111827',
+            }}
+          >
             <div className="modal-icon">✔</div>
             <p>{modal.message}</p>
 
@@ -628,6 +732,15 @@ export default function EditPostPage() {
             opacity: 1;
             transform: scale(1);
           }
+        }
+
+        .datetime-input::-webkit-calendar-picker-indicator {
+          cursor: pointer;
+        }
+
+        /* 다크 모드에서 아이콘 색 반전 */
+        .datetime-input.dark::-webkit-calendar-picker-indicator {
+          filter: invert(1);
         }
       `}</style>
     </>
