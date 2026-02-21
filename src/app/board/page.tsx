@@ -168,11 +168,12 @@ const getMiniPost = (darkMode: boolean): React.CSSProperties => ({
 
 const getOuterStyle = (darkMode: boolean): React.CSSProperties => ({
   minHeight: '100vh',
-  background: darkMode ? '#0f172a' : '#f1f5f9',
+  background: darkMode ? '#0f172a' : 'white',
 })
 
 const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
-  maxWidth: '1200px',
+  width: '100%', // 🔥 전체 폭 사용
+  maxWidth: '100%',
 
   marginTop: 0,
   marginBottom: 0,
