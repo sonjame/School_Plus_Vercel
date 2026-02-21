@@ -83,6 +83,31 @@ export default function BoardTemplate({
     return false // ✅ 정상
   }
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkScreen = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkScreen() // 처음 실행
+    window.addEventListener('resize', checkScreen)
+
+    return () => window.removeEventListener('resize', checkScreen)
+  }, [])
+
+  useEffect(() => {
+    const raw = localStorage.getItem('theme_settings')
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+      setDarkMode(parsed.darkMode)
+    } catch {}
+  }, [])
+
   useEffect(() => {
     async function load() {
       try {
@@ -125,7 +150,13 @@ export default function BoardTemplate({
   })
 
   return (
-    <>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: darkMode ? '#0f172a' : '#f1f5f9',
+        transition: '0.25s',
+      }}
+    >
       {/* 🚫 계정 정지 모달 */}
       {banInfo && (
         <div
@@ -143,7 +174,8 @@ export default function BoardTemplate({
             style={{
               width: '90%',
               maxWidth: '420px',
-              background: '#fff',
+              background: darkMode ? '#1e293b' : '#fff',
+              color: darkMode ? '#f1f5f9' : '#111827',
               borderRadius: '16px',
               padding: '24px',
               textAlign: 'center',
@@ -155,18 +187,33 @@ export default function BoardTemplate({
             </h2>
 
             <p
-              style={{ fontSize: '15px', color: '#444', marginBottom: '12px' }}
+              style={{
+                fontSize: '15px',
+                color: darkMode ? '#cbd5e1' : '#444',
+                marginBottom: '12px',
+              }}
             >
               {banInfo.reason}
             </p>
 
             {banInfo.remainHours !== undefined && (
-              <p style={{ fontSize: '14px', color: '#666' }}>
+              <p
+                style={{
+                  fontSize: '14px',
+                  color: darkMode ? '#94a3b8' : '#666',
+                }}
+              >
                 남은 정지 시간: <strong>{banInfo.remainHours}시간</strong>
               </p>
             )}
 
-            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+            <p
+              style={{
+                fontSize: '14px',
+                color: darkMode ? '#cbd5e1' : '#555',
+                marginTop: '10px',
+              }}
+            >
               현재 계정은 <strong>게시글·댓글 작성이 제한</strong>되어 있습니다.
             </p>
 
@@ -190,12 +237,14 @@ export default function BoardTemplate({
       )}
       <div
         style={{
-          background: '#fff',
+          background: darkMode ? '#1e293b' : '#fff',
+          color: darkMode ? '#f1f5f9' : '#111827',
           padding: 'clamp(14px, 2vw, 20px) clamp(10px, 2vw, 16px)',
+          paddingTop: isMobile ? '65px' : '40px',
           borderRadius: '12px',
           maxWidth: 'min(1200px, 98vw)',
           margin: '0 auto',
-          marginTop: 'clamp(12px, 4vw, 28px)',
+          marginTop: 0,
         }}
       >
         <div
@@ -248,42 +297,62 @@ export default function BoardTemplate({
         <div
           style={{
             display: 'flex',
+            alignItems: 'center',
             gap: 12,
             marginBottom: 20,
             flexWrap: 'wrap',
           }}
         >
-          <input
-            placeholder="검색어를 입력하세요"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+          {/* 왼쪽 영역 */}
+          <div
             style={{
-              flex: '1 1 200px',
-              padding: 12,
-              borderRadius: 8,
-              border: '1.5px solid #ccc',
-            }}
-          />
-          <select
-            value={sortType}
-            onChange={(e) => setSortType(e.target.value as 'latest' | 'likes')}
-            style={{
-              padding: '0 12px',
-              height: 44,
-              borderRadius: 8,
-              border: '1.5px solid #ccc',
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
+              flex: 1, // ⭐ 이게 핵심
             }}
           >
-            <option value="latest">🕒 최신순</option>
-            <option value="likes">💙 좋아요순</option>
-          </select>
+            <input
+              placeholder="검색어를 입력하세요"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                padding: '0 12px',
+                height: 44,
+                borderRadius: 8,
+                border: darkMode ? '1.5px solid #334155' : '1.5px solid #ccc',
+                background: darkMode ? '#0f172a' : '#fff',
+                color: darkMode ? '#f1f5f9' : '#111827',
+                flex: 1, // ⭐ input도 늘어나게
+                minWidth: 180,
+              }}
+            />
 
+            <select
+              value={sortType}
+              onChange={(e) =>
+                setSortType(e.target.value as 'latest' | 'likes')
+              }
+              style={{
+                padding: '0 12px',
+                height: 44,
+                borderRadius: 8,
+                border: darkMode ? '1.5px solid #334155' : '1.5px solid #ccc',
+                background: darkMode ? '#0f172a' : '#fff',
+                color: darkMode ? '#f1f5f9' : '#111827',
+              }}
+            >
+              <option value="latest">🕒 최신순</option>
+              <option value="likes">💙 좋아요순</option>
+            </select>
+          </div>
+
+          {/* 오른쪽 버튼 */}
           {canWrite ? (
             <button
               onClick={async () => {
                 const banned = await checkBanAndAlert()
                 if (banned) return
-
                 router.push(`/board/write?category=${category}`)
               }}
               style={{
@@ -314,6 +383,7 @@ export default function BoardTemplate({
                 fontWeight: 600,
                 fontSize: 13,
                 cursor: 'not-allowed',
+                marginLeft: 'auto',
               }}
             >
               {category === 'admin'
@@ -325,7 +395,12 @@ export default function BoardTemplate({
 
         {/* 목록 */}
         {sorted.length === 0 ? (
-          <p style={{ color: '#666', textAlign: 'center' }}>
+          <p
+            style={{
+              color: darkMode ? '#94a3b8' : '#666',
+              textAlign: 'center',
+            }}
+          >
             게시글이 없습니다.
           </p>
         ) : (
@@ -340,19 +415,30 @@ export default function BoardTemplate({
               >
                 <div
                   style={{
-                    border: '2px solid #E1F5FE',
+                    border: darkMode
+                      ? '1px solid #334155'
+                      : '2px solid #E1F5FE',
+                    background: darkMode ? '#0f172a' : '#fff',
                     borderRadius: 12,
                     padding: 16,
                     marginBottom: 14,
                     cursor: 'pointer',
                   }}
                 >
-                  <h3 style={{ fontSize: 20, fontWeight: 600 }}>{p.title}</h3>
+                  <h3
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 600,
+                      color: darkMode ? '#f1f5f9' : '#111827',
+                    }}
+                  >
+                    {p.title}
+                  </h3>
 
                   <p
                     style={{
                       marginTop: 6,
-                      color: '#555',
+                      color: darkMode ? '#94a3b8' : '#666',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
@@ -387,6 +473,6 @@ export default function BoardTemplate({
           })
         )}
       </div>
-    </>
+    </div>
   )
 }
