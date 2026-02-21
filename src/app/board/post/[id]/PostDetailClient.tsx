@@ -97,6 +97,18 @@ export default function PostDetailPage() {
     return false // ✅ 정상
   }
 
+  const [darkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return false
+      return JSON.parse(raw).darkMode ?? false
+    } catch {
+      return false
+    }
+  })
+
   useEffect(() => {
     const uid = localStorage.getItem('userId')
     if (uid) setMyUserId(Number(uid))
@@ -546,8 +558,14 @@ export default function PostDetailPage() {
           <div
             style={{
               marginLeft: isReply ? 24 : 0,
-              background: isReply ? '#F6F7F9' : '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              background: isReply
+                ? darkMode
+                  ? '#0f172a'
+                  : '#F6F7F9'
+                : darkMode
+                  ? '#1e293b'
+                  : '#FFFFFF',
+              border: darkMode ? '1px solid #334155' : '1px solid #E5E7EB',
               padding: isReply ? '10px 12px' : '14px',
               borderRadius: 8,
               marginBottom: 6,
@@ -571,7 +589,7 @@ export default function PostDetailPage() {
 
             {/* 메뉴 버튼 */}
             <button
-              style={menuBtn}
+              style={getMenuBtn(darkMode)}
               onClick={() =>
                 setOpenCommentMenu(openCommentMenu === c.id ? null : c.id)
               }
@@ -580,10 +598,10 @@ export default function PostDetailPage() {
             </button>
 
             {openCommentMenu === c.id && (
-              <div style={menuBox}>
+              <div style={commentMenuBox}>
                 <button
                   style={{
-                    ...menuItem,
+                    ...commentMenuItem,
                     color: reportedComments[c.id] ? '#9CA3AF' : undefined,
                     cursor: reportedComments[c.id] ? 'not-allowed' : 'pointer',
                   }}
@@ -593,7 +611,6 @@ export default function PostDetailPage() {
                       return
                     }
 
-                    // 🔥 어떤 댓글을 신고하는지 기억
                     setOpenCommentMenu(null)
                     setReportTarget({ type: 'comment', id: c.id })
                     setReportOpen(true)
@@ -605,7 +622,7 @@ export default function PostDetailPage() {
                 {canManageComment && (
                   <>
                     <button
-                      style={menuItem}
+                      style={commentMenuItem}
                       onClick={() => {
                         setEditId(c.id)
                         setEditValue(c.content)
@@ -614,7 +631,7 @@ export default function PostDetailPage() {
                       ✏ 수정하기
                     </button>
                     <button
-                      style={menuItemRed}
+                      style={commentMenuItemRed}
                       onClick={() => deleteComment(c.id)}
                     >
                       🗑 삭제하기
@@ -627,16 +644,20 @@ export default function PostDetailPage() {
             {editId === c.id ? (
               <div>
                 <textarea
-                  style={textBox}
+                  style={getTextBox(darkMode)}
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                 />
-                <button style={btnBlue} onClick={saveEdit}>
-                  저장
-                </button>
-                <button style={btnGray} onClick={() => setEditId(null)}>
-                  취소
-                </button>
+
+                {/* 🔥 버튼 영역 */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={btnBlue} onClick={saveEdit}>
+                    저장
+                  </button>
+                  <button style={btnGray} onClick={() => setEditId(null)}>
+                    취소
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -646,7 +667,7 @@ export default function PostDetailPage() {
                     fontSize: 14,
                     fontWeight: 500,
                     lineHeight: 1.5,
-                    color: '#111827',
+                    color: darkMode ? '#e2e8f0' : '#111827',
                   }}
                 >
                   {c.content}
@@ -657,7 +678,7 @@ export default function PostDetailPage() {
                   style={{
                     marginTop: 4,
                     fontSize: 12,
-                    color: '#6B7280',
+                    color: darkMode ? '#94a3b8' : '#6B7280',
                   }}
                 >
                   {c.author} · {new Date(c.created_at).toLocaleString()}
@@ -709,15 +730,15 @@ export default function PostDetailPage() {
                 style={{
                   marginTop: 10,
                   marginLeft: 24,
-                  background: '#F9FAFB',
-                  border: '1px solid #E5E7EB',
+                  background: darkMode ? '#0f172a' : '#F9FAFB',
+                  border: darkMode ? '1px solid #334155' : '1px solid #E5E7EB',
                   borderRadius: 8,
                   padding: 10,
                 }}
               >
                 <textarea
                   style={{
-                    ...textBox,
+                    ...getTextBox(darkMode),
                     marginBottom: 8,
                   }}
                   value={replyValue}
@@ -788,7 +809,15 @@ export default function PostDetailPage() {
   }
 
   return (
-    <>
+    <div
+      className="post-detail-root"
+      style={{
+        minHeight: '100vh',
+        background: darkMode ? '#0f172a' : '#f1f5f9',
+        color: darkMode ? '#f1f5f9' : '#111827',
+        paddingTop: 15,
+      }}
+    >
       {/* 🚫 계정 정지 모달 */}
       {banInfo && (
         <div
@@ -880,8 +909,11 @@ export default function PostDetailPage() {
         </h3>
 
         {/* 게시글 카드 */}
-        <div style={postCard}>
-          <button onClick={() => setMenuOpen(!menuOpen)} style={menuBtn}>
+        <div style={getPostCard(darkMode)}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={getMenuBtn(darkMode)}
+          >
             ⋮
           </button>
 
@@ -939,7 +971,7 @@ export default function PostDetailPage() {
             style={{
               padding: '10px 22px',
               fontSize: '14px',
-              background: '#F0F8FF',
+              background: darkMode ? '#0f172a' : '#F0F8FF',
               borderRadius: '12px 12px 0 0',
             }}
           >
@@ -972,8 +1004,21 @@ export default function PostDetailPage() {
             <span style={{ color: '#999' }}>{dateStr}</span>
           </div>
 
-          <div style={{ padding: '20px', background: '#F0F8FF' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 800 }}>{post.title}</h2>
+          <div
+            style={{
+              padding: '20px',
+              background: darkMode ? '#0f172a' : '#F0F8FF',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '24px',
+                fontWeight: 800,
+                color: darkMode ? '#f1f5f9' : '#111827',
+              }}
+            >
+              {post.title}
+            </h2>
           </div>
 
           {/* 이미지 (여러장 or 단일) */}
@@ -1016,7 +1061,7 @@ export default function PostDetailPage() {
                   fontSize: 15,
                   fontWeight: 700,
                   marginBottom: 8,
-                  color: '#37474F',
+                  color: darkMode ? '#e2e8f0' : '#37474F',
                 }}
               >
                 🎬 첨부
@@ -1069,12 +1114,14 @@ export default function PostDetailPage() {
                         style={{
                           padding: '10px 14px',
                           borderRadius: 10,
-                          border: '1px solid #CFD8DC',
+                          border: darkMode
+                            ? '1px solid #334155'
+                            : '1px solid #CFD8DC',
                           textDecoration: 'none',
-                          color: '#0288D1',
+                          color: darkMode ? '#4FC3F7' : '#0288D1',
                           fontSize: 14,
                           fontWeight: 600,
-                          background: '#F5FAFF',
+                          background: darkMode ? '#0f172a' : '#F5FAFF',
                           wordBreak: 'break-all',
                           overflowWrap: 'anywhere',
                           maxWidth: '100%',
@@ -1102,11 +1149,11 @@ export default function PostDetailPage() {
             </div>
           )}
 
-          <div style={postBody}>{post.content}</div>
+          <div style={getPostBody(darkMode)}>{post.content}</div>
 
           {/* 🔥 투표 영역 (좋아요 버튼 위에 위치) */}
           {hasVote && (
-            <div style={voteCard}>
+            <div style={getVoteCard(darkMode)}>
               <div style={voteHeader}>
                 <span style={{ fontWeight: 700 }}>투표</span>
 
@@ -1229,13 +1276,13 @@ export default function PostDetailPage() {
         </div>
 
         {/* 댓글 */}
-        <div style={commentCard}>
+        <div style={getCommentCard(darkMode)}>
           <h3 style={{ marginBottom: '10px' }}>💬 댓글</h3>
 
           {canComment ? (
             <>
               <textarea
-                style={textBox}
+                style={getTextBox(darkMode)}
                 placeholder="댓글 입력..."
                 value={commentValue}
                 onChange={(e) => setCommentValue(e.target.value)}
@@ -1249,8 +1296,8 @@ export default function PostDetailPage() {
               style={{
                 padding: '12px',
                 borderRadius: 8,
-                background: '#F1F5F9',
-                color: '#64748B',
+                background: darkMode ? '#0f172a' : '#F1F5F9',
+                color: darkMode ? '#94a3b8' : '#64748B',
                 fontSize: 14,
                 fontWeight: 600,
                 textAlign: 'center',
@@ -1270,7 +1317,7 @@ export default function PostDetailPage() {
         {/* 신고 모달 */}
         {reportOpen && (
           <div style={modalBg}>
-            <div style={reportBox}>
+            <div style={getReportBox(darkMode)}>
               <h3
                 style={{
                   marginBottom: '12px',
@@ -1375,7 +1422,7 @@ export default function PostDetailPage() {
         {/* 공통 모달 */}
         {modal.show && (
           <div style={modalBg}>
-            <div style={modalBox}>
+            <div style={getModalBox(darkMode)}>
               <p>{modal.message}</p>
 
               <div
@@ -1498,29 +1545,39 @@ export default function PostDetailPage() {
             )}
           </div>
         )}
+        <style jsx>{`
+          @media (min-width: 1024px) {
+            .post-detail-root {
+              padding-bottom: 120px;
+            }
+          }
+        `}</style>
       </div>
-    </>
+    </div>
   )
 }
 
 /* -------------------- 스타일 -------------------- */
 
-const postCard: React.CSSProperties = {
-  background: 'white',
+const getPostCard = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : 'white',
   borderRadius: '12px',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+  boxShadow: darkMode
+    ? '0 4px 14px rgba(0,0,0,0.35)'
+    : '0 4px 12px rgba(0,0,0,0.05)',
   marginBottom: '20px',
   position: 'relative',
-}
+})
 
-const postBody: React.CSSProperties = {
+const getPostBody = (darkMode: boolean): React.CSSProperties => ({
   padding: '20px',
   lineHeight: '1.7',
   fontSize: '16px',
   whiteSpace: 'pre-wrap',
-}
+  color: darkMode ? '#e2e8f0' : '#111827',
+})
 
-const menuBtn: React.CSSProperties = {
+const getMenuBtn = (darkMode: boolean): React.CSSProperties => ({
   position: 'absolute',
   top: '10px',
   right: '14px',
@@ -1528,7 +1585,8 @@ const menuBtn: React.CSSProperties = {
   border: 'none',
   cursor: 'pointer',
   fontSize: '22px',
-}
+  color: darkMode ? '#ffffff' : '#111827',
+})
 
 const menuBox: React.CSSProperties = {
   position: 'absolute',
@@ -1557,23 +1615,26 @@ const menuItemRed: React.CSSProperties = {
   color: 'red',
 }
 
-const commentCard: React.CSSProperties = {
-  background: 'white',
+const getCommentCard = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : 'white',
   padding: '25px',
   borderRadius: '12px',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-}
+  boxShadow: darkMode
+    ? '0 4px 14px rgba(0,0,0,0.35)'
+    : '0 4px 12px rgba(0,0,0,0.05)',
+})
 
-const textBox: React.CSSProperties = {
+const getTextBox = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
   padding: '12px 14px',
-  border: '1.5px solid #cfd8dc',
   borderRadius: '10px',
   marginBottom: '14px',
   fontSize: '14px',
   boxSizing: 'border-box',
-  background: '#ffffff',
-}
+  border: darkMode ? '1.5px solid #334155' : '1.5px solid #cfd8dc',
+  background: darkMode ? '#020617' : '#ffffff',
+  color: darkMode ? '#e2e8f0' : '#111827',
+})
 
 const btnBlue: React.CSSProperties = {
   background: '#4FC3F7',
@@ -1612,24 +1673,27 @@ const modalBg: React.CSSProperties = {
   zIndex: 9999,
 }
 
-const modalBox: React.CSSProperties = {
-  background: 'white',
-  padding: '24px',
+const getModalBox = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : 'white',
+  color: darkMode ? '#f1f5f9' : '#111827',
+  padding: '18px 16px',
   borderRadius: '12px',
-  width: '320px',
+  width: 'min(86vw, 300px)',
   textAlign: 'center',
-}
+})
 
-const reportBox: React.CSSProperties = {
-  background: '#ffffff',
-  padding: '22px',
-  borderRadius: '12px',
-  width: '420px',
-  maxWidth: '90%',
+const getReportBox = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : '#ffffff',
+  color: darkMode ? '#f1f5f9' : '#111827',
+  padding: '18px 16px', // 🔥 줄임
+  borderRadius: '10px',
+  width: 'min(88vw, 360px)', // 🔥 420 → 360
   textAlign: 'center',
-  boxShadow: '0 4px 18px rgba(0,0,0,0.12)',
-  border: '1.5px solid #E3EAF3',
-}
+  boxShadow: darkMode
+    ? '0 6px 20px rgba(0,0,0,0.45)'
+    : '0 4px 18px rgba(0,0,0,0.12)',
+  border: darkMode ? '1px solid #334155' : '1.5px solid #E3EAF3',
+})
 
 const inputBox: React.CSSProperties = {
   width: '100%',
@@ -1654,13 +1718,13 @@ const reportTextArea: React.CSSProperties = {
 }
 
 /* 🔥 투표 스타일 */
-const voteCard: React.CSSProperties = {
+const getVoteCard = (darkMode: boolean): React.CSSProperties => ({
   margin: '0 20px 16px',
   padding: '16px 14px 12px',
   borderRadius: 14,
-  background: '#F5FAFF',
-  border: '1px solid #BBDEFB',
-}
+  background: darkMode ? '#0f172a' : '#F5FAFF',
+  border: darkMode ? '1px solid #334155' : '1px solid #BBDEFB',
+})
 
 const voteHeader: React.CSSProperties = {
   display: 'flex',
@@ -1698,4 +1762,34 @@ const voteBarFill: React.CSSProperties = {
   height: '100%',
   borderRadius: 999,
   transition: 'width 0.25s ease',
+}
+
+const commentMenuBox: React.CSSProperties = {
+  position: 'absolute',
+  top: 34, // 댓글 기준 살짝 아래
+  right: 6,
+  background: 'white',
+  border: '1px solid #e5e7eb',
+  borderRadius: 10,
+  boxShadow: '0 4px 10px rgba(0,0,0,0.18)',
+  padding: '4px 0',
+  zIndex: 9999,
+  minWidth: 140, // 너무 넓어지지 않게
+  maxWidth: 180,
+}
+
+const commentMenuItem: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 10px', // 🔥 기존보다 줄임
+  textAlign: 'left',
+  background: 'white',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: 13, // 🔥 한 단계 작게
+  lineHeight: 1.3,
+}
+
+const commentMenuItemRed: React.CSSProperties = {
+  ...commentMenuItem,
+  color: 'red',
 }
