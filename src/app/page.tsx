@@ -79,6 +79,34 @@ export default function HomePage() {
     { id: number; title: string; message: string }[]
   >([])
 
+  // 🌙 다크모드 상태
+  const [themeSetting, setThemeSetting] = useState<{ darkMode: boolean }>({
+    darkMode: false,
+  })
+
+  // 🌙 초기 다크모드 로딩
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      setThemeSetting({ darkMode: !!parsed.darkMode })
+    } catch {
+      // 무시
+    }
+  }, [])
+
+  // 🌙 내정보 등에서 theme-change 발생 시 반영
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      if (!e?.detail) return
+      setThemeSetting({ darkMode: !!e.detail.darkMode })
+    }
+
+    window.addEventListener('theme-change', handleThemeChange)
+    return () => window.removeEventListener('theme-change', handleThemeChange)
+  }, [])
+
   const loadNotifications = async () => {
     const token = localStorage.getItem('accessToken')
     if (!token) return
@@ -513,7 +541,8 @@ export default function HomePage() {
             style={{
               width: '90%',
               maxWidth: '420px',
-              background: '#fff',
+              background: themeSetting.darkMode ? '#1e293b' : '#fff',
+              color: themeSetting.darkMode ? '#f9fafb' : '#111827',
               borderRadius: '16px',
               padding: '24px',
               textAlign: 'center',
@@ -630,9 +659,12 @@ export default function HomePage() {
           maxWidth: '1600px',
           margin: '0 auto',
           padding: 'clamp(8px, 3vw, 16px)',
-          backgroundColor: '#fff',
+          backgroundColor: themeSetting.darkMode ? '#020617' : '#fff',
+          color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
           borderRadius: '14px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+          boxShadow: themeSetting.darkMode
+            ? '0 2px 12px rgba(15,23,42,0.7)'
+            : '0 2px 8px rgba(0,0,0,0.07)',
         }}
       >
         {/* ------------------ 상단 ------------------ */}
@@ -688,7 +720,8 @@ export default function HomePage() {
                   top: '36px',
                   right: 0,
                   width: '320px',
-                  background: '#fff',
+                  background: themeSetting.darkMode ? '#0f172a' : '#fff',
+                  color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
                   borderRadius: '12px',
                   boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
                   padding: '12px',
@@ -1250,7 +1283,7 @@ export default function HomePage() {
             style={{
               minWidth: '260px',
               maxWidth: '320px',
-              background: '#fff',
+              background: themeSetting.darkMode ? '#0f172a' : '#fff',
               padding: '14px 16px',
               borderRadius: '14px',
               boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
@@ -1258,13 +1291,19 @@ export default function HomePage() {
               transition: 'all 0.3s ease',
             }}
           >
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            <div
+              style={{
+                fontWeight: 700,
+                marginBottom: 4,
+                color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
+              }}
+            >
               {toast.title}
             </div>
             <div
               style={{
                 fontSize: 13,
-                color: '#555',
+                color: themeSetting.darkMode ? '#cbd5f5' : '#555',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
