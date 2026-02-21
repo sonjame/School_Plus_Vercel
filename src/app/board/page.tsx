@@ -16,8 +16,24 @@ interface BoardSection {
   posts: Post[]
 }
 
+type ThemeSettings = {
+  darkMode: boolean
+}
+
 export default function BoardMainPage() {
   const [sections, setSections] = useState<BoardSection[]>([])
+
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const raw = localStorage.getItem('theme_settings')
+    if (!raw) return
+
+    try {
+      const parsed: ThemeSettings = JSON.parse(raw)
+      setDarkMode(parsed.darkMode)
+    } catch {}
+  }, [])
 
   useEffect(() => {
     const boards = [
@@ -48,31 +64,32 @@ export default function BoardMainPage() {
   }, [])
 
   return (
-    <div style={wrap}>
-      <h1 style={title}>📚 게시판 메인</h1>
+    <div style={getOuterStyle(darkMode)}>
+      <div style={getInnerStyle(darkMode)}>
+        <h1 style={getTitleStyle(darkMode)}>📚 게시판 메인</h1>
+        <div style={grid}>
+          {sections.map((s) => (
+            <Link key={s.key} href={`/board/${s.key}`} style={card}>
+              <div style={getCardInnerStyle(darkMode)}>
+                <div style={cardIcon}>{s.icon}</div>
 
-      <div style={grid}>
-        {sections.map((s) => (
-          <Link key={s.key} href={`/board/${s.key}`} style={card}>
-            <div style={cardInner}>
-              <div style={cardIcon}>{s.icon}</div>
+                <h3 style={getCardTitle(darkMode)}>{s.title}</h3>
 
-              <h3 style={cardTitle}>{s.title}</h3>
-
-              <p style={cardDesc}>
-                {s.posts.length > 0
-                  ? `${s.posts.length}개의 게시글`
-                  : '게시글 없음'}
-              </p>
-
-              {s.posts.slice(0, 2).map((p) => (
-                <p key={p.id} style={miniPost}>
-                  • {p.title}
+                <p style={getCardDesc(darkMode)}>
+                  {s.posts.length > 0
+                    ? `${s.posts.length}개의 게시글`
+                    : '게시글 없음'}
                 </p>
-              ))}
-            </div>
-          </Link>
-        ))}
+
+                {s.posts.slice(0, 2).map((p) => (
+                  <p key={p.id} style={getMiniPost(darkMode)}>
+                    • {p.title}
+                  </p>
+                ))}
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -80,22 +97,15 @@ export default function BoardMainPage() {
 
 /* ===================== Style ===================== */
 
-const wrap: React.CSSProperties = {
-  maxWidth: '1200px',
-  margin: '0 auto',
-  padding: '20px',
-  marginTop: 'clamp(12px, 5vw, 32px)',
-}
-
-const title: React.CSSProperties = {
+const getTitleStyle = (darkMode: boolean): React.CSSProperties => ({
   fontSize: '26px',
   fontWeight: 800,
-  color: '#222',
+  color: darkMode ? '#f1f5f9' : '#222',
   marginBottom: '26px',
   display: 'flex',
   alignItems: 'center',
   gap: '8px',
-}
+})
 
 const grid: React.CSSProperties = {
   display: 'grid',
@@ -108,17 +118,19 @@ const card: React.CSSProperties = {
   color: 'inherit',
 }
 
-const cardInner: React.CSSProperties = {
-  background: 'white',
+const getCardInnerStyle = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : 'white',
   padding: '24px',
   borderRadius: '16px',
-  boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-  border: '1px solid #eef1f5',
+  boxShadow: darkMode
+    ? '0 4px 14px rgba(0,0,0,0.35)'
+    : '0 4px 14px rgba(0,0,0,0.08)',
+  border: darkMode ? '1px solid #334155' : '1px solid #eef1f5',
   transition: '0.25s',
   cursor: 'pointer',
-}
+})
 
-;(cardInner as any)[':hover'] = {
+;(getCardInnerStyle as any)[':hover'] = {
   transform: 'translateY(-4px)',
   boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
 }
@@ -128,23 +140,47 @@ const cardIcon: React.CSSProperties = {
   marginBottom: '10px',
 }
 
-const cardTitle: React.CSSProperties = {
+const getCardTitle = (darkMode: boolean): React.CSSProperties => ({
   fontSize: '20px',
   fontWeight: 700,
   marginBottom: '6px',
-}
+  color: darkMode ? '#f1f5f9' : '#111827',
+})
 
-const cardDesc: React.CSSProperties = {
+const getCardDesc = (darkMode: boolean): React.CSSProperties => ({
   fontSize: '14px',
-  color: '#777',
+  color: darkMode ? '#94a3b8' : '#777',
   marginBottom: '12px',
-}
+})
 
-const miniPost: React.CSSProperties = {
+const getMiniPost = (darkMode: boolean): React.CSSProperties => ({
   fontSize: '14px',
-  color: '#4a4a4a',
-  background: '#f9fbff',
+  color: darkMode ? '#cbd5e1' : '#4a4a4a',
+  background: darkMode ? '#0f172a' : '#f9fbff',
   padding: '6px 10px',
   borderRadius: '6px',
   marginTop: '4px',
-}
+})
+
+const getOuterStyle = (darkMode: boolean): React.CSSProperties => ({
+  minHeight: '100vh',
+  background: darkMode ? '#0f172a' : '#f1f5f9',
+  transition: 'all 0.25s ease',
+})
+
+const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
+  maxWidth: '1200px',
+
+  marginTop: 0,
+  marginBottom: 0,
+  marginLeft: 'auto',
+  marginRight: 'auto',
+
+  padding: '20px',
+
+  paddingTop: 'clamp(60px, 10vw, 80px)',
+
+  background: darkMode ? '#0f172a' : 'white',
+  color: darkMode ? '#f1f5f9' : '#111827',
+  transition: 'all 0.25s ease',
+})
