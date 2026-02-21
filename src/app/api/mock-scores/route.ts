@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken'
 
 export async function POST(req: Request) {
   try {
-    // 🔐 인증
     const auth = req.headers.get('authorization')
     if (!auth) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -14,35 +13,33 @@ export async function POST(req: Request) {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
     const userId = decoded.id
 
-    const { grade, month, scores } = await req.json()
+    const { year, grade, month, scores } = await req.json()
 
-    if (!grade || !month || !scores) {
+    if (!year || !grade || !month || !scores) {
       return NextResponse.json({ message: '잘못된 요청' }, { status: 400 })
     }
 
-    /*
-      scores 예시:
-      {
-        "국어": 87,
-        "수학": 92,
-        "영어": 78,
-        "한국사": 41,
-        "통합사회": 46,
-        "통합과학": 39
-      }
-    */
+    for (const key of Object.keys(scores)) {
+      const rawScore = scores[key]
 
-    for (const subject of Object.keys(scores)) {
-      const rawScore = scores[subject]
+      // 🔥 subject / sub_type 분리
+      let subject = key
+      let subType: string | null = null
+
+      if (key.includes('_')) {
+        const parts = key.split('_')
+        subject = parts[0]
+        subType = parts[1]
+      }
 
       await db.query(
         `
         INSERT INTO mock_exam_scores
-        (user_id, grade, month, subject, raw_score)
-        VALUES (?, ?, ?, ?, ?)
+        (user_id, year, grade, month, subject, sub_type, raw_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE raw_score = VALUES(raw_score)
         `,
-        [userId, grade, month, subject, rawScore],
+        [userId, year, grade, month, subject, subType, rawScore],
       )
     }
 
