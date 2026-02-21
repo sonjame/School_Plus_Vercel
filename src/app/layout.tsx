@@ -459,12 +459,19 @@ export default function RootLayout({
                       gap: '8px',
                       padding: '10px 12px',
                       borderRadius: '8px',
-                      background: 'rgba(255,255,255,0.25)',
-                      color: 'white',
                       fontSize: '15px',
                       fontWeight: 600,
-                      border: '1px solid rgba(255,255,255,0.4)',
                       cursor: 'pointer',
+
+                      background: darkMode
+                        ? 'rgba(15,23,42,0.9)'
+                        : 'rgba(255,255,255,0.25)',
+
+                      border: darkMode
+                        ? '1px solid rgba(148,163,184,0.6)'
+                        : '1px solid rgba(255,255,255,0.4)',
+
+                      color: 'white',
                     }}
                   >
                     <span style={{ fontSize: '18px' }}>📋</span>
