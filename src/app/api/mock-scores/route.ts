@@ -6,11 +6,23 @@ export async function POST(req: Request) {
   try {
     const auth = req.headers.get('authorization')
     if (!auth) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'NO_TOKEN' }, { status: 401 })
     }
 
     const token = auth.replace('Bearer ', '')
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+
+    // 🔥 여기 추가
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!)
+    } catch (err: any) {
+      if (err.name === 'TokenExpiredError') {
+        return NextResponse.json({ message: 'TOKEN_EXPIRED' }, { status: 401 })
+      }
+
+      return NextResponse.json({ message: 'INVALID_TOKEN' }, { status: 401 })
+    }
+
     const userId = decoded.id
 
     const { year, grade, month, scores } = await req.json()
@@ -22,7 +34,6 @@ export async function POST(req: Request) {
     for (const key of Object.keys(scores)) {
       const rawScore = scores[key]
 
-      // 🔥 subject / sub_type 분리
       let subject = key
       let subType: string | null = null
 
@@ -46,6 +57,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('❌ mock score save error', e)
-    return NextResponse.json({ message: 'server error' }, { status: 500 })
+    return NextResponse.json({ message: 'SERVER_ERROR' }, { status: 500 })
   }
 }
