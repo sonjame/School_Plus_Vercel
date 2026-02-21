@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import BoardTemplate from '../BoardTemplate'
+import { useEffect, useState } from 'react'
 
 export default function CategoryPage() {
   const params = useParams<{ category: string }>()
@@ -18,8 +19,32 @@ export default function CategoryPage() {
     admin: '관리자 게시판',
   }
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const raw = localStorage.getItem('theme_settings')
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+      setDarkMode(parsed.darkMode)
+    } catch {}
+  }, [])
+
   if (!category || !boardTitleMap[category]) {
-    return <div style={{ padding: 20 }}>존재하지 않는 게시판입니다.</div>
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: darkMode ? '#0f172a' : '#f1f5f9',
+          color: darkMode ? '#f1f5f9' : '#111827',
+          padding: 40,
+          transition: '0.25s',
+        }}
+      >
+        존재하지 않는 게시판입니다.
+      </div>
+    )
   }
 
   return <BoardTemplate title={boardTitleMap[category]} category={category} />
