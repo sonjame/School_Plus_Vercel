@@ -938,14 +938,27 @@ export default function HomePage() {
             onClick={() => setShowRecommend(!showRecommend)}
             style={{
               padding: '10px 18px',
-              background: '#4FC3F7',
+              background: themeSetting.darkMode ? '#1e40af' : '#4FC3F7',
               color: 'white',
               borderRadius: '10px',
               fontWeight: 600,
-              border: 'none',
+              border: themeSetting.darkMode ? '1px solid #334155' : 'none',
               cursor: 'pointer',
               fontSize: '14px',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+              boxShadow: themeSetting.darkMode
+                ? '0 2px 8px rgba(0,0,0,0.6)'
+                : '0 2px 5px rgba(0,0,0,0.15)',
+              transition: '0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = themeSetting.darkMode
+                ? '#2563eb'
+                : '#38bdf8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = themeSetting.darkMode
+                ? '#1e40af'
+                : '#4FC3F7'
             }}
           >
             {showRecommend ? '추천 도서 접기' : '오늘의 추천 도서 보기'}
@@ -1202,27 +1215,62 @@ export default function HomePage() {
               marginBottom: '14px',
             }}
           >
-            {CATEGORY_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setSelectedCategory(tab.key)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '999px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  background:
-                    selectedCategory === tab.key ? '#4FC3F7' : '#E1F5FE',
-                  color: selectedCategory === tab.key ? 'white' : '#0277BD',
-                  whiteSpace: 'nowrap', // ⭐ 줄바꿈 방지 (핵심)
-                  flex: '0 0 auto', // ⭐ 버튼 폭 고정
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {CATEGORY_TABS.map((tab) => {
+              const isActive = selectedCategory === tab.key
+
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setSelectedCategory(tab.key)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    flex: '0 0 auto',
+                    transition: '0.2s',
+
+                    background: isActive
+                      ? '#4FC3F7'
+                      : themeSetting.darkMode
+                        ? '#1e293b'
+                        : '#E1F5FE',
+
+                    color: isActive
+                      ? 'white'
+                      : themeSetting.darkMode
+                        ? '#93c5fd'
+                        : '#0277BD',
+
+                    border: themeSetting.darkMode
+                      ? '1px solid #334155'
+                      : 'none',
+
+                    boxShadow: themeSetting.darkMode
+                      ? '0 1px 4px rgba(0,0,0,0.4)'
+                      : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = themeSetting.darkMode
+                        ? '#334155'
+                        : '#dbeafe'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = themeSetting.darkMode
+                        ? '#1e293b'
+                        : '#E1F5FE'
+                    }
+                  }}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
 
           {popularPosts.length === 0 ? (
