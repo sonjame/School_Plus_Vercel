@@ -28,16 +28,26 @@ interface SchoolRow {
   [key: string]: unknown
 }
 
-const pwInputStyle: React.CSSProperties = {
+const getPwInputStyle = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
   padding: '9px 10px',
   borderRadius: 8,
-  border: '1px solid #d1d5db',
+  border: darkMode ? '1px solid #334155' : '1px solid #d1d5db',
+  background: darkMode ? '#0f172a' : 'white',
+  color: darkMode ? '#e2e8f0' : '#111827',
   fontSize: 13,
   boxSizing: 'border-box',
-}
+})
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({
+  label,
+  value,
+  darkMode,
+}: {
+  label: string
+  value: string
+  darkMode: boolean
+}) {
   return (
     <div
       style={{
@@ -53,13 +63,12 @@ function Field({ label, value }: { label: string; value: string }) {
           marginBottom: 6,
           fontSize: 13,
           fontWeight: 600,
-          color: '#374151',
+          color: darkMode ? '#e2e8f0' : '#374151',
           width: '80%',
         }}
       >
         {label}
       </label>
-
       <input
         value={value}
         readOnly
@@ -68,9 +77,9 @@ function Field({ label, value }: { label: string; value: string }) {
           width: '80%',
           padding: '10px 12px',
           borderRadius: 10,
-          border: '1px solid #e5e7eb',
-          background: '#f3f4f6',
-          color: '#6b7280',
+          border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
+          background: darkMode ? '#0f172a' : '#f3f4f6',
+          color: darkMode ? '#e2e8f0' : '#6b7280',
           cursor: 'not-allowed',
         }}
       />
@@ -190,6 +199,24 @@ export default function MyInfoPagePreview() {
     commentReply: boolean
   }
 
+  type ThemeSettings = {
+    darkMode: boolean
+  }
+
+  const getThemeSetting = (): ThemeSettings => {
+    const raw = localStorage.getItem('theme_settings')
+    if (!raw) return { darkMode: false }
+    return JSON.parse(raw)
+  }
+
+  const saveThemeSetting = (settings: ThemeSettings) => {
+    localStorage.setItem('theme_settings', JSON.stringify(settings))
+  }
+
+  const [themeSetting, setThemeSetting] = useState<ThemeSettings>({
+    darkMode: false,
+  })
+
   const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     chat: true,
     postComment: true,
@@ -251,6 +278,17 @@ export default function MyInfoPagePreview() {
   useEffect(() => {
     const settings = getNotificationSettings()
     setNotificationSettings(settings)
+  }, [])
+
+  useEffect(() => {
+    const saved = getThemeSetting()
+    setThemeSetting(saved)
+
+    if (saved.darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }, [])
 
   const handlePasswordChange = async () => {
@@ -462,17 +500,18 @@ export default function MyInfoPagePreview() {
       ...user,
       classNum: data.classNum,
     }
+
     setUser(updatedUser)
 
-    // ✅ localStorage는 딱 한 번만
+    // 🔥 user 전체 기준으로 저장 (profileImageUrl 유지)
     const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
 
     localStorage.setItem(
       'loggedInUser',
       JSON.stringify({
         ...prev,
-        classNum: data.classNum, // 🔥 핵심
-        token: prev.token, // 🔐 토큰 유지
+        ...updatedUser, // ← 핵심
+        token: prev.token,
       }),
     )
 
@@ -507,16 +546,22 @@ export default function MyInfoPagePreview() {
         display: 'flex',
         justifyContent: 'center',
         padding: '70px 40px 30px',
+        background: themeSetting.darkMode ? '#0f172a' : '#f8fafc',
+        color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
+        transition: 'all 0.25s ease',
       }}
     >
       <div
         style={{
           width: '100%',
           maxWidth: 520,
-          background: 'white',
+          background: themeSetting.darkMode ? '#1e293b' : 'white',
           borderRadius: 16,
           padding: 24,
-          boxShadow: '0 10px 30px rgba(15,23,42,0.12)',
+          boxShadow: themeSetting.darkMode
+            ? '0 10px 30px rgba(0,0,0,0.4)'
+            : '0 10px 30px rgba(15,23,42,0.12)',
+          transition: 'all 0.25s ease',
         }}
       >
         {/* 🔹 프로필 사진 */}
@@ -552,7 +597,8 @@ export default function MyInfoPagePreview() {
                 <div
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    background: 'white',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                     borderRadius: 16,
                     padding: 24,
                     width: '90%',
@@ -811,7 +857,10 @@ export default function MyInfoPagePreview() {
             onClick={() => setShowNotificationModal(true)}
             style={{
               background: 'transparent',
-              border: '1px solid #e5e7eb',
+              border: themeSetting.darkMode
+                ? '1px solid #334155'
+                : '1px solid #e5e7eb',
+              color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
               padding: '6px 14px',
               borderRadius: 999,
               cursor: 'pointer',
@@ -819,12 +868,26 @@ export default function MyInfoPagePreview() {
               fontWeight: 600,
             }}
           >
-            ⚙ 알림 설정
+            ⚙ 설정
           </button>
         </div>
+        <Field
+          label="이름"
+          value={user.name || ''}
+          darkMode={themeSetting.darkMode}
+        />
 
-        <Field label="이름" value={user.name || ''} />
-        <Field label="아이디" value={user.username} />
+        <Field
+          label="아이디"
+          value={user.username}
+          darkMode={themeSetting.darkMode}
+        />
+
+        <Field
+          label="학년"
+          value={getCurrentGrade(user.entryYear)}
+          darkMode={themeSetting.darkMode}
+        />
 
         {/* 🔹 학교 변경 UI */}
         <div style={{ marginBottom: 18, width: '100%', textAlign: 'center' }}>
@@ -860,8 +923,11 @@ export default function MyInfoPagePreview() {
                 flex: 1,
                 padding: '10px 12px',
                 borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: '#f3f4f6',
+                background: themeSetting.darkMode ? '#0f172a' : '#f3f4f6',
+                border: themeSetting.darkMode
+                  ? '1px solid #334155'
+                  : '1px solid #e5e7eb',
+                color: themeSetting.darkMode ? '#e2e8f0' : '#374151',
                 cursor: 'not-allowed',
               }}
             />
@@ -900,8 +966,11 @@ export default function MyInfoPagePreview() {
                 width: '85%', // 📌 input과 동일 비율
                 margin: '6px auto 0',
                 borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: '#f9fafb',
+                background: themeSetting.darkMode ? '#0f172a' : '#f9fafb',
+                border: themeSetting.darkMode
+                  ? '1px solid #334155'
+                  : '1px solid #e5e7eb',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 padding: '8px 10px', // 📌 padding 줄여서 input에 딱 맞게
                 boxSizing: 'border-box',
               }}
@@ -919,7 +988,11 @@ export default function MyInfoPagePreview() {
                   width: '90%', // 📌 컨테이너와 동일하게
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: '1px solid #d1d5db',
+                  border: themeSetting.darkMode
+                    ? '1px solid #334155'
+                    : '1px solid #d1d5db',
+                  background: themeSetting.darkMode ? '#0f172a' : 'white',
+                  color: themeSetting.darkMode ? '#e2e8f0' : '#111827',
                   fontSize: 13,
                   outline: 'none',
                 }}
@@ -945,7 +1018,8 @@ export default function MyInfoPagePreview() {
                     overflowY: 'auto',
                     borderRadius: 8,
                     border: '1px solid #e5e7eb',
-                    background: 'white',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                     marginTop: 6,
                   }}
                 >
@@ -1027,7 +1101,11 @@ export default function MyInfoPagePreview() {
           )}
         </div>
 
-        <Field label="학년" value={getCurrentGrade(user.entryYear)} />
+        <Field
+          label="학년"
+          value={getCurrentGrade(user.entryYear)}
+          darkMode={themeSetting.darkMode}
+        />
 
         {/* 🔹 반 정보 */}
         <div style={{ marginBottom: 18, width: '100%', textAlign: 'center' }}>
@@ -1062,9 +1140,15 @@ export default function MyInfoPagePreview() {
                 flex: 1,
                 padding: '10px 12px',
                 borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: '#f3f4f6',
-                color: user.classNum ? '#374151' : '#9ca3af',
+                border: themeSetting.darkMode
+                  ? '1px solid #334155'
+                  : '1px solid #e5e7eb',
+                background: themeSetting.darkMode ? '#0f172a' : '#f3f4f6',
+                color: themeSetting.darkMode
+                  ? '#e2e8f0'
+                  : user.classNum
+                    ? '#374151'
+                    : '#9ca3af',
                 cursor: 'not-allowed',
               }}
             />
@@ -1096,8 +1180,10 @@ export default function MyInfoPagePreview() {
               margin: '6px auto 0',
               padding: '10px',
               borderRadius: 10,
-              border: '1px solid #e5e7eb',
-              background: '#f9fafb',
+              border: themeSetting.darkMode
+                ? '1px solid #334155'
+                : '1px solid #e5e7eb',
+              background: themeSetting.darkMode ? '#0f172a' : '#f9fafb',
             }}
           >
             <input
@@ -1107,7 +1193,7 @@ export default function MyInfoPagePreview() {
               onChange={(e) =>
                 setClassInput(e.target.value.replace(/[^0-9]/g, ''))
               }
-              style={pwInputStyle}
+              style={getPwInputStyle(themeSetting.darkMode)}
             />
 
             <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
@@ -1171,8 +1257,10 @@ export default function MyInfoPagePreview() {
                 marginTop: 14,
                 padding: 12,
                 borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: '#f9fafb',
+                border: themeSetting.darkMode
+                  ? '1px solid #334155'
+                  : '1px solid #e5e7eb',
+                background: themeSetting.darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
@@ -1183,7 +1271,7 @@ export default function MyInfoPagePreview() {
                 placeholder="현재 비밀번호"
                 value={currentPw}
                 onChange={(e) => setCurrentPw(e.target.value)}
-                style={pwInputStyle}
+                style={getPwInputStyle(themeSetting.darkMode)}
               />
               <div style={{ position: 'relative' }}>
                 <input
@@ -1191,7 +1279,7 @@ export default function MyInfoPagePreview() {
                   placeholder="새 비밀번호"
                   value={newPw}
                   onChange={(e) => setNewPw(e.target.value)}
-                  style={{ ...pwInputStyle, paddingRight: 40 }}
+                  style={{ ...getPwInputStyle, paddingRight: 40 }}
                 />
 
                 {/* 🔐 비밀번호 조건 안내 (회원가입과 동일) */}
@@ -1259,7 +1347,7 @@ export default function MyInfoPagePreview() {
                   placeholder="새 비밀번호 확인"
                   value={newPw2}
                   onChange={(e) => setNewPw2(e.target.value)}
-                  style={{ ...pwInputStyle, paddingRight: 40 }}
+                  style={{ ...getPwInputStyle, paddingRight: 40 }}
                 />
               </div>
 
@@ -1318,7 +1406,8 @@ export default function MyInfoPagePreview() {
           >
             <div
               style={{
-                background: 'white',
+                background: themeSetting.darkMode ? '#1e293b' : 'white',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 borderRadius: 12,
                 padding: 20,
                 width: '90%',
@@ -1355,7 +1444,8 @@ export default function MyInfoPagePreview() {
                     padding: '7px 14px',
                     borderRadius: 999,
                     border: '1px solid #d1d5db',
-                    background: 'white',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                     cursor: 'pointer',
                   }}
                 >
@@ -1381,7 +1471,8 @@ export default function MyInfoPagePreview() {
           >
             <div
               style={{
-                background: 'white',
+                background: themeSetting.darkMode ? '#1e293b' : 'white',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 borderRadius: 12,
                 padding: 20,
                 width: '80%',
@@ -1415,7 +1506,8 @@ export default function MyInfoPagePreview() {
                     padding: '7px 14px',
                     borderRadius: 999,
                     border: '1px solid #d1d5db',
-                    background: 'white',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                     cursor: 'pointer',
                   }}
                 >
@@ -1441,7 +1533,8 @@ export default function MyInfoPagePreview() {
           >
             <div
               style={{
-                background: 'white',
+                background: themeSetting.darkMode ? '#1e293b' : 'white',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 borderRadius: 12,
                 padding: 20,
                 width: '80%',
@@ -1469,7 +1562,7 @@ export default function MyInfoPagePreview() {
                 placeholder="비밀번호 입력"
                 value={deletePw}
                 onChange={(e) => setDeletePw(e.target.value)}
-                style={pwInputStyle}
+                style={getPwInputStyle(themeSetting.darkMode)}
               />
 
               <div
@@ -1504,7 +1597,8 @@ export default function MyInfoPagePreview() {
                     padding: '7px 14px',
                     borderRadius: 999,
                     border: '1px solid #d1d5db',
-                    background: 'white',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                     cursor: 'pointer',
                   }}
                 >
@@ -1529,7 +1623,8 @@ export default function MyInfoPagePreview() {
           >
             <div
               style={{
-                background: 'white',
+                background: themeSetting.darkMode ? '#1e293b' : 'white',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 borderRadius: 12,
                 padding: 22,
                 width: '80%',
@@ -1587,7 +1682,8 @@ export default function MyInfoPagePreview() {
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: 'white',
+                background: themeSetting.darkMode ? '#1e293b' : 'white',
+                color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                 borderRadius: 16,
                 padding: 20,
                 width: '90%',
@@ -1615,7 +1711,9 @@ export default function MyInfoPagePreview() {
                     gap: 12,
                     padding: 10,
                     borderRadius: 12,
-                    border: '1px solid #e5e7eb',
+                    border: themeSetting.darkMode
+                      ? '1px solid #334155'
+                      : '1px solid #e5e7eb',
                     marginBottom: 10,
                   }}
                 >
@@ -1778,7 +1876,8 @@ export default function MyInfoPagePreview() {
         >
           <div
             style={{
-              background: 'white',
+              background: themeSetting.darkMode ? '#1e293b' : 'white',
+              color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
               borderRadius: 16,
               padding: 24,
               width: '90%',
@@ -1851,7 +1950,8 @@ export default function MyInfoPagePreview() {
                       width: 22,
                       height: 22,
                       borderRadius: '50%',
-                      background: 'white',
+                      background: themeSetting.darkMode ? '#1e293b' : 'white',
+                      color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
                       position: 'absolute',
                       top: 2,
                       left: notificationSettings[
@@ -1866,6 +1966,69 @@ export default function MyInfoPagePreview() {
                 </div>
               </div>
             ))}
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <span>🌙 다크모드</span>
+
+              <div
+                onClick={() => {
+                  const updated = {
+                    darkMode: !themeSetting.darkMode,
+                  }
+
+                  setThemeSetting(updated)
+                  saveThemeSetting(updated)
+
+                  if (updated.darkMode) {
+                    document.documentElement.classList.add('dark')
+                  } else {
+                    document.documentElement.classList.remove('dark')
+                  }
+                }}
+                style={{
+                  width: 60,
+                  height: 26,
+                  borderRadius: 999,
+                  background: themeSetting.darkMode ? '#4FC3F7' : '#e5e7eb',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 6px',
+                  boxSizing: 'border-box',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: themeSetting.darkMode ? 'white' : '#6b7280',
+                  justifyContent: themeSetting.darkMode
+                    ? 'flex-start'
+                    : 'flex-end',
+                }}
+              >
+                {themeSetting.darkMode ? 'ON' : 'OFF'}
+
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: themeSetting.darkMode ? '#1e293b' : 'white',
+                    color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
+                    position: 'absolute',
+                    top: 2,
+                    left: themeSetting.darkMode ? 34 : 2,
+                    transition: 'all 0.25s ease',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </div>
+            </div>
 
             <button
               onClick={() => setShowNotificationModal(false)}
@@ -1901,7 +2064,8 @@ export default function MyInfoPagePreview() {
         >
           <div
             style={{
-              background: 'white',
+              background: themeSetting.darkMode ? '#1e293b' : 'white',
+              color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
               borderRadius: 16,
               padding: '28px 24px',
               width: '90%',
