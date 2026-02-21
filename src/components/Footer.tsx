@@ -40,6 +40,8 @@ function getWeekDates() {
 }
 
 export default function WeeklyMealPage() {
+  const [darkMode, setDarkMode] = useState(false)
+
   const [weekMeals, setWeekMeals] = useState<
     { date: string; label: string; meal: string[] | null }[]
   >([])
@@ -77,15 +79,38 @@ export default function WeeklyMealPage() {
     ).then(setWeekMeals)
   }, [ready, eduCode, schoolCode])
 
+  // 🌙 다크모드 초기 로드
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      setDarkMode(!!parsed.darkMode)
+    } catch {}
+  }, [])
+
+  // 🌙 내정보에서 토글 시 반영
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      if (!e?.detail) return
+      setDarkMode(!!e.detail.darkMode)
+    }
+
+    window.addEventListener('theme-change', handleThemeChange)
+    return () => window.removeEventListener('theme-change', handleThemeChange)
+  }, [])
+
   return (
     <div
       style={{
         minHeight: '250px',
         marginBottom: '32px',
         padding: '20px',
-        background: '#F3FAFF',
+        background: darkMode ? '#0f172a' : '#F3FAFF',
         borderRadius: '16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        boxShadow: darkMode
+          ? '0 2px 8px rgba(0,0,0,0.4)'
+          : '0 2px 8px rgba(0,0,0,0.05)',
 
         /* 모바일 화면 조건 */
         maxWidth: '1500px',
@@ -97,8 +122,8 @@ export default function WeeklyMealPage() {
         style={{
           fontSize: '18px',
           fontWeight: 700,
-          color: '#4FC3F7',
-          borderBottom: '2px solid #4FC3F7',
+          color: darkMode ? '#7dd3fc' : '#4FC3F7',
+          borderBottom: darkMode ? '2px solid #7dd3fc' : '2px solid #4FC3F7',
           paddingBottom: '6px',
           marginBottom: '16px',
         }}
@@ -167,11 +192,13 @@ export default function WeeklyMealPage() {
             key={idx}
             className="meal-card"
             style={{
-              background: 'white',
+              background: darkMode ? '#1e293b' : 'white',
               borderRadius: '12px',
               padding: '12px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-              border: '1px solid #E1F5FE',
+              border: darkMode ? '1px solid #334155' : '1px solid #E1F5FE',
+              boxShadow: darkMode
+                ? '0 2px 6px rgba(0,0,0,0.5)'
+                : '0 2px 6px rgba(0,0,0,0.05)',
               minHeight: '140px',
             }}
           >
@@ -179,7 +206,7 @@ export default function WeeklyMealPage() {
               className="meal-date"
               style={{
                 fontWeight: 700,
-                color: '#0288D1',
+                color: darkMode ? '#93c5fd' : '#0288D1',
                 marginBottom: '6px',
                 fontSize: '14px',
                 textAlign: 'center',
@@ -190,7 +217,11 @@ export default function WeeklyMealPage() {
 
             {!d.meal && (
               <p
-                style={{ fontSize: '12px', color: '#777', textAlign: 'center' }}
+                style={{
+                  fontSize: '12px',
+                  color: darkMode ? '#94a3b8' : '#777',
+                  textAlign: 'center',
+                }}
               >
                 급식 없음
               </p>
