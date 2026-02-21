@@ -559,7 +559,12 @@ export default function HomePage() {
               계정 이용 제한이 해제되었습니다.
             </p>
 
-            <p style={{ fontSize: '14px', color: '#555' }}>
+            <p
+              style={{
+                fontSize: '14px',
+                color: themeSetting.darkMode ? '#cbd5e1' : '#555',
+              }}
+            >
               다시 게시글·댓글을 작성할 수 있습니다 🎉
             </p>
 
@@ -598,7 +603,8 @@ export default function HomePage() {
             style={{
               width: '90%',
               maxWidth: '420px',
-              background: '#fff',
+              background: themeSetting.darkMode ? '#1e293b' : '#fff',
+              color: themeSetting.darkMode ? '#f9fafb' : '#111827',
               borderRadius: '16px',
               padding: '24px',
               textAlign: 'center',
@@ -621,14 +627,26 @@ export default function HomePage() {
               </p>
             )}
 
-            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+            <p
+              style={{
+                fontSize: '14px',
+                color: themeSetting.darkMode ? '#cbd5e1' : '#555',
+                marginTop: '10px',
+              }}
+            >
               현재 계정은 <strong>게시글 작성 및 댓글 작성과 채팅 제한</strong>
               되어 있습니다.
               <br />
               문의사항은 아래 고객센터로 연락을 주세요.
             </p>
 
-            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+            <p
+              style={{
+                fontSize: '14px',
+                color: themeSetting.darkMode ? '#cbd5e1' : '#555',
+                marginTop: '10px',
+              }}
+            >
               SchoolPlus 고객센터 : 0000-0000
             </p>
 
@@ -734,7 +752,13 @@ export default function HomePage() {
                 </div>
 
                 {unreadMessages.length === 0 ? (
-                  <p style={{ fontSize: 13, color: '#777', marginBottom: 10 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: themeSetting.darkMode ? '#94a3b8' : '#777',
+                      marginBottom: 10,
+                    }}
+                  >
                     새로운 채팅이 없습니다.
                   </p>
                 ) : (
@@ -751,7 +775,9 @@ export default function HomePage() {
                           key={`${msg.roomId}-${msg.messageId}`}
                           style={{
                             padding: '8px',
-                            borderBottom: '1px solid #eee',
+                            borderBottom: themeSetting.darkMode
+                              ? '1px solid #334155'
+                              : '1px solid #eee',
                             cursor: 'pointer',
                           }}
                           onClick={() => {
@@ -803,7 +829,12 @@ export default function HomePage() {
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>📢 알림</div>
 
                 {notifications.length === 0 ? (
-                  <p style={{ fontSize: 13, color: '#777' }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: themeSetting.darkMode ? '#94a3b8' : '#777',
+                    }}
+                  >
                     새로운 알림이 없습니다.
                   </p>
                 ) : (
@@ -815,7 +846,13 @@ export default function HomePage() {
                           padding: '8px',
                           borderBottom: '1px solid #eee',
                           cursor: 'pointer',
-                          background: n.is_read ? '#fff' : '#E3F2FD',
+                          background: n.is_read
+                            ? themeSetting.darkMode
+                              ? '#0f172a'
+                              : '#fff'
+                            : themeSetting.darkMode
+                              ? '#1e3a8a'
+                              : '#E3F2FD',
                           position: 'relative',
                         }}
                         onClick={async () => {
@@ -966,7 +1003,9 @@ export default function HomePage() {
                   >
                     <div
                       style={{
-                        backgroundColor: '#E1F5FE',
+                        backgroundColor: themeSetting.darkMode
+                          ? '#1e293b'
+                          : '#E1F5FE',
                         borderRadius: '14px',
                         padding: '14px 16px',
                         cursor: 'pointer',
@@ -980,7 +1019,13 @@ export default function HomePage() {
                           marginBottom: 6,
                         }}
                       >
-                        <strong style={{ color: '#0277BD' }}>
+                        <strong
+                          style={{
+                            color: themeSetting.darkMode
+                              ? '#93c5fd'
+                              : '#0277BD',
+                          }}
+                        >
                           {item.dateLabel}
                         </strong>
                         <span
@@ -996,7 +1041,12 @@ export default function HomePage() {
                           {item.ddayLabel}
                         </span>
                       </div>
-                      <p style={{ marginTop: '2px', color: '#555' }}>
+                      <p
+                        style={{
+                          marginTop: '2px',
+                          color: themeSetting.darkMode ? '#cbd5e1' : '#555',
+                        }}
+                      >
                         {item.event}
                       </p>
                     </div>
@@ -1051,7 +1101,9 @@ export default function HomePage() {
                   >
                     <div
                       style={{
-                        backgroundColor: '#E1F5FE',
+                        backgroundColor: themeSetting.darkMode
+                          ? '#1e293b'
+                          : '#E1F5FE',
                         borderRadius: '14px',
                         padding: '14px 16px',
                         cursor: 'pointer',
@@ -1065,7 +1117,13 @@ export default function HomePage() {
                           marginBottom: 6,
                         }}
                       >
-                        <strong style={{ color: '#0277BD' }}>
+                        <strong
+                          style={{
+                            color: themeSetting.darkMode
+                              ? '#93c5fd'
+                              : '#0277BD',
+                          }}
+                        >
                           {item.dateLabel}
                         </strong>
                         <span
@@ -1081,7 +1139,12 @@ export default function HomePage() {
                           {item.ddayLabel}
                         </span>
                       </div>
-                      <p style={{ marginTop: '2px', color: '#555' }}>
+                      <p
+                        style={{
+                          marginTop: '2px',
+                          color: themeSetting.darkMode ? '#cbd5e1' : '#555',
+                        }}
+                      >
                         {item.event}
                       </p>
                     </div>
@@ -1107,7 +1170,7 @@ export default function HomePage() {
             📚 오늘의 시간표 ({today})
           </h3>
 
-          <TodayTimetable today={today} />
+          <TodayTimetable today={today} darkMode={themeSetting.darkMode} />
         </section>
 
         {/* ------------------ 주간 시간표 ------------------ */}
@@ -1190,19 +1253,27 @@ export default function HomePage() {
                   >
                     <div
                       style={{
-                        backgroundColor: 'white',
-                        border: '2px solid #E1F5FE',
+                        backgroundColor: themeSetting.darkMode
+                          ? '#1e293b'
+                          : 'white',
+                        border: themeSetting.darkMode
+                          ? '1px solid #334155'
+                          : '2px solid #E1F5FE',
+                        boxShadow: themeSetting.darkMode
+                          ? '0 2px 8px rgba(0,0,0,0.5)'
+                          : '0 2px 5px rgba(0,0,0,0.05)',
                         borderRadius: '12px',
                         padding: '14px',
                         marginBottom: '14px',
                         transition: '0.2s',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
                       }}
                       onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor = '#E1F5FE')
+                        (e.currentTarget.style.backgroundColor =
+                          themeSetting.darkMode ? '#334155' : '#E1F5FE')
                       }
                       onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor = 'white')
+                        (e.currentTarget.style.backgroundColor =
+                          themeSetting.darkMode ? '#1e293b' : 'white')
                       }
                     >
                       {/* ⬇️ 기존 카드 내용 그대로 */}
@@ -1225,7 +1296,7 @@ export default function HomePage() {
                         style={{
                           fontSize: 'clamp(14px, 3vw, 17px)',
                           fontWeight: 600,
-                          color: '#333',
+                          color: themeSetting.darkMode ? '#f1f5f9' : '#333',
                           marginBottom: '4px',
                         }}
                       >
@@ -1235,7 +1306,7 @@ export default function HomePage() {
                       <p
                         style={{
                           fontSize: 'clamp(12px, 2.3vw, 14px)',
-                          color: '#555',
+                          color: themeSetting.darkMode ? '#cbd5e1' : '#555',
                           overflow: 'hidden',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -1362,7 +1433,13 @@ const getSubjectColor = (subject: string) => {
   return newColor
 }
 
-function TodayTimetable({ today }: { today: string }) {
+function TodayTimetable({
+  today,
+  darkMode,
+}: {
+  today: string
+  darkMode: boolean
+}) {
   const [todayList, setTodayList] = useState<any[]>([])
 
   useEffect(() => {
@@ -1412,8 +1489,8 @@ function TodayTimetable({ today }: { today: string }) {
     return (
       <p
         style={{
-          color: '#777',
-          background: '#E1F5FE',
+          color: darkMode ? '#cbd5e1' : '#777',
+          backgroundColor: darkMode ? '#1e293b' : '#E1F5FE',
           padding: '16px',
           borderRadius: '12px',
         }}
@@ -1426,7 +1503,7 @@ function TodayTimetable({ today }: { today: string }) {
   return (
     <div
       style={{
-        backgroundColor: '#E1F5FE',
+        backgroundColor: darkMode ? '#1e293b' : '#E1F5FE',
         borderRadius: '12px',
         padding: '12px',
         display: 'grid',
@@ -1448,10 +1525,20 @@ function TodayTimetable({ today }: { today: string }) {
           >
             <div style={{ fontWeight: 700 }}>{c.period}교시</div>
             <div>{c.subject}</div>
-            <div style={{ fontSize: '13px', color: '#555' }}>
+            <div
+              style={{
+                fontSize: '13px',
+                color: darkMode ? '#e2e8f0' : '#555',
+              }}
+            >
               👨‍🏫 {c.teacher || '미입력'}
             </div>
-            <div style={{ fontSize: '12px', color: '#777' }}>
+            <div
+              style={{
+                fontSize: '12px',
+                color: darkMode ? '#cbd5e1' : '#777',
+              }}
+            >
               🏫 {c.room || '미지정'}
             </div>
           </div>
