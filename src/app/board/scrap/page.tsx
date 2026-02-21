@@ -6,6 +6,18 @@ import { useEffect, useState } from 'react'
 export default function ScrapPage() {
   const [scraps, setScraps] = useState<any[]>([])
 
+  const [darkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return false
+      return JSON.parse(raw).darkMode ?? false
+    } catch {
+      return false
+    }
+  })
+
   useEffect(() => {
     async function loadScraps() {
       const userId = localStorage.getItem('userId')
@@ -54,60 +66,74 @@ export default function ScrapPage() {
   }, [])
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
-      <h2
+    <div
+      style={{
+        minHeight: '100vh',
+        background: darkMode ? '#0f172a' : '#f8fafc',
+      }}
+    >
+      <div
         style={{
-          fontSize: 24,
-          fontWeight: 700,
-          color: '#4FC3F7',
-          marginBottom: 20,
+          maxWidth: 900,
+          margin: '0 auto',
+          padding: 20,
+          color: darkMode ? '#f1f5f9' : '#111827',
         }}
       >
-        ⭐ 스크랩한 글
-      </h2>
-
-      {scraps.length === 0 && (
-        <p style={{ color: '#777', fontSize: 15 }}>
-          스크랩한 게시글이 없습니다.
-        </p>
-      )}
-
-      {scraps.map((p) => (
-        <Link
-          key={p.id}
-          href={`/board/post/${p.id}`}
-          style={{ textDecoration: 'none', color: 'inherit' }}
+        <h2
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            color: '#4FC3F7',
+            marginBottom: 20,
+          }}
         >
-          <div style={card}>
-            <div style={header}>
-              <span style={tag}>{categoryToName(p.category)}</span>
-              <span style={likes}>💙 {p.likes}</span>
-            </div>
+          ⭐ 스크랩한 글
+        </h2>
 
-            <h3 style={title}>{p.title}</h3>
-            <p style={content}>{p.content}</p>
+        {scraps.length === 0 && (
+          <p style={{ color: '#777', fontSize: 15 }}>
+            스크랩한 게시글이 없습니다.
+          </p>
+        )}
 
-            <div style={footer}>
-              <span>{p.author}</span>
-              <span>{new Date(p.created_at).toLocaleString()}</span>
+        {scraps.map((p) => (
+          <Link
+            key={p.id}
+            href={`/board/post/${p.id}`}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
+            <div style={getCardStyle(darkMode)}>
+              <div style={header}>
+                <span style={tag}>{categoryToName(p.category)}</span>
+                <span style={likes}>💙 {p.likes}</span>
+              </div>
+              <h3 style={getTitleStyle(darkMode)}>{p.title}</h3>
+              <p style={getContentStyle(darkMode)}>{p.content}</p>
+
+              <div style={getFooterStyle(darkMode)}>
+                <span>{p.author}</span>
+                <span>{new Date(p.created_at).toLocaleString()}</span>
+              </div>
             </div>
-          </div>
-        </Link>
-      ))}
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }
 
 /* ---------- STYLE (동일) ---------- */
-const card: React.CSSProperties = {
-  background: '#ffffff',
+const getCardStyle = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : '#ffffff',
   padding: '18px 22px',
   borderRadius: 14,
-  border: '1px solid #E1F5FE',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  border: darkMode ? '1px solid #334155' : '1px solid #E1F5FE',
+  boxShadow: darkMode
+    ? '0 4px 14px rgba(0,0,0,0.35)'
+    : '0 2px 8px rgba(0,0,0,0.06)',
   marginBottom: 16,
-  transition: '0.2s',
-}
+})
 
 const header: React.CSSProperties = {
   display: 'flex',
@@ -130,29 +156,29 @@ const likes: React.CSSProperties = {
   color: '#555',
 }
 
-const title: React.CSSProperties = {
+const getTitleStyle = (darkMode: boolean): React.CSSProperties => ({
   fontSize: 18,
   fontWeight: 700,
   margin: '6px 0',
-  color: '#333',
-}
+  color: darkMode ? '#f1f5f9' : '#333',
+})
 
-const content: React.CSSProperties = {
+const getContentStyle = (darkMode: boolean): React.CSSProperties => ({
   fontSize: 14,
-  color: '#666',
+  color: darkMode ? '#cbd5e1' : '#666',
   marginBottom: 12,
   overflow: 'hidden',
   display: '-webkit-box',
   WebkitLineClamp: 2,
   WebkitBoxOrient: 'vertical',
-}
+})
 
-const footer: React.CSSProperties = {
+const getFooterStyle = (darkMode: boolean): React.CSSProperties => ({
   display: 'flex',
   justifyContent: 'space-between',
   fontSize: 12,
-  color: '#888',
-}
+  color: darkMode ? '#94a3b8' : '#888',
+})
 
 function categoryToName(c?: string) {
   if (!c) return '자유' // 🔥 방어 (undefined / null)
