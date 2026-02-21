@@ -34,6 +34,26 @@ export default function LibraryRecommend() {
       })
   }
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setDarkMode(!!parsed.darkMode)
+      }
+    } catch {}
+
+    const handleThemeChange = (e: any) => {
+      if (!e?.detail) return
+      setDarkMode(!!e.detail.darkMode)
+    }
+
+    window.addEventListener('theme-change', handleThemeChange)
+    return () => window.removeEventListener('theme-change', handleThemeChange)
+  }, [])
+
   useEffect(() => {
     loadBooks()
   }, [page])
@@ -51,7 +71,7 @@ export default function LibraryRecommend() {
         />
       </Head>
 
-      <div className="container">
+      <div className={`container ${darkMode ? 'dark' : ''}`}>
         <h2 className="section-title">
           <span className="material-symbols-rounded title-icon">
             auto_stories
@@ -269,6 +289,75 @@ export default function LibraryRecommend() {
           color: #6B7280;
           font-size: 16px;
           margin-top: 30px;
+        }
+
+        /* =========================
+          🌙 DARK MODE
+          ========================= */
+
+        .container.dark {
+          background: transparent;
+        }
+
+        .container.dark .section-title,
+        .container.dark .title-icon {
+          color: #60A5FA;
+        }
+
+        .container.dark .section-box {
+          background: #0f172a;
+          border: 1px solid #334155;
+          box-shadow: 0px 2px 8px rgba(0,0,0,0.5);
+        }
+
+        .container.dark .loading,
+        .container.dark .no-data {
+          color: #cbd5e1;
+        }
+
+        .container.dark .book-card {
+          background: #1e293b;
+          border: 1px solid #334155;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        .container.dark .book-card:hover {
+          box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+        }
+
+        .container.dark .book-title {
+          color: #f1f5f9;
+        }
+
+        .container.dark .book-author {
+          color: #94a3b8;
+        }
+
+        .container.dark .book-date {
+          color: #64748b;
+        }
+
+        .container.dark .divider {
+          border-bottom: 1px solid #334155;
+        }
+
+        .container.dark .page-btn {
+          background: #1e293b;
+          border: 1px solid #334155;
+          color: #93c5fd;
+        }
+
+        .container.dark .page-btn:hover {
+          background: #334155;
+        }
+
+        .container.dark .page-btn.active {
+          background: #2563EB;
+          color: white;
+        }
+
+        .container.dark .page-btn:disabled {
+          opacity: 0.3;
         }
 
         /* 📱 모바일 페이지네이션 사이즈 축소 */
