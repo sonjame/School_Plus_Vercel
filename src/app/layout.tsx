@@ -15,6 +15,33 @@ export default function RootLayout({
   const [isPC, setIsPC] = useState<boolean>(true)
   const [banRemainMs, setBanRemainMs] = useState<number | null>(null)
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  // 🔥 theme_settings에서 다크모드 불러오기 (관리자 외에 적용)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      setDarkMode(Boolean(parsed.darkMode))
+    } catch {
+      // 무시
+    }
+  }, [])
+
+  // 🔥 다크모드 변경 브로드캐스트 수신 (내정보 등에서 변경 시)
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      if (!e?.detail) return
+      setDarkMode(Boolean(e.detail.darkMode))
+    }
+
+    window.addEventListener('theme-change', handleThemeChange)
+    return () => {
+      window.removeEventListener('theme-change', handleThemeChange)
+    }
+  }, [])
+
   // ⭐ 모달 상태
   const [modal, setModal] = useState({
     show: false,
@@ -231,7 +258,8 @@ export default function RootLayout({
       <body
         style={{
           margin: 0,
-          background: '#f2f4f7',
+          background: darkMode ? '#020617' : '#f2f4f7',
+          color: darkMode ? '#e5e7eb' : '#111827',
           fontFamily: 'Pretendard, sans-serif',
         }}
       >
@@ -268,8 +296,10 @@ export default function RootLayout({
               height: '100vh',
               background:
                 user?.level === 'admin'
-                  ? 'linear-gradient(180deg, #0F172A, #020617)'
-                  : '#4DB8FF',
+                  ? 'linear-gradient(180deg, #0F172A, #020617)' // 🔒 관리자 전용 테마 고정
+                  : darkMode
+                    ? '#020617' // 🌙 다크모드: 진한 네이비 배경
+                    : '#4DB8FF', // ☀️ 라이트모드: 기존 파란색
 
               /* ✅ padding 분해 */
               paddingTop: '20px',
@@ -404,7 +434,12 @@ export default function RootLayout({
               <>
                 {/* 👤 학생 전용 메뉴 그대로 */}
 
-                <MenuItem icon="👤" label="내정보" href="/my-info" />
+                <MenuItem
+                  icon="👤"
+                  label="내정보"
+                  href="/my-info"
+                  darkMode={darkMode}
+                />
 
                 {/* 게시판 드롭다운 */}
                 <div
@@ -461,17 +496,53 @@ export default function RootLayout({
                   )}
                 </div>
 
-                <MenuItem icon="💬" label="채팅" href="/chat" />
-                <MenuItem icon="📅" label="일정" href="/calendar" />
-                <MenuItem icon="⏰" label="시간표" href="/timetable" />
-                <MenuItem icon="📊" label="모의고사" href="/mockscores" />
-                <MenuItem icon="📊" label="내신점수" href="/schooltest" />
-                <MenuItem icon="🍚" label="급식표" href="/meal" />
-                <MenuItem icon="📚" label="도서관" href="/Library" />
+                <MenuItem
+                  icon="💬"
+                  label="채팅"
+                  href="/chat"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="📅"
+                  label="일정"
+                  href="/calendar"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="⏰"
+                  label="시간표"
+                  href="/timetable"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="📊"
+                  label="모의고사"
+                  href="/mockscores"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="📊"
+                  label="내신점수"
+                  href="/schooltest"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="🍚"
+                  label="급식표"
+                  href="/meal"
+                  darkMode={darkMode}
+                />
+                <MenuItem
+                  icon="📚"
+                  label="도서관"
+                  href="/Library"
+                  darkMode={darkMode}
+                />
                 <MenuItem
                   icon="🏫"
                   label="학교인증"
                   href="/school_certification"
+                  darkMode={darkMode}
                 />
               </>
             )}
@@ -525,7 +596,12 @@ export default function RootLayout({
                   </button>
                 </>
               ) : (
-                <MenuItem icon="🔐" label="로그인" href="/auth/login" />
+                <MenuItem
+                  icon="🔐"
+                  label="로그인"
+                  href="/auth/login"
+                  darkMode={darkMode}
+                />
               )}
             </div>
           </aside>
@@ -649,10 +725,12 @@ function MenuItem({
   icon,
   label,
   href,
+  darkMode,
 }: {
   icon: string
   label: string
   href: string
+  darkMode: boolean
 }) {
   return (
     <Link
@@ -663,12 +741,14 @@ function MenuItem({
         gap: '8px',
         padding: '10px 12px',
         borderRadius: '8px',
-        background: 'rgba(255,255,255,0.25)',
+        background: darkMode ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.25)',
         color: 'white',
         textDecoration: 'none',
         fontSize: '15px',
         fontWeight: 600,
-        border: '1px solid rgba(255,255,255,0.4)',
+        border: darkMode
+          ? '1px solid rgba(148,163,184,0.6)'
+          : '1px solid rgba(255,255,255,0.4)',
       }}
     >
       <span style={{ fontSize: '18px' }}>{icon}</span>
@@ -676,6 +756,7 @@ function MenuItem({
     </Link>
   )
 }
+
 function AdminMenuItem({
   icon,
   label,
