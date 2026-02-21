@@ -103,6 +103,7 @@ export default function HomePage() {
           ? '💬 내 게시글에 댓글'
           : '↪️ 내 댓글에 답글',
         latest.message,
+        latest.type === 'post_commented' ? 'postComment' : 'commentReply',
       )
     }
 
@@ -197,7 +198,20 @@ export default function HomePage() {
     loadUnreadChat()
   }, [])
 
-  const showToast = (title: string, message: string) => {
+  const showToast = (
+    title: string,
+    message: string,
+    type?: 'chat' | 'postComment' | 'commentReply',
+  ) => {
+    const raw = localStorage.getItem('notification_settings')
+    if (raw) {
+      const settings = JSON.parse(raw)
+
+      if (type && settings[type] === false) {
+        return // 🔥 설정 꺼져있으면 토스트 안 띄움
+      }
+    }
+
     const id = Date.now()
 
     setToastList((prev) => [...prev, { id, title, message }])
@@ -225,7 +239,7 @@ export default function HomePage() {
       data.messages?.length > 0
     ) {
       const latest = data.messages[0]
-      showToast(`💬 ${latest.senderName}`, latest.content)
+      showToast(`💬 ${latest.senderName}`, latest.content, 'chat')
     }
 
     prevChatCountRef.current = data.unreadCount
@@ -247,7 +261,11 @@ export default function HomePage() {
       !isFirstLoadRef.current &&
       data.unreadCount > prevNotifyCountRef.current
     ) {
-      showToast('📢 새로운 알림', '새로운 공지/알림이 도착했습니다.')
+      showToast(
+        '📢 새로운 알림',
+        '새로운 공지/알림이 도착했습니다.',
+        'postComment', // 또는 'commentReply'
+      )
     }
 
     prevNotifyCountRef.current = data.unreadCount
