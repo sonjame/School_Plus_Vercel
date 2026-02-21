@@ -49,6 +49,18 @@ export default function WritePage() {
     })
   }
 
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const raw = localStorage.getItem('theme_settings')
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+      setDarkMode(parsed.darkMode)
+    } catch {}
+  }, [])
+
   /* 카테고리 로드 */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -225,12 +237,12 @@ export default function WritePage() {
 
   return (
     <>
-      <div style={pageWrap}>
-        <div style={card}>
+      <div style={pageWrap(darkMode)}>
+        <div style={card(darkMode)}>
           {/* ❌ 닫기 버튼 */}
           <button
             onClick={() => handleCancel()}
-            style={closeBtn}
+            style={closeBtn(darkMode)}
             aria-label="글쓰기 취소"
           >
             ✕
@@ -240,7 +252,13 @@ export default function WritePage() {
 
           {/* 카테고리 */}
           <label style={label}>카테고리</label>
-          <div style={{ ...inputBox, background: '#ECEFF1', fontWeight: 600 }}>
+          <div
+            style={{
+              ...inputBox(darkMode),
+              background: darkMode ? '#0f172a' : '#ECEFF1',
+              fontWeight: 600,
+            }}
+          >
             {category === 'admin'
               ? '🛠 관리자 게시판'
               : category === 'graduate'
@@ -260,7 +278,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목을 입력하세요"
-            style={inputBox}
+            style={inputBox(darkMode)}
           />
 
           {/* 내용 */}
@@ -269,7 +287,7 @@ export default function WritePage() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="내용을 입력하세요"
-            style={textArea}
+            style={textArea(darkMode)}
           />
 
           {/* 투표 스위치 */}
@@ -323,7 +341,7 @@ export default function WritePage() {
                   style={{ display: 'flex', gap: 8, marginBottom: 10 }}
                 >
                   <input
-                    style={{ ...inputBox, flex: 1 }}
+                    style={{ ...inputBox(darkMode), flex: 1 }}
                     placeholder={`옵션 ${i + 1}`}
                     value={opt}
                     onChange={(e) => updateOption(i, e.target.value)}
@@ -355,10 +373,12 @@ export default function WritePage() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    border: '1.5px solid #CFD8DC',
+                    border: darkMode
+                      ? '1.5px solid #334155'
+                      : '1.5px solid #CFD8DC',
                     borderRadius: 12,
                     padding: '12px 14px',
-                    background: '#FFFFFF',
+                    background: darkMode ? '#0f172a' : '#FFFFFF',
                     cursor: 'pointer',
                     gap: 10,
                     overflow: 'hidden',
@@ -400,7 +420,13 @@ export default function WritePage() {
                   </span>
                 </div>
 
-                <p style={{ fontSize: 13, color: '#78909C', marginTop: 6 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: darkMode ? '#94a3b8' : '#78909C',
+                    marginTop: 6,
+                  }}
+                >
                   투표 종료 후에는 투표가 불가능합니다.
                 </p>
               </div>
@@ -440,7 +466,7 @@ export default function WritePage() {
 
           <input
             placeholder="https:// (Enter를 누르면 추가)"
-            style={inputBox}
+            style={inputBox(darkMode)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return
 
@@ -473,7 +499,11 @@ export default function WritePage() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '10px 14px',
-                    border: '1px solid #CFD8DC',
+                    border: darkMode
+                      ? '1px solid #334155'
+                      : '1px solid #CFD8DC',
+                    background: darkMode ? '#0f172a' : '#fff',
+                    color: darkMode ? '#f1f5f9' : '#111827',
                     borderRadius: 10,
                     marginBottom: 6,
                   }}
@@ -543,7 +573,7 @@ export default function WritePage() {
       {/* ❗ 중앙 투표시간 모달 */}
       {showPicker && (
         <div style={centerModalBg}>
-          <div style={centerModalBox}>
+          <div style={centerModalBox(darkMode)}>
             <h3 style={{ margin: '0 0 14px 0', fontSize: 20, fontWeight: 700 }}>
               투표 마감 시간
             </h3>
@@ -611,7 +641,7 @@ export default function WritePage() {
       {/* 기존 alert 모달 */}
       {modal.show && (
         <div style={modalBg}>
-          <div style={modalBox}>
+          <div style={modalBox(darkMode)}>
             <p>{modal.message}</p>
             <button style={btnBlue} onClick={modal.onConfirm}>
               확인
@@ -726,26 +756,30 @@ export default function WritePage() {
 /* --------------------------- STYLE --------------------------- */
 /* ------------------------------------------------------------ */
 
-const pageWrap: React.CSSProperties = {
-  background: '#F3F6FA',
+const pageWrap = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#0f172a' : '#F3F6FA',
   minHeight: '100vh',
   padding: '40px 20px',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'flex-start',
   fontFamily: 'Inter, sans-serif',
-}
+  transition: '0.25s',
+})
 
-const card: React.CSSProperties = {
+const card = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
-  maxWidth: 'min(960px, 92vw)', // 🔥 핵심
-  background: '#fff',
-  padding: '36px clamp(20px, 3vw, 40px)', // 좌우 패딩 반응형
+  maxWidth: 'min(960px, 92vw)',
+  background: darkMode ? '#1e293b' : '#fff',
+  padding: '36px clamp(20px, 3vw, 40px)',
   borderRadius: 20,
-  boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-  border: '1px solid #E3EAF3',
+  boxShadow: darkMode
+    ? '0 6px 20px rgba(0,0,0,0.4)'
+    : '0 6px 18px rgba(0,0,0,0.06)',
+  border: darkMode ? '1px solid #334155' : '1px solid #E3EAF3',
   marginTop: 10,
-}
+  transition: '0.25s',
+})
 
 const titleStyle: React.CSSProperties = {
   fontSize: 28,
@@ -766,30 +800,32 @@ const label: React.CSSProperties = {
   display: 'block',
 }
 
-const inputBox: React.CSSProperties = {
+const inputBox = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
   padding: '14px 16px',
   borderRadius: 12,
-  border: '1.5px solid #CFD8DC',
-  background: '#F9FAFB',
+  border: darkMode ? '1.5px solid #334155' : '1.5px solid #CFD8DC',
+  background: darkMode ? '#0f172a' : '#F9FAFB',
+  color: darkMode ? '#f1f5f9' : '#111827',
   fontSize: '15px',
   outline: 'none',
   boxSizing: 'border-box',
-}
+})
 
-const textArea: React.CSSProperties = {
+const textArea = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
   height: 220,
   padding: '14px 16px',
   borderRadius: 12,
-  border: '1.5px solid #CFD8DC',
-  background: '#F9FAFB',
+  border: darkMode ? '1.5px solid #334155' : '1.5px solid #CFD8DC',
+  background: darkMode ? '#0f172a' : '#F9FAFB',
+  color: darkMode ? '#f1f5f9' : '#111827',
   fontSize: '15px',
   resize: 'vertical',
   outline: 'none',
   boxSizing: 'border-box',
   lineHeight: 1.6,
-}
+})
 
 const uploadBtn: React.CSSProperties = {
   marginTop: 26,
@@ -874,14 +910,15 @@ const modalBg: React.CSSProperties = {
   zIndex: 999,
 }
 
-const modalBox: React.CSSProperties = {
-  background: 'white',
+const modalBox = (darkMode: boolean): React.CSSProperties => ({
+  background: darkMode ? '#1e293b' : 'white',
+  color: darkMode ? '#f1f5f9' : '#111827',
   padding: '22px',
   borderRadius: 12,
   width: 300,
   textAlign: 'center',
   boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-}
+})
 
 const btnBlue: React.CSSProperties = {
   background: '#4FC3F7',
@@ -906,15 +943,16 @@ const centerModalBg: React.CSSProperties = {
   zIndex: 99999,
 }
 
-const centerModalBox: React.CSSProperties = {
+const centerModalBox = (darkMode: boolean): React.CSSProperties => ({
   width: '90%',
   maxWidth: 420,
-  background: '#fff',
+  background: darkMode ? '#1e293b' : '#fff',
+  color: darkMode ? '#f1f5f9' : '#111827',
   padding: '24px 26px',
   borderRadius: 14,
   boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
   textAlign: 'center',
-}
+})
 
 const centerDateInputWrapper: React.CSSProperties = {
   width: '100%',
@@ -980,16 +1018,16 @@ const centerOkBtn: React.CSSProperties = {
   cursor: 'pointer',
 }
 
-const closeBtn: React.CSSProperties = {
+const closeBtn = (darkMode: boolean): React.CSSProperties => ({
   position: 'absolute',
   top: 60,
   right: 330,
   width: 40,
   height: 40,
   borderRadius: '50%',
-  border: 'none',
-  background: '#F1F5F9',
-  color: '#37474F',
+  background: darkMode ? '#1e293b' : '#F1F5F9',
+  color: darkMode ? '#f1f5f9' : '#37474F',
+  border: darkMode ? '1px solid #334155' : 'none',
   fontSize: 22,
   fontWeight: 700,
   cursor: 'pointer',
@@ -997,4 +1035,4 @@ const closeBtn: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   transition: '0.2s',
-}
+})
