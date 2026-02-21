@@ -6,6 +6,7 @@ import LibraryRecommend from '../components/Library'
 import TimetablePreview from '../components/Dashboard/TimetablePreview'
 import Link from 'next/link'
 import { apiFetch } from '@/src/lib/apiFetch'
+import { useRef } from 'react'
 
 interface Post {
   id: string
@@ -56,30 +57,27 @@ export default function HomePage() {
   const [unreadMessages, setUnreadMessages] = useState<UnreadMessage[]>([])
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [unbanModalOpen, setUnbanModalOpen] = useState(false)
+
+  const prevLatestNotificationIdRef = useRef<number | null>(null)
+
+  const prevNotifyCountRef = useRef(0)
+  const prevChatCountRef = useRef(0)
+  const isFirstLoadRef = useRef(true)
+  const isFirstChatLoadRef = useRef(true)
+
   // 🔔 관리자 알림
   const [unreadNotifyCount, setUnreadNotifyCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
-  const [isNotifyOpen, setIsNotifyOpen] = useState(false)
 
   const [banInfo, setBanInfo] = useState<{
     reason: string
     remainHours?: number
   } | null>(null)
 
-  useEffect(() => {
-    const loadUnreadNotifications = async () => {
-      const token = localStorage.getItem('accessToken')
-      if (!token) return
-
-      const res = await apiFetch('/api/notifications/unread-count')
-      if (!res.ok) return
-
-      const data = await res.json()
-      setUnreadNotifyCount(data.unreadCount || 0)
-    }
-
-    loadUnreadNotifications()
-  }, [])
+  // 🔔 토스트 알림
+  const [toastList, setToastList] = useState<
+    { id: number; title: string; message: string }[]
+  >([])
 
   const loadNotifications = async () => {
     const token = localStorage.getItem('accessToken')
@@ -90,6 +88,26 @@ export default function HomePage() {
 
     const data = await res.json()
     setNotifications(data || [])
+
+    if (!Array.isArray(data) || data.length === 0) return
+
+    const latest = data[0]
+
+    // 🔥 이전 알림과 다를 때만 토스트
+    if (
+      latest.id !== prevLatestNotificationIdRef.current &&
+      (latest.type === 'post_commented' || latest.type === 'comment_reply')
+    ) {
+      showToast(
+        latest.type === 'post_commented'
+          ? '💬 내 게시글에 댓글'
+          : '↪️ 내 댓글에 답글',
+        latest.message,
+      )
+    }
+
+    // ⭐ 현재 최신 id 저장
+    prevLatestNotificationIdRef.current = latest.id
   }
 
   const deleteNotification = async (id: number) => {
@@ -179,18 +197,81 @@ export default function HomePage() {
     loadUnreadChat()
   }, [])
 
+  const showToast = (title: string, message: string) => {
+    const id = Date.now()
+
+    setToastList((prev) => [...prev, { id, title, message }])
+
+    setTimeout(() => {
+      setToastList((prev) => prev.filter((t) => t.id !== id))
+    }, 4000)
+  }
+
   const loadUnreadChatSummary = async () => {
     const token = localStorage.getItem('accessToken')
     if (!token) return
 
     const res = await apiFetch('/api/chat/unread-summary')
-
     if (!res.ok) return
 
     const data = await res.json()
+
     setUnreadMessages(data.messages || [])
     setUnreadChatCount(data.unreadCount || 0)
+
+    if (
+      !isFirstChatLoadRef.current &&
+      data.unreadCount > prevChatCountRef.current &&
+      data.messages?.length > 0
+    ) {
+      const latest = data.messages[0]
+      showToast(`💬 ${latest.senderName}`, latest.content)
+    }
+
+    prevChatCountRef.current = data.unreadCount
+    isFirstChatLoadRef.current = false
   }
+
+  const loadUnreadNotifications = async () => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const res = await apiFetch('/api/notifications/unread-count')
+    if (!res.ok) return
+
+    const data = await res.json()
+
+    setUnreadNotifyCount(data.unreadCount || 0)
+
+    if (
+      !isFirstLoadRef.current &&
+      data.unreadCount > prevNotifyCountRef.current
+    ) {
+      showToast('📢 새로운 알림', '새로운 공지/알림이 도착했습니다.')
+    }
+
+    prevNotifyCountRef.current = data.unreadCount
+    isFirstLoadRef.current = false
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    // 처음 한 번 실행
+    loadUnreadChatSummary()
+    loadUnreadNotifications()
+    loadNotifications()
+
+    // 5초마다 자동 체크
+    const interval = setInterval(() => {
+      loadUnreadChatSummary()
+      loadUnreadNotifications()
+      loadNotifications()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   const CATEGORY_TABS = [
     { key: 'all', label: '전체' },
@@ -494,8 +575,14 @@ export default function HomePage() {
             )}
 
             <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
-              현재 계정은 <strong>게시글 작성 및 댓글 작성이 제한</strong>되어
-              있습니다.
+              현재 계정은 <strong>게시글 작성 및 댓글 작성과 채팅 제한</strong>
+              되어 있습니다.
+              <br />
+              문의사항은 아래 고객센터로 연락을 주세요.
+            </p>
+
+            <p style={{ fontSize: '14px', color: '#555', marginTop: '10px' }}>
+              SchoolPlus 고객센터 : 0000-0000
             </p>
 
             <button
@@ -1126,6 +1213,49 @@ export default function HomePage() {
             </div>
           )}
         </section>
+      </div>
+
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          zIndex: 99999,
+        }}
+      >
+        {toastList.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              minWidth: '260px',
+              maxWidth: '320px',
+              background: '#fff',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+              transform: 'translateX(0)',
+              transition: 'all 0.3s ease',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              {toast.title}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: '#555',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {toast.message}
+            </div>
+          </div>
+        ))}
       </div>
     </>
   )
