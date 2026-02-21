@@ -23,17 +23,18 @@ type ThemeSettings = {
 export default function BoardMainPage() {
   const [sections, setSections] = useState<BoardSection[]>([])
 
-  const [darkMode, setDarkMode] = useState(false)
-
-  useEffect(() => {
-    const raw = localStorage.getItem('theme_settings')
-    if (!raw) return
+  const [darkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
 
     try {
+      const raw = localStorage.getItem('theme_settings')
+      if (!raw) return false
       const parsed: ThemeSettings = JSON.parse(raw)
-      setDarkMode(parsed.darkMode)
-    } catch {}
-  }, [])
+      return Boolean(parsed.darkMode)
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     const boards = [
@@ -168,7 +169,6 @@ const getMiniPost = (darkMode: boolean): React.CSSProperties => ({
 const getOuterStyle = (darkMode: boolean): React.CSSProperties => ({
   minHeight: '100vh',
   background: darkMode ? '#0f172a' : '#f1f5f9',
-  transition: 'all 0.25s ease',
 })
 
 const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
@@ -185,5 +185,4 @@ const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
 
   background: darkMode ? '#0f172a' : 'white',
   color: darkMode ? '#f1f5f9' : '#111827',
-  transition: 'all 0.25s ease',
 })
