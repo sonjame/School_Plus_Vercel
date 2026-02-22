@@ -21,19 +21,14 @@ export default function LibrarySearch() {
   const visiblePages = PAGES.slice(start - 1, end)
 
   const [recentKeywords, setRecentKeywords] = useState<any[]>([])
-
   const [suggestions, setSuggestions] = useState<string[]>([])
-
   const [showSuggestions, setShowSuggestions] = useState(false)
 
+  /* 🌙 다크모드 상태 */
+  const [darkMode, setDarkMode] = useState(false)
+
   const getToken = () => {
-    const stored = localStorage.getItem('loggedInUser')
-    if (!stored) return null
-    try {
-      return JSON.parse(stored).token
-    } catch {
-      return null
-    }
+    return localStorage.getItem('accessToken')
   }
 
   const dropdownItems = query.trim()
@@ -81,6 +76,7 @@ export default function LibrarySearch() {
 
   useEffect(() => {
     if (query.trim() !== '') handleSearch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
   useEffect(() => {
@@ -108,7 +104,7 @@ export default function LibrarySearch() {
   useEffect(() => {
     const loadHistory = async () => {
       const token = getToken()
-      if (!token) return // 🔥 이 한 줄이 핵심
+      if (!token) return
 
       const res = await fetch('/api/search-history', {
         headers: {
@@ -122,20 +118,85 @@ export default function LibrarySearch() {
     }
 
     loadHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /* 🌙 다크모드 초기 로드 (user별 theme_settings) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  /* 🌙 다른 컴포넌트에서 theme-change 이벤트 쏠 때 동기화 */
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
   }, [])
 
   return (
     <>
-      <div className="container">
+      <div
+        className="container"
+        style={{
+          background: darkMode ? 'transparent' : '#f9fafb',
+          color: darkMode ? '#e5e7eb' : '#111827',
+        }}
+      >
         <h1 className="title">
-          <span className="material-symbols-rounded icon-large">search</span>
+          <span
+            className="material-symbols-rounded icon-large"
+            style={{
+              color: darkMode ? '#60a5fa' : '#3b82f6',
+            }}
+          >
+            search
+          </span>
           도서 검색
         </h1>
 
         {/* 검색창 */}
         <div className="search-area">
-          <div className="search-box" style={{ position: 'relative' }}>
-            <span className="material-symbols-rounded icon">search</span>
+          <div
+            className="search-box"
+            style={{
+              position: 'relative',
+              background: darkMode ? '#020617' : '#ffffff',
+              borderColor: darkMode ? '#374151' : '#cccccc',
+              boxShadow: darkMode
+                ? '0 8px 24px rgba(15,23,42,0.9)'
+                : '0 4px 15px rgba(0,0,0,0.06)',
+            }}
+          >
+            <span
+              className="material-symbols-rounded icon"
+              style={{
+                color: darkMode ? '#9ca3af' : 'gray',
+              }}
+            >
+              search
+            </span>
 
             <input
               className="search-input"
@@ -150,6 +211,10 @@ export default function LibrarySearch() {
               onBlur={() => {
                 setTimeout(() => setShowSuggestions(false), 150)
               }}
+              style={{
+                color: darkMode ? '#e5e7eb' : '#111827',
+                background: 'transparent',
+              }}
             />
 
             <button
@@ -158,11 +223,17 @@ export default function LibrarySearch() {
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               className="search-button"
+              style={{
+                background: '#2563eb',
+                boxShadow: darkMode
+                  ? '0 4px 12px rgba(37,99,235,0.6)'
+                  : '0 4px 12px rgba(37,99,235,0.4)',
+              }}
             >
               검색
             </button>
 
-            {/* 🔍 연관검색어 */}
+            {/* 🔍 연관검색어 / 최근검색어 드롭다운 */}
             {showSuggestions && dropdownItems.length > 0 && (
               <div
                 style={{
@@ -170,11 +241,13 @@ export default function LibrarySearch() {
                   top: '100%',
                   left: 0,
                   right: 0,
-                  background: '#fff',
-                  border: '1px solid #ddd',
+                  background: darkMode ? '#020617' : '#ffffff',
+                  border: `1px solid ${darkMode ? '#374151' : '#dddddd'}`,
                   borderRadius: 12,
                   marginTop: 6,
-                  boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                  boxShadow: darkMode
+                    ? '0 10px 30px rgba(15,23,42,0.9)'
+                    : '0 6px 18px rgba(0,0,0,0.12)',
                   zIndex: 20,
                 }}
               >
@@ -184,10 +257,12 @@ export default function LibrarySearch() {
                     style={{
                       padding: '10px 14px',
                       fontSize: 13,
-                      color: '#2563eb',
+                      color: darkMode ? '#60a5fa' : '#2563eb',
                       textAlign: 'right',
                       cursor: 'pointer',
-                      borderBottom: '1px solid #eee',
+                      borderBottom: `1px solid ${
+                        darkMode ? '#1f2937' : '#eeeeee'
+                      }`,
                     }}
                     onMouseDown={async () => {
                       if (!confirm('최근 검색어를 모두 삭제할까요?')) return
@@ -214,10 +289,13 @@ export default function LibrarySearch() {
                     style={{
                       padding: '10px 14px',
                       cursor: 'pointer',
-                      borderBottom: '1px solid #eee',
+                      borderBottom: `1px solid ${
+                        darkMode ? '#1f2937' : '#eeeeee'
+                      }`,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      color: darkMode ? '#e5e7eb' : '#111827',
                     }}
                     onMouseDown={() => {
                       const keyword =
@@ -237,7 +315,10 @@ export default function LibrarySearch() {
                     {/* ❌ 단일 삭제 (검색기록만) */}
                     {item.type === 'history' && (
                       <span
-                        style={{ color: '#aaa', cursor: 'pointer' }}
+                        style={{
+                          color: darkMode ? '#9ca3af' : '#aaaaaa',
+                          cursor: 'pointer',
+                        }}
                         onMouseDown={async (e) => {
                           e.stopPropagation()
                           await fetch('/api/search-history', {
@@ -264,7 +345,14 @@ export default function LibrarySearch() {
           </div>
         </div>
 
-        {loading && <p className="loading">⏳ 검색 중입니다...</p>}
+        {loading && (
+          <p
+            className="loading"
+            style={{ color: darkMode ? '#9ca3af' : '#666666' }}
+          >
+            ⏳ 검색 중입니다...
+          </p>
+        )}
 
         {/* 검색 결과 */}
         {searchBooks.length > 0 && (
@@ -277,7 +365,16 @@ export default function LibrarySearch() {
                 rel="noopener noreferrer"
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
-                <div className="book-item">
+                <div
+                  className="book-item"
+                  style={{
+                    background: darkMode ? '#020617' : '#ffffff',
+                    borderColor: darkMode ? '#374151' : '#dddddd',
+                    boxShadow: darkMode
+                      ? '0 8px 24px rgba(15,23,42,0.9)'
+                      : '0 4px 12px rgba(0,0,0,0.08)',
+                  }}
+                >
                   <img src={book.cover} className="book-cover" />
 
                   <div className="book-info">
@@ -287,14 +384,35 @@ export default function LibrarySearch() {
                           ? book.title.slice(0, 60) + '…'
                           : book.title}
                       </h3>
-                      <p className="book-author">{book.author}</p>
+                      <p
+                        className="book-author"
+                        style={{
+                          color: darkMode ? '#9ca3af' : '#555555',
+                        }}
+                      >
+                        {book.author}
+                      </p>
                     </div>
 
-                    <p className="book-date">{book.pubDate}</p>
+                    <p
+                      className="book-date"
+                      style={{
+                        color: darkMode ? '#6b7280' : '#777777',
+                      }}
+                    >
+                      {book.pubDate}
+                    </p>
                   </div>
                 </div>
 
-                {i !== searchBooks.length - 1 && <hr className="divider" />}
+                {i !== searchBooks.length - 1 && (
+                  <hr
+                    className="divider"
+                    style={{
+                      borderColor: darkMode ? '#1f2937' : '#cccccc',
+                    }}
+                  />
+                )}
               </a>
             ))}
           </div>
@@ -308,26 +426,57 @@ export default function LibrarySearch() {
               className="page-btn"
               onClick={() => {
                 setPageGroup((g) => g - 1)
-                window.scrollTo({ top: 0, behavior: 'smooth' }) // 맨 위로 이동
+                window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               disabled={pageGroup === 1}
+              style={{
+                background: darkMode ? '#111827' : '#e5e7eb',
+                color: darkMode ? '#e5e7eb' : '#111827',
+                border: darkMode ? '1px solid #374151' : 'none',
+                opacity: pageGroup === 1 ? 0.5 : 1,
+              }}
             >
               이전
             </button>
 
             {/* 번호 */}
-            {visiblePages.map((num) => (
-              <button
-                key={num}
-                className={`page-btn ${page === num ? 'active' : ''}`}
-                onClick={() => {
-                  setPage(num)
-                  window.scrollTo({ top: 0, behavior: 'smooth' }) // 페이지 이동 시 맨 위
-                }}
-              >
-                {num}
-              </button>
-            ))}
+            {visiblePages.map((num) => {
+              const active = page === num
+              return (
+                <button
+                  key={num}
+                  className={`page-btn ${active ? 'active' : ''}`}
+                  onClick={() => {
+                    setPage(num)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  style={{
+                    background: active
+                      ? '#2563eb'
+                      : darkMode
+                        ? '#111827'
+                        : '#e5e7eb',
+                    color: active
+                      ? '#ffffff'
+                      : darkMode
+                        ? '#e5e7eb'
+                        : '#111827',
+                    border: active
+                      ? 'none'
+                      : darkMode
+                        ? '1px solid #374151'
+                        : 'none',
+                    boxShadow: active
+                      ? darkMode
+                        ? '0 4px 15px rgba(37,99,235,0.6)'
+                        : '0 4px 15px rgba(37,99,235,0.4)'
+                      : 'none',
+                  }}
+                >
+                  {num}
+                </button>
+              )
+            })}
 
             {/* 다음 그룹 */}
             <button
@@ -337,6 +486,12 @@ export default function LibrarySearch() {
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               disabled={pageGroup === TOTAL_GROUPS}
+              style={{
+                background: darkMode ? '#111827' : '#e5e7eb',
+                color: darkMode ? '#e5e7eb' : '#111827',
+                border: darkMode ? '1px solid #374151' : 'none',
+                opacity: pageGroup === TOTAL_GROUPS ? 0.5 : 1,
+              }}
             >
               다음
             </button>
@@ -347,7 +502,7 @@ export default function LibrarySearch() {
       {/* 아래 CSS는 네 기존 코드 그대로 유지됨 */}
       <style>{`
         .container {
-          max-width: 960px;
+          max-width: 1650px;
           margin: auto;
           padding: 30px;
           text-align: center;
@@ -366,7 +521,6 @@ export default function LibrarySearch() {
 
         .icon-large {
           font-size: 48px;
-          color: #3b82f6;
         }
 
         .search-area {
@@ -382,9 +536,9 @@ export default function LibrarySearch() {
           width: 100%;
           max-width: 720px;
           padding: 16px 24px;
-          background: white;
-          border: 1px solid #ccc;
           border-radius: 20px;
+          border: 1px solid #ccc;
+          background: white;
           box-shadow: 0 4px 15px rgba(0,0,0,0.06);
         }
 
