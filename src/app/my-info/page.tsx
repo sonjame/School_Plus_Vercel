@@ -203,41 +203,44 @@ export default function MyInfoPagePreview() {
     darkMode: boolean
   }
 
-  const getThemeSetting = (): ThemeSettings => {
-    const raw = localStorage.getItem('theme_settings')
+  const getThemeSetting = (userId: number): ThemeSettings => {
+    const raw = localStorage.getItem(`theme_settings_${userId}`)
     if (!raw) return { darkMode: false }
     return JSON.parse(raw)
   }
 
-  const saveThemeSetting = (settings: ThemeSettings) => {
-    localStorage.setItem('theme_settings', JSON.stringify(settings))
+  const saveThemeSetting = (userId: number, settings: ThemeSettings) => {
+    localStorage.setItem(`theme_settings_${userId}`, JSON.stringify(settings))
   }
-
-  const [themeSetting, setThemeSetting] = useState<ThemeSettings>(() => {
-    if (typeof window === 'undefined') return { darkMode: false }
-
-    try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return { darkMode: false }
-      return JSON.parse(raw)
-    } catch {
-      return { darkMode: false }
-    }
+  const [themeSetting, setThemeSetting] = useState<ThemeSettings>({
+    darkMode: false,
   })
+
+  useEffect(() => {
+    if (!user) return
+    const settings = getThemeSetting(user.id)
+    setThemeSetting(settings)
+  }, [user])
   const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     chat: true,
     postComment: true,
     commentReply: true,
   }
 
-  const getNotificationSettings = (): NotificationSettings => {
-    const raw = localStorage.getItem('notification_settings')
+  const getNotificationSettings = (userId: number) => {
+    const raw = localStorage.getItem(`notification_settings_${userId}`)
     if (!raw) return DEFAULT_NOTIFICATION_SETTINGS
     return JSON.parse(raw)
   }
 
-  const saveNotificationSettings = (settings: NotificationSettings) => {
-    localStorage.setItem('notification_settings', JSON.stringify(settings))
+  const saveNotificationSettings = (
+    userId: number,
+    settings: NotificationSettings,
+  ) => {
+    localStorage.setItem(
+      `notification_settings_${userId}`,
+      JSON.stringify(settings),
+    )
   }
 
   const [showNotificationModal, setShowNotificationModal] = useState(false)
@@ -283,9 +286,10 @@ export default function MyInfoPagePreview() {
   }, [])
 
   useEffect(() => {
-    const settings = getNotificationSettings()
+    if (!user) return
+    const settings = getNotificationSettings(user.id)
     setNotificationSettings(settings)
-  }, [])
+  }, [user])
 
   const handlePasswordChange = async () => {
     if (!currentPw || !newPw || !newPw2) {
@@ -1903,7 +1907,8 @@ export default function MyInfoPagePreview() {
                       [key]: !notificationSettings[key],
                     }
                     setNotificationSettings(updated)
-                    saveNotificationSettings(updated)
+                    if (!user) return
+                    saveNotificationSettings(user.id, updated)
                   }}
                   style={{
                     width: 60,
@@ -1977,7 +1982,8 @@ export default function MyInfoPagePreview() {
                   }
 
                   setThemeSetting(updated)
-                  saveThemeSetting(updated)
+                  if (!user) return
+                  saveThemeSetting(user.id, updated)
 
                   // 🔥 RootLayout에 알려주기
                   if (typeof window !== 'undefined') {
