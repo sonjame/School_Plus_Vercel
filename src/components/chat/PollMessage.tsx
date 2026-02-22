@@ -1,6 +1,7 @@
 'use client'
 
 import { apiFetch } from '@/src/lib/apiFetch'
+import { useEffect, useState } from 'react'
 
 type PollMessageProps = {
   msg: any
@@ -114,17 +115,48 @@ export default function PollMessage({
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 480
 
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   return (
     <div
       style={{
-        background: isDark ? '#1e293b' : 'white',
+        background: darkMode? '#1e293b' : 'white',
         borderRadius: 14,
         padding: '16px 14px',
-        border: isDark ? '1px solid #334155' : '1px solid #e5e7eb',
-        color: isDark ? '#e5e7eb' : '#111827',
+        border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
+        color: darkMode ? '#e5e7eb' : '#111827',
         width: '100%',
         maxWidth: isMobile ? 240 : 400,
       }}
@@ -146,10 +178,10 @@ export default function PollMessage({
           style={{
             fontSize: 12,
             color: isClosed
-              ? isDark
+              ? darkMode
                 ? '#f87171'
                 : '#ef4444'
-              : isDark
+              : darkMode
                 ? '#60a5fa'
                 : '#2563eb',
             fontWeight: 600,
@@ -179,9 +211,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: '12px 14px',
                   borderRadius: 10,
-                  background: isDark ? '#334155' : '#f9fafb',
-                  border: isDark ? '1px solid #475569' : '1px solid #d1d5db',
-                  color: isDark ? '#e2e8f0' : '#111827',
+                  background: darkMode? '#334155' : '#f9fafb',
+                  border: darkMode ? '1px solid #475569' : '1px solid #d1d5db',
+                  color: darkMode? '#e2e8f0' : '#111827',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: 14,
@@ -200,9 +232,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: isMobile ? '4px 12px' : '8px 12px',
                   borderRadius: 10,
-                  background: isDark ? '#3f1d1d' : '#fee2e2',
-                  color: isDark ? '#fca5a5' : '#b91c1c',
-                  border: isDark ? '1px solid #7f1d1d' : '1px solid #ef4444',
+                  background:darkMode  ? '#3f1d1d' : '#fee2e2',
+                  color: darkMode ? '#fca5a5' : '#b91c1c',
+                  border: darkMode? '1px solid #7f1d1d' : '1px solid #ef4444',
                   cursor: 'pointer',
                   fontWeight: 600,
                   marginTop: 4,
@@ -218,7 +250,7 @@ export default function PollMessage({
                 <div
                   style={{
                     height: 12,
-                    background: isDark ? '#334155' : '#e5e7eb',
+                    background: darkMode ? '#334155' : '#e5e7eb',
                     borderRadius: 999,
                     overflow: 'hidden',
                   }}
@@ -236,7 +268,7 @@ export default function PollMessage({
                   style={{
                     fontSize: 12,
                     marginTop: 4,
-                    color: isDark ? '#cbd5e1' : '#374151',
+                    color: darkMode ? '#cbd5e1' : '#374151',
                     fontWeight: 600,
                   }}
                 >
@@ -248,7 +280,7 @@ export default function PollMessage({
                   <div
                     style={{
                       fontSize: 11,
-                      color: isDark ? '#94a3b8' : '#6b7280',
+                      color: darkMode? '#94a3b8' : '#6b7280',
                       marginTop: 2,
                     }}
                   >
@@ -270,7 +302,7 @@ export default function PollMessage({
           alignItems: 'center',
           marginTop: 10,
           fontSize: 12,
-          color: isDark ? '#94a3b8' : '#6b7280',
+          color: darkMode ? '#94a3b8' : '#6b7280',
         }}
       >
         <div style={{ display: 'flex', gap: 8 }}>
@@ -282,7 +314,7 @@ export default function PollMessage({
           {/* 👀 읽은 사람 수 */}
           {typeof msg.readCount === 'number' && (
             <span
-              style={{ color: isDark ? '#60a5fa' : '#2563eb', fontWeight: 600 }}
+              style={{ color: darkMode? '#60a5fa' : '#2563eb', fontWeight: 600 }}
             >
               👀 {msg.readCount}
             </span>
@@ -297,7 +329,7 @@ export default function PollMessage({
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: isDark ? '#60a5fa' : '#2563eb',
+                  color: darkMode ? '#60a5fa' : '#2563eb',
                   cursor: 'pointer',
                   fontSize: 13,
                   padding: '6px 4px',
@@ -312,7 +344,7 @@ export default function PollMessage({
               style={{
                 border: 'none',
                 background: 'transparent',
-                color: isDark ? '#f87171' : '#ef4444',
+                color: darkMode ? '#f87171' : '#ef4444',
                 cursor: 'pointer',
               }}
             >
