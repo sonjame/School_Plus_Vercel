@@ -1,7 +1,7 @@
 'use client'
 
 import { BarChart, Bar } from 'recharts'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -63,6 +63,41 @@ export default function ScoresPage() {
   const [months, setMonths] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [showModal, setShowModal] = useState(false)
+
+  // 🌙 다크모드
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   // ---------------------------------------------
   // ⭐ 점수 초기 상태
@@ -604,7 +639,7 @@ export default function ScoresPage() {
       : []
 
   return (
-    <div className="page-wrap">
+    <div className={`page-wrap ${darkMode ? 'dark' : ''}`}>
       <h1 className="title">모의고사 성적 계산기</h1>
       <p className="subtitle">원점수 기준 등급을 확인하세요</p>
 
@@ -622,8 +657,10 @@ export default function ScoresPage() {
           style={{
             padding: '8px 12px',
             borderRadius: 6,
-            border: '1px solid #ccc',
+            border: `1px solid ${darkMode ? '#334155' : '#ccc'}`,
             fontSize: 14,
+            background: darkMode ? '#020617' : '#fff',
+            color: darkMode ? '#e5e7eb' : '#111827',
           }}
         >
           {yearRange.map((y) => (
@@ -688,26 +725,34 @@ export default function ScoresPage() {
                 {grade === 3 && (
                   <>
                     <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                      {['화법과작문', '언어와매체'].map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setKoreanType(type)}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: 8,
-                            border:
-                              koreanType === type
+                      {['화법과작문', '언어와매체'].map((type) => {
+                        const active = koreanType === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setKoreanType(type)}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: 8,
+                              border: active
                                 ? '2px solid #e74c3c'
-                                : '1px solid #ccc',
-                            background:
-                              koreanType === type ? '#fdecea' : '#fff',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
+                                : `1px solid ${darkMode ? '#334155' : '#ccc'}`,
+                              background: active
+                                ? darkMode
+                                  ? '#451a1a'
+                                  : '#fdecea'
+                                : darkMode
+                                  ? '#020617'
+                                  : '#fff',
+                              color: darkMode ? '#e5e7eb' : '#111827',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {type}
+                          </button>
+                        )
+                      })}
                     </div>
                   </>
                 )}
@@ -730,25 +775,34 @@ export default function ScoresPage() {
                 {grade === 3 && (
                   <>
                     <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                      {['확률과통계', '미적분', '기하'].map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setMathType(type)}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: 8,
-                            border:
-                              mathType === type
+                      {['확률과통계', '미적분', '기하'].map((type) => {
+                        const active = mathType === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setMathType(type)}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: 8,
+                              border: active
                                 ? '2px solid #3498db'
-                                : '1px solid #ccc',
-                            background: mathType === type ? '#eaf4ff' : '#fff',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
+                                : `1px solid ${darkMode ? '#334155' : '#ccc'}`,
+                              background: active
+                                ? darkMode
+                                  ? '#0b253f'
+                                  : '#eaf4ff'
+                                : darkMode
+                                  ? '#020617'
+                                  : '#fff',
+                              color: darkMode ? '#e5e7eb' : '#111827',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {type}
+                          </button>
+                        )
+                      })}
                     </div>
                   </>
                 )}
@@ -1102,30 +1156,37 @@ export default function ScoresPage() {
               flexWrap: 'wrap',
             }}
           >
-            {subjectButtons.map((btn) => (
-              <button
-                key={`${btn.key}-${btn.label}`}
-                onClick={() => setSelectedSubject(btn)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 999,
-                  border:
-                    selectedSubject?.key === btn.key &&
-                    selectedSubject?.label === btn.label
+            {subjectButtons.map((btn) => {
+              const active =
+                selectedSubject?.key === btn.key &&
+                selectedSubject?.label === btn.label
+
+              return (
+                <button
+                  key={`${btn.key}-${btn.label}`}
+                  onClick={() => setSelectedSubject(btn)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: active
                       ? `2px solid ${subjectColors[btn.key]}`
-                      : '1px solid #ddd',
-                  background:
-                    selectedSubject?.key === btn.key &&
-                    selectedSubject?.label === btn.label
-                      ? '#f5f9ff'
-                      : '#fff',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                {btn.label}
-              </button>
-            ))}
+                      : `1px solid ${darkMode ? '#4b5563' : '#ddd'}`,
+                    background: active
+                      ? darkMode
+                        ? '#111827'
+                        : '#f5f9ff'
+                      : darkMode
+                        ? '#020617'
+                        : '#fff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {btn.label}
+                </button>
+              )
+            })}
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -1135,8 +1196,18 @@ export default function ScoresPage() {
                 padding: '6px 12px',
                 borderRadius: 6,
                 border:
-                  chartType === 'line' ? '2px solid #4d8dff' : '1px solid #ccc',
-                background: chartType === 'line' ? '#eef4ff' : '#fff',
+                  chartType === 'line'
+                    ? '2px solid #4d8dff'
+                    : `1px solid ${darkMode ? '#4b5563' : '#ccc'}`,
+                background:
+                  chartType === 'line'
+                    ? darkMode
+                      ? '#111827'
+                      : '#eef4ff'
+                    : darkMode
+                      ? '#020617'
+                      : '#fff',
+                color: darkMode ? '#e5e7eb' : '#111827',
                 cursor: 'pointer',
                 fontSize: 13,
               }}
@@ -1150,8 +1221,18 @@ export default function ScoresPage() {
                 padding: '6px 12px',
                 borderRadius: 6,
                 border:
-                  chartType === 'bar' ? '2px solid #4d8dff' : '1px solid #ccc',
-                background: chartType === 'bar' ? '#eef4ff' : '#fff',
+                  chartType === 'bar'
+                    ? '2px solid #4d8dff'
+                    : `1px solid ${darkMode ? '#4b5563' : '#ccc'}`,
+                background:
+                  chartType === 'bar'
+                    ? darkMode
+                      ? '#111827'
+                      : '#eef4ff'
+                    : darkMode
+                      ? '#020617'
+                      : '#fff',
+                color: darkMode ? '#e5e7eb' : '#111827',
                 cursor: 'pointer',
                 fontSize: 13,
               }}
@@ -1165,13 +1246,21 @@ export default function ScoresPage() {
             <div style={{ width: '100%', height: 320 }}>
               <ResponsiveContainer>
                 {chartType === 'line' ? (
-                  /* ----------------------- */
-                  /*      ❗ Line Chart      */
-                  /* ----------------------- */
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={darkMode ? '#1f2937' : '#e0e0e0'}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                      tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                      tickLine={{ stroke: darkMode ? '#4b5563' : '#ccc' }}
+                    />
                     <YAxis
+                      stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                      tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                      tickLine={{ stroke: darkMode ? '#4b5563' : '#ccc' }}
                       domain={[
                         0,
                         [
@@ -1184,7 +1273,19 @@ export default function ScoresPage() {
                           : 100,
                       ]}
                     />
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: darkMode ? '#020617' : '#ffffff',
+                        borderColor: darkMode ? '#4b5563' : '#e5e7eb',
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                      labelStyle={{
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                      itemStyle={{
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                    />
                     <Line
                       type="monotone"
                       dataKey="score"
@@ -1195,13 +1296,21 @@ export default function ScoresPage() {
                     />
                   </LineChart>
                 ) : (
-                  /* ----------------------- */
-                  /*      ❗ Bar Chart       */
-                  /* ----------------------- */
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={darkMode ? '#1f2937' : '#e0e0e0'}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                      tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                      tickLine={{ stroke: darkMode ? '#4b5563' : '#ccc' }}
+                    />
                     <YAxis
+                      stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                      tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                      tickLine={{ stroke: darkMode ? '#4b5563' : '#ccc' }}
                       domain={[
                         0,
                         [
@@ -1214,7 +1323,20 @@ export default function ScoresPage() {
                           : 100,
                       ]}
                     />
-                    <Tooltip />
+                    <Tooltip
+                      cursor={false} // ⭐ 이 줄 추가: 하얀 배경(커서) 제거
+                      contentStyle={{
+                        backgroundColor: darkMode ? '#020617' : '#ffffff',
+                        borderColor: darkMode ? '#4b5563' : '#e5e7eb',
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                      labelStyle={{
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                      itemStyle={{
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                      }}
+                    />
                     <Bar
                       dataKey="score"
                       fill={subjectColors[selectedSubject.key]}
@@ -1443,6 +1565,88 @@ export default function ScoresPage() {
             opacity: 1;
             transform: scale(1);
           }
+        }
+
+        /* ================================== */
+        /* 🌙 다크모드용 스타일 오버라이드   */
+        /* ================================== */
+        .page-wrap.dark {
+          background: #020617;
+          color: #e5e7eb;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
+        }
+
+        .page-wrap.dark .title {
+          color: #38bdf8;
+        }
+
+        .page-wrap.dark .subtitle {
+          color: #94a3b8;
+        }
+
+        .page-wrap.dark .card {
+          background: #0f172a;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.8);
+        }
+
+        .page-wrap.dark .section-title {
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark .grade-btn,
+        .page-wrap.dark .month-btn {
+          background: #020617;
+          border-color: #1f2937;
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark .grade-btn.active,
+        .page-wrap.dark .month-btn.active {
+          background: #4d8dff;
+          color: #ffffff;
+          border-color: #4d8dff;
+        }
+
+        .page-wrap.dark .input-box input {
+          background: #020617;
+          border-color: #334155;
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark .explore-btn {
+          background: #020617;
+          border-color: #334155;
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark .explore-btn.active {
+          background: #4d8dff;
+          color: #ffffff;
+          border-color: #4d8dff;
+        }
+
+        .page-wrap.dark .subject-scroll {
+          background: #020617;
+          border-color: #1f2937;
+        }
+
+        .page-wrap.dark table {
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark th {
+          background: #020617;
+          color: #e5e7eb;
+        }
+
+        .page-wrap.dark td {
+          border-color: #1f2937;
+        }
+
+        .page-wrap.dark .modal-box {
+          background: #020617;
+          border-color: #4d8dff;
+          color: #e5e7eb;
         }
       `}</style>
       {showModal && (
