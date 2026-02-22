@@ -2,7 +2,7 @@
 
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -74,7 +74,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'center',
     cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 600,
   },
+
   previewImg: {
     maxWidth: '100%',
     borderRadius: 12,
@@ -119,7 +122,7 @@ const styles: Record<string, React.CSSProperties> = {
   previewImgFit: {
     maxWidth: '100%',
     maxHeight: '100%',
-    objectFit: 'contain', // ⭐ 가로/세로 핵심
+    objectFit: 'contain',
     borderRadius: 12,
   },
 }
@@ -136,6 +139,43 @@ const SchoolAuthPage: React.FC = () => {
   const [birthDate, setBirthDate] = useState('') // YYYY-MM-DD
   const [validFrom, setValidFrom] = useState('') // 시작일
   const [validTo, setValidTo] = useState('') // 종료일
+
+  /* 🌙 다크모드 상태 */
+  const [darkMode, setDarkMode] = useState(false)
+
+  /* 🌙 다크모드 초기 로드 (user별 theme_settings) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  /* 🌙 다른 컴포넌트에서 theme-change 이벤트 쏠 때 동기화 */
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const handleRemoveImage = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -261,21 +301,56 @@ const SchoolAuthPage: React.FC = () => {
   }
 
   return (
-    <div style={styles.page}>
+    <div
+      style={{
+        ...styles.page,
+        background: darkMode ? '#020617' : '#f5f7fb',
+        color: darkMode ? '#e5e7eb' : '#111827',
+      }}
+    >
       <div style={styles.layout}>
-        <div style={styles.card}>
+        <div
+          style={{
+            ...styles.card,
+            background: darkMode ? '#020617' : '#ffffff',
+            color: darkMode ? '#e5e7eb' : '#111827',
+            boxShadow: darkMode
+              ? '0 16px 40px rgba(15,23,42,0.9)'
+              : '0 8px 30px rgba(15,23,42,0.12)',
+            border: darkMode ? '1px solid #1f2937' : 'none',
+          }}
+        >
           <h2 style={styles.title}>학교 인증</h2>
-          <div style={styles.subtitle}>
+          <div
+            style={{
+              ...styles.subtitle,
+              color: darkMode ? '#9ca3af' : '#6b7280',
+            }}
+          >
             학생증 사진을 업로드하여 학교를 인증하세요
           </div>
 
-          <div style={styles.infoBox}>
+          <div
+            style={{
+              ...styles.infoBox,
+              background: darkMode ? '#0b1220' : '#d8eaff',
+              border: `1px solid ${darkMode ? '#1d4ed8' : '#aacbff'}`,
+              color: darkMode ? '#e5e7eb' : '#374151',
+            }}
+          >
             학교 인증을 완료하면 안전한 학교 커뮤니티를 이용할 수 있습니다.
             <br />
             학생증 사진을 업로드하고 다음 단계 버튼을 눌러서 진행해주세요.
           </div>
 
-          <div style={styles.noteBox}>
+          <div
+            style={{
+              ...styles.noteBox,
+              background: darkMode ? '#020617' : '#e4efff',
+              border: `1px solid ${darkMode ? '#1d4ed8' : '#b4ccff'}`,
+              color: darkMode ? '#e5e7eb' : '#374151',
+            }}
+          >
             <div style={{ fontWeight: 700, marginBottom: 6 }}>안내사항</div>
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
               <li>학생증에서 학교명과 이름이 명확하게 보여야 합니다.</li>
@@ -283,11 +358,23 @@ const SchoolAuthPage: React.FC = () => {
             </ul>
           </div>
 
-          <div style={styles.sectionTitle}>🖼 학생증 사진 업로드</div>
+          <div
+            style={{
+              ...styles.sectionTitle,
+              color: darkMode ? '#e5e7eb' : '#111827',
+            }}
+          >
+            🖼 학생증 사진 업로드
+          </div>
 
           {!previewUrl && (
             <div
-              style={styles.uploadArea}
+              style={{
+                ...styles.uploadArea,
+                background: darkMode ? '#020617' : '#e4efff',
+                borderColor: darkMode ? '#2563eb' : '#9bbcff',
+                color: darkMode ? '#e5e7eb' : '#1f2937',
+              }}
               onClick={() => fileInputRef.current?.click()}
             >
               학생증 사진 선택
@@ -309,7 +396,13 @@ const SchoolAuthPage: React.FC = () => {
 
           {previewUrl && (
             <>
-              <div style={styles.previewWrapper}>
+              <div
+                style={{
+                  ...styles.previewWrapper,
+                  background: darkMode ? '#020617' : '#f1f5f9',
+                  borderColor: darkMode ? '#1f2937' : '#e5e7eb',
+                }}
+              >
                 <img
                   src={previewUrl}
                   alt="학생증 미리보기"
@@ -331,7 +424,16 @@ const SchoolAuthPage: React.FC = () => {
             </>
           )}
 
-          <button style={styles.nextBtn} onClick={handleNext}>
+          <button
+            style={{
+              ...styles.nextBtn,
+              background: '#4f46e5',
+              boxShadow: darkMode
+                ? '0 8px 24px rgba(79,70,229,0.7)'
+                : '0 6px 18px rgba(79,70,229,0.45)',
+            }}
+            onClick={handleNext}
+          >
             다음 단계
           </button>
 
@@ -341,8 +443,8 @@ const SchoolAuthPage: React.FC = () => {
                 marginTop: 20,
                 padding: 16,
                 borderRadius: 16,
-                background: '#eef2ff',
-                border: '1px solid #c7d2fe',
+                background: darkMode ? '#020617' : '#eef2ff',
+                border: `1px solid ${darkMode ? '#312e81' : '#c7d2fe'}`,
               }}
             >
               <div
@@ -350,7 +452,7 @@ const SchoolAuthPage: React.FC = () => {
                   fontWeight: 700,
                   marginBottom: 10,
                   fontSize: 15,
-                  color: '#3730a3',
+                  color: darkMode ? '#a5b4fc' : '#3730a3',
                 }}
               >
                 ✅ 인식된 학생 정보
@@ -383,7 +485,7 @@ const SchoolAuthPage: React.FC = () => {
                 style={{
                   marginTop: 10,
                   fontSize: 12,
-                  color: '#6b7280',
+                  color: darkMode ? '#9ca3af' : '#6b7280',
                 }}
               >
                 위 정보로 학교 인증이 진행됩니다.
@@ -405,12 +507,14 @@ const SchoolAuthPage: React.FC = () => {
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
-                    border: '1px solid #ccc',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#cccccc'}`,
+                    background: darkMode ? '#020617' : '#ffffff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
                   }}
                 />
               </div>
 
-              <div>
+              <div style={{ marginBottom: 12 }}>
                 🏫 학교
                 <input
                   value={schoolInput}
@@ -420,7 +524,9 @@ const SchoolAuthPage: React.FC = () => {
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
-                    border: '1px solid #ccc',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#cccccc'}`,
+                    background: darkMode ? '#020617' : '#ffffff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
                   }}
                 />
               </div>
@@ -436,7 +542,9 @@ const SchoolAuthPage: React.FC = () => {
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
-                    border: '1px solid #ccc',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#cccccc'}`,
+                    background: darkMode ? '#020617' : '#ffffff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
                   }}
                 />
               </div>
@@ -452,7 +560,9 @@ const SchoolAuthPage: React.FC = () => {
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
-                    border: '1px solid #ccc',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#cccccc'}`,
+                    background: darkMode ? '#020617' : '#ffffff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
                   }}
                 />
               </div>
@@ -468,14 +578,26 @@ const SchoolAuthPage: React.FC = () => {
                     padding: 10,
                     marginTop: 6,
                     borderRadius: 8,
-                    border: '1px solid #ccc',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#cccccc'}`,
+                    background: darkMode ? '#020617' : '#ffffff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
                   }}
                 />
               </div>
             </div>
           )}
 
-          {error && <div style={{ color: 'red' }}>{error}</div>}
+          {error && (
+            <div
+              style={{
+                color: '#f97373',
+                marginTop: 16,
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
         </div>
       </div>
     </div>
