@@ -86,13 +86,40 @@ export default function HomePage() {
 
   // 🌙 초기 다크모드 로딩
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      setThemeSetting({ darkMode: !!parsed.darkMode })
-    } catch {
-      // 무시
+    const loadTheme = () => {
+      try {
+        const userRaw = localStorage.getItem('loggedInUser')
+        if (!userRaw) {
+          setThemeSetting({ darkMode: false })
+          return
+        }
+
+        const user = JSON.parse(userRaw)
+        if (!user?.id) {
+          setThemeSetting({ darkMode: false })
+          return
+        }
+
+        const raw = localStorage.getItem(`theme_settings_${user.id}`)
+        if (!raw) {
+          setThemeSetting({ darkMode: false })
+          return
+        }
+
+        const parsed = JSON.parse(raw)
+        setThemeSetting({ darkMode: !!parsed.darkMode })
+      } catch {
+        setThemeSetting({ darkMode: false })
+      }
+    }
+
+    loadTheme()
+
+    // ⭐ 로그인 변경 시 다시 불러오기
+    window.addEventListener('storage', loadTheme)
+
+    return () => {
+      window.removeEventListener('storage', loadTheme)
     }
   }, [])
 
