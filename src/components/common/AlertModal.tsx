@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useState } from 'react'
 
 type AlertModalProps = {
   open: boolean
@@ -15,10 +16,40 @@ export default function AlertModal({
   confirmText = '확인',
   onClose,
 }: AlertModalProps) {
-  if (!open) return null
+  const [darkMode, setDarkMode] = useState(false)
 
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
+  if (!open) return null
 
   return (
     <div
@@ -39,11 +70,11 @@ export default function AlertModal({
         style={{
           width: '90%',
           maxWidth: 360,
-          background: isDark ? '#1e293b' : 'white',
+          background: darkMode ? '#1e293b' : 'white',
           borderRadius: 18,
           padding: '22px 20px',
           textAlign: 'center',
-          boxShadow: isDark
+          boxShadow: darkMode
             ? '0 15px 40px rgba(0,0,0,0.6)'
             : '0 20px 40px rgba(0,0,0,0.25)',
         }}
@@ -55,7 +86,7 @@ export default function AlertModal({
             fontSize: 16,
             fontWeight: 800,
             marginBottom: 8,
-            color: isDark ? '#f1f5f9' : '#111827',
+            color: darkMode ? '#f1f5f9' : '#111827',
           }}
         >
           {title}
@@ -64,7 +95,7 @@ export default function AlertModal({
         <p
           style={{
             fontSize: 14,
-            color: isDark ? '#cbd5e1' : '#4b5563',
+            color: darkMode? '#cbd5e1' : '#4b5563',
             lineHeight: 1.5,
             marginBottom: 18,
             whiteSpace: 'pre-line',
