@@ -50,17 +50,39 @@ export default function WritePage() {
     })
   }
 
-  const [darkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
 
     try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return false
-      return JSON.parse(raw).darkMode ?? false
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
     } catch {
-      return false
+      setDarkMode(false)
     }
-  })
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const router = useRouter()
 
@@ -170,7 +192,7 @@ export default function WritePage() {
       return
     }
 
-    showAlert('작성 중인 내용이 삭제됩니다.\n정말 취소할까요?', () => {
+    showAlert('작성 중인 내용이 삭제됩니다.정말 취소할까요?', () => {
       router.replace(`/board/${category}`)
     })
   }
