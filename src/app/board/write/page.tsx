@@ -604,12 +604,12 @@ export default function WritePage() {
             </h3>
 
             {/* 날짜 */}
-            <div style={centerDateInputWrapper}>
+            <div style={centerDateInputWrapper(darkMode)}>
               <input
                 type="date"
                 value={tempDate}
                 onChange={(e) => setTempDate(e.target.value)}
-                style={centerDateInput}
+                style={centerDateInput(darkMode)}
               />
             </div>
 
@@ -618,7 +618,7 @@ export default function WritePage() {
               <select
                 value={tempAmPm}
                 onChange={(e) => setTempAmPm(e.target.value as '오전' | '오후')}
-                style={centerSelect}
+                style={centerSelect(darkMode)}
               >
                 <option value="오전">오전</option>
                 <option value="오후">오후</option>
@@ -627,7 +627,7 @@ export default function WritePage() {
               <select
                 value={tempHour}
                 onChange={(e) => setTempHour(e.target.value)}
-                style={centerSelect}
+                style={centerSelect(darkMode)}
               >
                 {Array.from({ length: 12 }, (_, i) =>
                   String(i + 1).padStart(2, '0'),
@@ -639,7 +639,7 @@ export default function WritePage() {
               <select
                 value={tempMinute}
                 onChange={(e) => setTempMinute(e.target.value)}
-                style={centerSelect}
+                style={centerSelect(darkMode)}
               >
                 {['00', '10', '20', '30', '40', '50'].map((v) => (
                   <option key={v}>{v}</option>
@@ -649,7 +649,7 @@ export default function WritePage() {
 
             <div style={centerBtnRow}>
               <button
-                style={centerCancelBtn}
+                style={centerCancelBtn(darkMode)}
                 onClick={() => setShowPicker(false)}
               >
                 취소
@@ -977,22 +977,22 @@ const centerModalBox = (darkMode: boolean): React.CSSProperties => ({
   textAlign: 'center',
 })
 
-const centerDateInputWrapper: React.CSSProperties = {
+const centerDateInputWrapper = (darkMode: boolean): React.CSSProperties => ({
   width: '100%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  border: '1.5px solid #CFD8DC',
+  border: darkMode ? '1.5px solid #334155' : '1.5px solid #CFD8DC',
   borderRadius: 12,
   padding: '10px 14px',
-  background: '#FFFFFF',
+  background: darkMode ? '#0f172a' : '#FFFFFF',
   marginBottom: 16,
   gap: 10,
   overflow: 'hidden',
   boxSizing: 'border-box',
-}
+})
 
-const centerDateInput: React.CSSProperties = {
+const centerDateInput = (darkMode: boolean): React.CSSProperties => ({
   flex: 1,
   border: 'none',
   outline: 'none',
@@ -1000,8 +1000,10 @@ const centerDateInput: React.CSSProperties = {
   padding: '4px 0',
   appearance: 'none',
   WebkitAppearance: 'none',
-  minWidth: 0, // ← 텍스트 길어질 때 줄바꿈 방지
-}
+  minWidth: 0,
+  background: 'transparent',
+  color: darkMode ? '#f1f5f9' : '#111827',
+})
 
 const centerTimeRow: React.CSSProperties = {
   display: 'flex',
@@ -1009,13 +1011,15 @@ const centerTimeRow: React.CSSProperties = {
   marginBottom: 18,
 }
 
-const centerSelect: React.CSSProperties = {
+const centerSelect = (darkMode: boolean): React.CSSProperties => ({
   flex: 1,
   padding: '10px',
   borderRadius: 10,
-  border: '1.5px solid #CFD8DC',
+  border: darkMode ? '1.5px solid #334155' : '1.5px solid #CFD8DC',
   fontSize: 16,
-}
+  background: darkMode ? '#0f172a' : '#fff',
+  color: darkMode ? '#f1f5f9' : '#111827',
+})
 
 const centerBtnRow: React.CSSProperties = {
   display: 'flex',
@@ -1024,13 +1028,14 @@ const centerBtnRow: React.CSSProperties = {
   marginTop: 10,
 }
 
-const centerCancelBtn: React.CSSProperties = {
+const centerCancelBtn = (darkMode: boolean): React.CSSProperties => ({
   padding: '10px 18px',
-  background: '#ddd',
+  background: darkMode ? '#334155' : '#ddd',
+  color: darkMode ? '#f1f5f9' : '#111827',
   borderRadius: 8,
   border: 'none',
   cursor: 'pointer',
-}
+})
 
 const centerOkBtn: React.CSSProperties = {
   padding: '10px 18px',
