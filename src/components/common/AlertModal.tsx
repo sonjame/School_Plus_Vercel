@@ -17,13 +17,17 @@ export default function AlertModal({
 }: AlertModalProps) {
   if (!open) return null
 
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -35,11 +39,13 @@ export default function AlertModal({
         style={{
           width: '90%',
           maxWidth: 360,
-          background: 'white',
+          background: isDark ? '#1e293b' : 'white',
           borderRadius: 18,
           padding: '22px 20px',
           textAlign: 'center',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+          boxShadow: isDark
+            ? '0 15px 40px rgba(0,0,0,0.6)'
+            : '0 20px 40px rgba(0,0,0,0.25)',
         }}
       >
         <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
@@ -49,7 +55,7 @@ export default function AlertModal({
             fontSize: 16,
             fontWeight: 800,
             marginBottom: 8,
-            color: '#111827',
+            color: isDark ? '#f1f5f9' : '#111827',
           }}
         >
           {title}
@@ -58,7 +64,7 @@ export default function AlertModal({
         <p
           style={{
             fontSize: 14,
-            color: '#4b5563',
+            color: isDark ? '#cbd5e1' : '#4b5563',
             lineHeight: 1.5,
             marginBottom: 18,
             whiteSpace: 'pre-line',
