@@ -196,14 +196,20 @@ export default function TimetablePreview() {
                   borderRadius: '8px',
                   padding: '12px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  // 👇 카드 안 글자 색은 항상 진한 색으로 고정
+                  color: '#111827',
                 }}
               >
-                <div style={{ fontWeight: 700 }}>{c.period}교시</div>
-                <div>{c.subject}</div>
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                  {c.period}교시
+                </div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {c.subject}
+                </div>
                 <div
                   style={{
                     fontSize: '13px',
-                    color: darkMode ? '#e2e8f0' : '#555',
+                    color: '#374151', // 🧑‍🏫 선생님: 진한 회색
                   }}
                 >
                   👨‍🏫 {c.teacher || '미입력'}
@@ -211,7 +217,7 @@ export default function TimetablePreview() {
                 <div
                   style={{
                     fontSize: '12px',
-                    color: darkMode ? '#cbd5e1' : '#777',
+                    color: '#4b5563', // 🏫 교실: 살짝 더 연한 회색
                   }}
                 >
                   🏫 {c.room || '미지정'}
