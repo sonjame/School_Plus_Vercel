@@ -51,6 +51,43 @@ export default function CalendarPage() {
   const todayKey = formatLocalDate(today)
 
   /* ===============================
+     Dark Mode
+  ================================ */
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
+
+  /* ===============================
      State
   ================================ */
 
@@ -378,7 +415,7 @@ export default function CalendarPage() {
   ================================ */
 
   return (
-    <div className="page-wrapper">
+    <div className={`page-wrapper ${darkMode ? 'dark' : ''}`}>
       <div className="main-layout">
         <div className="calendar-area">
           <div className="month-header">
@@ -965,7 +1002,12 @@ export default function CalendarPage() {
           border-radius: 12px;
           padding: 16px;
           width: 600px;
-          height: 630px;
+          height: auto;
+          max-height: 80vh;
+          overflow-y: auto;
+          transition:
+            max-height 0.2s ease,
+            height 0.2s ease;
         }
 
         .modal input {
@@ -1253,8 +1295,205 @@ export default function CalendarPage() {
         }
 
         /* ===============================
-   📱 Mobile Responsive
-================================ */
+           🌙 Dark Mode Overrides
+        ================================ */
+
+        .page-wrapper.dark {
+          background: #020617;
+        }
+
+        .page-wrapper.dark .calendar-area,
+        .page-wrapper.dark .right-panel {
+          background: #0f172a;
+          color: #e2e8f0;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
+        }
+
+        .page-wrapper.dark .month-title,
+        .page-wrapper.dark .rp-date,
+        .page-wrapper.dark .rp-section-title {
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .nav-btn {
+          background: #1f2937;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .weekday-row {
+          color: #9ca3af;
+        }
+
+        .page-wrapper.dark .cell {
+          background: #020617;
+          border-color: #1f2937;
+        }
+
+        .page-wrapper.dark .cell.selected {
+          border-color: #4f46e5;
+          background: #020617;
+        }
+
+        .page-wrapper.dark .cell-date {
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .cell-academic {
+          background: #1d283a;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .today-badge {
+          background: #e5e7eb;
+          color: #020617;
+        }
+
+        .page-wrapper.dark .rp-none,
+        .page-wrapper.dark .rp-empty {
+          color: #6b7280;
+        }
+
+        .page-wrapper.dark .event-card {
+          background: #020617;
+          border-left-color: #4f46e5;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+        }
+
+        .page-wrapper.dark .event-title {
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .event-time {
+          color: #9ca3af;
+        }
+
+        .page-wrapper.dark .event-desc {
+          color: #cbd5f5;
+        }
+
+        .page-wrapper.dark .edit-btn {
+          color: #9ca3af;
+        }
+
+        .page-wrapper.dark .edit-btn:hover {
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .add-btn {
+          background: #4f46e5;
+          color: #f9fafb;
+        }
+
+        /* 모달 & 백드롭 */
+
+        .page-wrapper.dark .modal-backdrop {
+          background: rgba(15, 23, 42, 0.8);
+        }
+
+        .page-wrapper.dark .modal,
+        .page-wrapper.dark .delete-modal {
+          background: #020617;
+          color: #e5e7eb;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .page-wrapper.dark .modal h3,
+        .page-wrapper.dark .delete-title {
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .modal input,
+        .page-wrapper.dark .modal textarea,
+        .page-wrapper.dark .repeat-row select,
+        .page-wrapper.dark .repeat-row input {
+          background: #020617;
+          border-color: #334155;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .modal input::placeholder,
+        .page-wrapper.dark .modal textarea::placeholder {
+          color: #6b7280;
+        }
+
+        .page-wrapper.dark .time-row span,
+        .page-wrapper.dark .range-row span {
+          color: #9ca3af;
+        }
+
+        .page-wrapper.dark .mode-toggle button {
+          background: #020617;
+          border-color: #334155;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .mode-toggle button.active {
+          background: #4f46e5;
+          border-color: #4f46e5;
+          color: #f9fafb;
+        }
+
+        .page-wrapper.dark .weekday-btn {
+          background: #020617;
+          border-color: #334155;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .weekday-btn.active {
+          background: #4f46e5;
+          border-color: #4f46e5;
+          color: #f9fafb;
+        }
+
+        .page-wrapper.dark .btn-cancel {
+          background: #1f2937;
+          color: #e5e7eb;
+        }
+
+        .page-wrapper.dark .btn-delete {
+          background: #ef4444;
+          color: #f9fafb;
+        }
+
+        .page-wrapper.dark .delete-message {
+          color: #e5e7eb;
+        }
+
+        /* 모바일 모달도 같이 어둡게 */
+
+        @media (max-width: 768px) {
+          .page-wrapper.dark .modal {
+            background: #020617;
+          }
+        }
+
+        /* ===============================
+        🌙 Dark Mode Overrides
+        ================================ */
+
+        .page-wrapper.dark {
+          background: #020617;
+        }
+
+        /* ...기존 다크 모드 코드들... */
+
+        /* 🔥 학사일정 카드 (오른쪽) 다크모드 전용 */
+        .page-wrapper.dark .rp-card.academic {
+          background: #0b1220; /* 더 진한 남색 박스 */
+          border-radius: 10px;
+          padding: 8px;
+          margin-top: 6px;
+          border: 1px solid #1e293b; /* 살짝 테두리 */
+        }
+
+        .page-wrapper.dark .rp-card-title {
+          color: #f9fafb; /* 거의 흰색 */
+          font-weight: 600;
+        }
+
+        /* ===============================
+        📱 Mobile Responsive
+        ================================ */
 
         @media (max-width: 768px) {
           .main-layout {
@@ -1274,8 +1513,8 @@ export default function CalendarPage() {
           /* ===== 🔥 모달 덮어쓰기 (핵심) ===== */
           .modal {
             width: 80%;
-            height: 58dvh; /* 🔥 핵심 */
-            max-height: none; /* 🔥 제거 */
+            height: auto;
+            height: auto;
             border-radius: 16px 16px 0 0;
             position: fixed;
             bottom: 0;
