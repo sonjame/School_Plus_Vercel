@@ -114,13 +114,17 @@ export default function PollMessage({
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 480
 
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   return (
     <div
       style={{
-        background: 'white',
+        background: isDark ? '#1e293b' : 'white',
         borderRadius: 14,
         padding: '16px 14px',
-        border: '1px solid #e5e7eb',
+        border: isDark ? '1px solid #334155' : '1px solid #e5e7eb',
+        color: isDark ? '#e5e7eb' : '#111827',
         width: '100%',
         maxWidth: isMobile ? 240 : 400,
       }}
@@ -141,7 +145,13 @@ export default function PollMessage({
         <div
           style={{
             fontSize: 12,
-            color: isClosed ? '#ef4444' : '#2563eb',
+            color: isClosed
+              ? isDark
+                ? '#f87171'
+                : '#ef4444'
+              : isDark
+                ? '#60a5fa'
+                : '#2563eb',
             fontWeight: 600,
             marginBottom: 12,
           }}
@@ -169,8 +179,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: '12px 14px',
                   borderRadius: 10,
-                  border: '1px solid #d1d5db',
-                  background: '#f9fafb',
+                  background: isDark ? '#334155' : '#f9fafb',
+                  border: isDark ? '1px solid #475569' : '1px solid #d1d5db',
+                  color: isDark ? '#e2e8f0' : '#111827',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: 14,
@@ -189,9 +200,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: isMobile ? '4px 12px' : '8px 12px',
                   borderRadius: 10,
-                  border: '1px solid #ef4444',
-                  background: '#fee2e2',
-                  color: '#b91c1c',
+                  background: isDark ? '#3f1d1d' : '#fee2e2',
+                  color: isDark ? '#fca5a5' : '#b91c1c',
+                  border: isDark ? '1px solid #7f1d1d' : '1px solid #ef4444',
                   cursor: 'pointer',
                   fontWeight: 600,
                   marginTop: 4,
@@ -207,7 +218,7 @@ export default function PollMessage({
                 <div
                   style={{
                     height: 12,
-                    background: '#e5e7eb',
+                    background: isDark ? '#334155' : '#e5e7eb',
                     borderRadius: 999,
                     overflow: 'hidden',
                   }}
@@ -225,7 +236,7 @@ export default function PollMessage({
                   style={{
                     fontSize: 12,
                     marginTop: 4,
-                    color: '#374151',
+                    color: isDark ? '#cbd5e1' : '#374151',
                     fontWeight: 600,
                   }}
                 >
@@ -237,7 +248,7 @@ export default function PollMessage({
                   <div
                     style={{
                       fontSize: 11,
-                      color: '#6b7280',
+                      color: isDark ? '#94a3b8' : '#6b7280',
                       marginTop: 2,
                     }}
                   >
@@ -259,7 +270,7 @@ export default function PollMessage({
           alignItems: 'center',
           marginTop: 10,
           fontSize: 12,
-          color: '#6b7280',
+          color: isDark ? '#94a3b8' : '#6b7280',
         }}
       >
         <div style={{ display: 'flex', gap: 8 }}>
@@ -270,7 +281,9 @@ export default function PollMessage({
 
           {/* 👀 읽은 사람 수 */}
           {typeof msg.readCount === 'number' && (
-            <span style={{ color: '#2563eb', fontWeight: 600 }}>
+            <span
+              style={{ color: isDark ? '#60a5fa' : '#2563eb', fontWeight: 600 }}
+            >
               👀 {msg.readCount}
             </span>
           )}
@@ -284,7 +297,7 @@ export default function PollMessage({
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: '#2563eb',
+                  color: isDark ? '#60a5fa' : '#2563eb',
                   cursor: 'pointer',
                   fontSize: 13,
                   padding: '6px 4px',
@@ -299,7 +312,7 @@ export default function PollMessage({
               style={{
                 border: 'none',
                 background: 'transparent',
-                color: '#ef4444',
+                color: isDark ? '#f87171' : '#ef4444',
                 cursor: 'pointer',
               }}
             >
