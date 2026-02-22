@@ -22,13 +22,35 @@ export default function CategoryPage() {
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
-    const raw = localStorage.getItem('theme_settings')
-    if (!raw) return
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
 
     try {
-      const parsed = JSON.parse(raw)
-      setDarkMode(parsed.darkMode)
-    } catch {}
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
   }, [])
 
   if (!category || !boardTitleMap[category]) {
