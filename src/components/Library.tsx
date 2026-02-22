@@ -37,13 +37,34 @@ export default function LibraryRecommend() {
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('theme_settings')
-      if (raw) {
+    const loadTheme = () => {
+      try {
+        const userRaw = localStorage.getItem('loggedInUser')
+        if (!userRaw) {
+          setDarkMode(false)
+          return
+        }
+
+        const user = JSON.parse(userRaw)
+        if (!user?.id) {
+          setDarkMode(false)
+          return
+        }
+
+        const raw = localStorage.getItem(`theme_settings_${user.id}`)
+        if (!raw) {
+          setDarkMode(false)
+          return
+        }
+
         const parsed = JSON.parse(raw)
         setDarkMode(!!parsed.darkMode)
+      } catch {
+        setDarkMode(false)
       }
-    } catch {}
+    }
+
+    loadTheme()
 
     const handleThemeChange = (e: any) => {
       if (!e?.detail) return
@@ -51,7 +72,10 @@ export default function LibraryRecommend() {
     }
 
     window.addEventListener('theme-change', handleThemeChange)
-    return () => window.removeEventListener('theme-change', handleThemeChange)
+
+    return () => {
+      window.removeEventListener('theme-change', handleThemeChange)
+    }
   }, [])
 
   useEffect(() => {
