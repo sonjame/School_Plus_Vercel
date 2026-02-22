@@ -79,14 +79,35 @@ export default function EditPostPage() {
   useEffect(() => {
     setMounted(true)
 
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
     try {
-      const raw = localStorage.getItem('theme_settings')
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
       if (!raw) return
-      const parsed = JSON.parse(raw)
-      setDarkMode(parsed.darkMode ?? false)
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
     } catch {
-      // 무시
+      setDarkMode(false)
     }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
   }, [])
 
   /* ------------------------------
@@ -94,7 +115,14 @@ export default function EditPostPage() {
   ------------------------------ */
   useEffect(() => {
     async function loadPost() {
-      const userId = localStorage.getItem('userId')
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) {
+        showAlert('로그인이 필요합니다.', () => router.push('/login'))
+        return
+      }
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
       if (!userId) {
         showAlert('로그인이 필요합니다.', () => router.push('/login'))
         return
@@ -181,7 +209,14 @@ export default function EditPostPage() {
       return
     }
 
-    const userId = localStorage.getItem('userId')
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) {
+      showAlert('로그인이 필요합니다.')
+      return
+    }
+
+    const parsed = JSON.parse(storedUser)
+    const userId = parsed.id
     if (!userId) {
       showAlert('로그인이 필요합니다.')
       return
