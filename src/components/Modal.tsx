@@ -9,7 +9,8 @@ interface ModalProps {
   onConfirm?: () => void
   confirmText?: string
   danger?: boolean
-  showCancel?: boolean // ⭐ 추가
+  showCancel?: boolean
+  darkMode?: boolean // 🌙 다크모드 추가
   children: React.ReactNode
 }
 
@@ -20,7 +21,8 @@ export default function Modal({
   onConfirm,
   confirmText = '확인',
   danger,
-  showCancel = true, // ⭐ 기본은 취소 버튼 보임
+  showCancel = true,
+  darkMode = false, // 기본 false
   children,
 }: ModalProps) {
   useEffect(() => {
@@ -32,28 +34,61 @@ export default function Modal({
 
   if (!open) return null
 
-  return (
-    <div style={styles.backdrop} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        {title && <h3 style={styles.title}>{title}</h3>}
+  const backdropStyle = {
+    ...styles.backdrop,
+    background: darkMode ? 'rgba(15,23,42,0.75)' : 'rgba(0,0,0,0.45)',
+  }
 
-        <div style={styles.content}>{children}</div>
+  const modalStyle = {
+    ...styles.modal,
+    background: darkMode ? '#020617' : '#ffffff',
+    color: darkMode ? '#e5e7eb' : '#111827',
+    boxShadow: darkMode
+      ? '0 18px 45px rgba(15,23,42,0.9)'
+      : '0 10px 30px rgba(0,0,0,0.2)',
+  }
+
+  const titleStyle = {
+    ...styles.title,
+    color: darkMode ? '#e5e7eb' : '#111827',
+  }
+
+  const contentStyle = {
+    ...styles.content,
+    color: darkMode ? '#cbd5f5' : '#374151',
+  }
+
+  const cancelBtnStyle = {
+    ...styles.cancelBtn,
+    background: darkMode ? '#020617' : '#ffffff',
+    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+    color: darkMode ? '#e5e7eb' : '#111827',
+  }
+
+  const confirmBtnStyle = {
+    ...styles.confirmBtn,
+    background: danger ? '#ef4444' : '#2563eb',
+    boxShadow: darkMode
+      ? '0 4px 12px rgba(37,99,235,0.7)'
+      : '0 4px 12px rgba(37,99,235,0.3)',
+  }
+
+  return (
+    <div style={backdropStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        {title && <h3 style={titleStyle}>{title}</h3>}
+
+        <div style={contentStyle}>{children}</div>
 
         <div style={styles.actions}>
           {showCancel && (
-            <button style={styles.cancelBtn} onClick={onClose}>
+            <button style={cancelBtnStyle} onClick={onClose}>
               취소
             </button>
           )}
 
           {onConfirm && (
-            <button
-              style={{
-                ...styles.confirmBtn,
-                background: danger ? '#ef4444' : '#2563eb',
-              }}
-              onClick={onConfirm}
-            >
+            <button style={confirmBtnStyle} onClick={onConfirm}>
               {confirmText}
             </button>
           )}
@@ -123,4 +158,4 @@ const styles = {
     fontSize: 14,
     fontWeight: 600,
   },
-}
+} as const
