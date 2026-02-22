@@ -397,11 +397,18 @@ export default function HomePage() {
     loadPopularPosts()
 
     /* ==========================================
-       📆 오늘 요일
-    ========================================== */
+   📆 오늘 요일
+  ========================================== */
     const dayNames = ['일', '월', '화', '수', '목', '금', '토']
     const now = new Date()
-    setToday(`${dayNames[now.getDay()]}요일`)
+    const dayIndex = now.getDay()
+
+    // ✅ 월~금일 때만 today 설정, 주말이면 표시 안 함
+    if (dayIndex >= 1 && dayIndex <= 5) {
+      setToday(`${dayNames[dayIndex]}요일`)
+    } else {
+      setToday('') // 토/일은 오늘 시간표 섹션 자체를 안 보여줄 거라 비워둠
+    }
 
     /* ==========================================
        📅 홈 캘린더 일정 불러오기
@@ -1196,22 +1203,24 @@ export default function HomePage() {
         </section>
 
         {/* ------------------ 오늘 시간표 ------------------ */}
-        <section style={{ marginBottom: '36px' }}>
-          <h3
-            style={{
-              fontSize: 'clamp(16px, 3vw, 20px)',
-              fontWeight: 700,
-              color: '#4FC3F7',
-              borderBottom: '2px solid #4FC3F7',
-              paddingBottom: '6px',
-              marginBottom: '14px',
-            }}
-          >
-            📚 오늘의 시간표 ({today})
-          </h3>
+        {today && (
+          <section style={{ marginBottom: '36px' }}>
+            <h3
+              style={{
+                fontSize: 'clamp(16px, 3vw, 20px)',
+                fontWeight: 700,
+                color: '#4FC3F7',
+                borderBottom: '2px solid #4FC3F7',
+                paddingBottom: '6px',
+                marginBottom: '14px',
+              }}
+            >
+              📚 오늘의 시간표 ({today})
+            </h3>
 
-          <TodayTimetable today={today} darkMode={themeSetting.darkMode} />
-        </section>
+            <TodayTimetable today={today} darkMode={themeSetting.darkMode} />
+          </section>
+        )}
 
         {/* ------------------ 주간 시간표 ------------------ */}
         <TimetablePreview />
@@ -1592,26 +1601,44 @@ function TodayTimetable({
           <div
             key={i}
             style={{
-              background: bg, // ✅ 여기만 변경
+              background: bg,
               borderRadius: '8px',
               padding: '12px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              // 🆕 카드 안 텍스트는 항상 어두운 색
+              color: '#111827',
             }}
           >
-            <div style={{ fontWeight: 700 }}>{c.period}교시</div>
-            <div>{c.subject}</div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>
+              {c.period}교시
+            </div>
+
+            {/* 🆕 과목 더 또렷하게 */}
             <div
               style={{
-                fontSize: '13px',
-                color: darkMode ? '#e2e8f0' : '#555',
+                fontWeight: 700,
+                marginBottom: 4,
+                fontSize: 15,
+                color: '#111827',
+              }}
+            >
+              {c.subject}
+            </div>
+
+            <div
+              style={{
+                fontSize: 13,
+                color: '#374151', // 👨‍🏫 선생님
               }}
             >
               👨‍🏫 {c.teacher || '미입력'}
             </div>
+
             <div
               style={{
-                fontSize: '12px',
-                color: darkMode ? '#cbd5e1' : '#777',
+                fontSize: 12,
+                color: '#4b5563', // 🏫 교실
+                marginTop: 2,
               }}
             >
               🏫 {c.room || '미지정'}
