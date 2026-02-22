@@ -41,16 +41,13 @@ export default function GradePage() {
 
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR)
   const [selectedExam, setSelectedExam] = useState(EXAMS[0])
-  const [graphType, setGraphType] = useState('line')
+  const [graphType, setGraphType] = useState<'line' | 'bar'>('line')
   const [maskScore, setMaskScore] = useState(false)
 
   const [subjectsByExam, setSubjectsByExam] = useState<SubjectsByExam>({})
   const [scoresByExam, setScoresByExam] = useState<ScoresByExam>({})
 
   const [newSubject, setNewSubject] = useState('')
-
-  const sb: Record<string, string[]> = {}
-  const sc: Record<string, Record<string, number>> = {}
 
   const [editingSubject, setEditingSubject] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -59,14 +56,50 @@ export default function GradePage() {
   const [savedModalOpen, setSavedModalOpen] = useState(false)
 
   const [isMobile, setIsMobile] = useState(false)
-
   const [subjectAlertOpen, setSubjectAlertOpen] = useState(false)
+
+  /* 🌙 다크모드 상태 */
+  const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
+  }, [])
+
+  /* 🌙 다크모드 초기 로드 (user별 theme_settings) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  /* 🌙 다른 컴포넌트에서 theme-change 이벤트 쏠 때 동기화 */
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
   }, [])
 
   /* ================= 로드 ================= */
@@ -129,7 +162,6 @@ export default function GradePage() {
     }
 
     const semester = EXAM_TO_SEMESTER[selectedExam as ExamType]
-
     const scores = scoresByExam[selectedExam]
 
     if (!scores || Object.keys(scores).length === 0) {
@@ -156,9 +188,7 @@ export default function GradePage() {
       return
     }
 
-    // ✅ 핵심: 저장 후 다시 로드
     await reloadScores()
-
     setSavedModalOpen(true)
   }
 
@@ -167,7 +197,6 @@ export default function GradePage() {
     if (!token) return
 
     const res = await apiFetch(`/api/exam-score?year=${selectedYear}`)
-
     if (!res.ok) return
 
     const rows = await res.json()
@@ -179,7 +208,9 @@ export default function GradePage() {
       if (!sb[r.exam]) sb[r.exam] = []
       if (!sc[r.exam]) sc[r.exam] = {}
 
-      sb[r.exam].push(r.subject)
+      if (!sb[r.exam].includes(r.subject)) {
+        sb[r.exam].push(r.subject)
+      }
       sc[r.exam][r.subject] = r.score
     }
 
@@ -219,7 +250,6 @@ export default function GradePage() {
       return alert(err.message || '과목 추가 실패')
     }
 
-    // 프론트 상태에도 반영
     setSubjectsByExam((prev) => ({
       ...prev,
       [selectedExam]: [...(prev[selectedExam] || []), subject],
@@ -258,7 +288,6 @@ export default function GradePage() {
 
     if (!res.ok) return alert('과목 수정 실패')
 
-    // 상태 업데이트
     setSubjectsByExam((prev) => ({
       ...prev,
       [selectedExam]: prev[selectedExam].map((s) =>
@@ -313,7 +342,6 @@ export default function GradePage() {
   /* ================= 시간표 과목 불러오기 ================= */
   const loadFromTimetable = async () => {
     const semester = EXAM_TO_SEMESTER[selectedExam as ExamType]
-
     const token = localStorage.getItem('accessToken')
 
     if (!token) {
@@ -333,7 +361,6 @@ export default function GradePage() {
 
     const data = await res.json()
 
-    // ✅ 과목명만 추출 + 중복 제거
     const subjects = Array.from(
       new Set(
         data
@@ -364,7 +391,6 @@ export default function GradePage() {
   /* ================= 그래프 데이터 ================= */
   const chartData = EXAMS.map((exam) => {
     const s = scoresByExam[exam]
-
     const values = s
       ? Object.values(s).filter((v): v is number => typeof v === 'number')
       : []
@@ -392,7 +418,6 @@ export default function GradePage() {
 
       {/* ================= 모달 영역 ================= */}
 
-      {/* 🗑 과목 삭제 모달 */}
       <Modal
         open={!!deleteTarget}
         title="과목 삭제"
@@ -400,6 +425,7 @@ export default function GradePage() {
         onConfirm={confirmDelete}
         confirmText="삭제"
         danger
+        darkMode={darkMode}
       >
         <p>
           <b>{deleteTarget}</b> 과목을 삭제할까요?
@@ -408,19 +434,18 @@ export default function GradePage() {
         </p>
       </Modal>
 
-      {/* 💾 저장 완료 모달 */}
       <Modal
         open={savedModalOpen}
         title="저장 완료"
-        onClose={() => setSavedModalOpen(false)} // 필수
+        onClose={() => setSavedModalOpen(false)}
         onConfirm={() => setSavedModalOpen(false)}
         confirmText="확인"
-        showCancel={false} // ⭐ 여기!
+        showCancel={false}
+        darkMode={darkMode}
       >
         <p>점수가 정상적으로 저장되었습니다 ✅</p>
       </Modal>
 
-      {/* ⚠️ 과목명 입력 안내 모달 */}
       <Modal
         open={subjectAlertOpen}
         title="입력 오류"
@@ -428,6 +453,7 @@ export default function GradePage() {
         onConfirm={() => setSubjectAlertOpen(false)}
         confirmText="확인"
         showCancel={false}
+        darkMode={darkMode}
       >
         <p>과목명을 입력하세요.</p>
       </Modal>
@@ -435,10 +461,17 @@ export default function GradePage() {
       <div
         style={{
           ...styles.wrapper,
+          background: darkMode ? '#020617' : '#f1f5f9', // 🌙 배경
           padding: isMobile ? '16px 8px' : '0',
         }}
       >
-        <div style={styles.page}>
+        <div
+          style={{
+            ...styles.page,
+            background: darkMode ? '#020617' : '#ffffff',
+            color: darkMode ? '#e5e7eb' : '#111827',
+          }}
+        >
           <h1 style={styles.title}>
             <span className="material-symbols-rounded">school</span>
             내신 성적 관리
@@ -452,10 +485,14 @@ export default function GradePage() {
               alignItems: isMobile ? 'stretch' : 'center',
             }}
           >
-            {/* 왼쪽: 년도 + 시간표 */}
             <div style={styles.yearGroup}>
               <select
-                style={styles.select}
+                style={{
+                  ...styles.select,
+                  background: darkMode ? '#020617' : '#ffffff',
+                  color: darkMode ? '#e5e7eb' : '#111827',
+                  borderColor: darkMode ? '#374151' : '#d1d5db',
+                }}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
               >
@@ -471,6 +508,9 @@ export default function GradePage() {
                   ...styles.greenBtn,
                   width: isMobile ? '100%' : 'auto',
                   justifyContent: 'center',
+                  boxShadow: darkMode
+                    ? '0 4px 10px rgba(15,23,42,0.7)'
+                    : 'none',
                 }}
                 onClick={loadFromTimetable}
               >
@@ -479,12 +519,14 @@ export default function GradePage() {
               </button>
             </div>
 
-            {/* 오른쪽: 점수 마스킹 */}
             <button
               onClick={() => setMaskScore((v) => !v)}
               style={{
                 ...styles.maskBtn,
                 width: isMobile ? '100%' : 'auto',
+                background: darkMode ? '#020617' : '#ffffff',
+                color: darkMode ? '#e5e7eb' : '#111827',
+                borderColor: darkMode ? '#4b5563' : '#d1d5db',
               }}
             >
               {maskScore ? '점수 보기 👁️' : '점수 가리기 🙈'}
@@ -502,8 +544,24 @@ export default function GradePage() {
                   flex: isMobile ? '1 1 45%' : 'none',
                   padding: isMobile ? '12px 10px' : '8px 14px',
                   fontSize: isMobile ? 14 : 13,
-                  background: selectedExam === exam ? '#2563eb' : '#f1f5f9',
-                  color: selectedExam === exam ? '#fff' : '#111',
+                  background:
+                    selectedExam === exam
+                      ? '#2563eb'
+                      : darkMode
+                        ? '#020617'
+                        : '#f1f5f9',
+                  color:
+                    selectedExam === exam
+                      ? '#ffffff'
+                      : darkMode
+                        ? '#e5e7eb'
+                        : '#111827',
+                  border:
+                    selectedExam === exam
+                      ? 'none'
+                      : darkMode
+                        ? '1px solid #4b5563'
+                        : '1px solid transparent',
                 }}
               >
                 {exam}
@@ -512,8 +570,13 @@ export default function GradePage() {
           </div>
 
           {/* 과목 입력 카드 */}
-
-          <div style={styles.card}>
+          <div
+            style={{
+              ...styles.card,
+              background: darkMode ? '#0f172a' : '#f8fafc',
+              boxShadow: darkMode ? '0 8px 20px rgba(15,23,42,0.8)' : 'none',
+            }}
+          >
             {subjects.map((subj) => (
               <div
                 key={subj}
@@ -526,7 +589,12 @@ export default function GradePage() {
                 <div style={styles.left}>
                   {editingSubject === subj ? (
                     <input
-                      style={styles.editInput}
+                      style={{
+                        ...styles.editInput,
+                        background: darkMode ? '#020617' : '#ffffff',
+                        color: darkMode ? '#e5e7eb' : '#111827',
+                        borderColor: darkMode ? '#4b5563' : '#d1d5db',
+                      }}
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
@@ -547,8 +615,11 @@ export default function GradePage() {
                     style={{
                       ...styles.scoreInput,
                       width: isMobile ? 64 : 80,
-                      fontSize: isMobile ? 14 : 14,
+                      fontSize: 14,
                       padding: isMobile ? '6px' : '7px',
+                      background: darkMode ? '#020617' : '#ffffff',
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                      borderColor: darkMode ? '#4b5563' : '#d1d5db',
                     }}
                     placeholder="점수 입력"
                     value={scores[subj] ?? ''}
@@ -589,58 +660,142 @@ export default function GradePage() {
             {/* 과목 추가 */}
             <div style={styles.addRow}>
               <input
-                style={styles.input}
+                style={{
+                  ...styles.input,
+                  background: darkMode ? '#020617' : '#ffffff',
+                  color: darkMode ? '#e5e7eb' : '#111827',
+                  borderColor: darkMode ? '#4b5563' : '#d1d5db',
+                }}
                 placeholder="새 과목 추가"
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
               />
-              <button style={styles.blueBtn} onClick={addSubject}>
+              <button
+                style={{
+                  ...styles.blueBtn,
+                  boxShadow: darkMode
+                    ? '0 4px 10px rgba(37,99,235,0.6)'
+                    : 'none',
+                }}
+                onClick={addSubject}
+              >
                 추가
               </button>
             </div>
           </div>
 
           <div style={styles.saveRow}>
-            <button style={styles.saveBtn} onClick={saveAll}>
+            <button
+              style={{
+                ...styles.saveBtn,
+                boxShadow: darkMode ? '0 5px 16px rgba(37,99,235,0.7)' : 'none',
+              }}
+              onClick={saveAll}
+            >
               <span className="material-symbols-rounded">save</span>
               점수 저장
             </button>
           </div>
 
-          <div style={styles.avgBox}>
+          <div
+            style={{
+              ...styles.avgBox,
+              color: darkMode ? '#e5e7eb' : '#111827',
+            }}
+          >
             평균 점수 <b>{avg}</b>
           </div>
 
           {/* 그래프 카드 */}
-          <div style={styles.graphCard}>
+          <div
+            style={{
+              ...styles.graphCard,
+              background: darkMode ? '#0f172a' : '#f8fafc',
+              boxShadow: darkMode ? '0 8px 20px rgba(15,23,42,0.8)' : 'none',
+            }}
+          >
             <ResponsiveContainer width="100%" height={isMobile ? 220 : 280}>
               {graphType === 'line' ? (
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={darkMode ? '#1f2937' : '#e0e0e0'}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                    tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                    tickLine={{ stroke: darkMode ? '#4b5563' : '#d1d5db' }}
+                  />
                   <YAxis
                     domain={[0, 100]}
                     tickFormatter={(v) => v.toFixed(1)}
+                    stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                    tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                    tickLine={{ stroke: darkMode ? '#4b5563' : '#d1d5db' }}
                   />
                   <Tooltip
+                    contentStyle={{
+                      backgroundColor: darkMode ? '#020617' : '#ffffff',
+                      borderColor: darkMode ? '#4b5563' : '#e5e7eb',
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
+                    labelStyle={{
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
+                    itemStyle={{
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
                     formatter={(value) =>
                       typeof value === 'number' ? value.toFixed(1) : value
                     }
+                    cursor={{
+                      fill: darkMode
+                        ? 'rgba(15,23,42,0.6)'
+                        : 'rgba(0,0,0,0.04)',
+                    }}
                   />
                   <Line dataKey="avg" stroke="#2563eb" strokeWidth={3} />
                 </LineChart>
               ) : (
                 <BarChart data={chartData} barCategoryGap="35%">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={darkMode ? '#1f2937' : '#e0e0e0'}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                    tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                    tickLine={{ stroke: darkMode ? '#4b5563' : '#d1d5db' }}
+                  />
                   <YAxis
                     domain={[0, 105]}
                     tickFormatter={(v) => v.toFixed(1)}
+                    stroke={darkMode ? '#9ca3af' : '#4b5563'}
+                    tick={{ fill: darkMode ? '#e5e7eb' : '#111827' }}
+                    tickLine={{ stroke: darkMode ? '#4b5563' : '#d1d5db' }}
                   />
                   <Tooltip
+                    contentStyle={{
+                      backgroundColor: darkMode ? '#020617' : '#ffffff',
+                      borderColor: darkMode ? '#4b5563' : '#e5e7eb',
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
+                    labelStyle={{
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
+                    itemStyle={{
+                      color: darkMode ? '#e5e7eb' : '#111827',
+                    }}
                     formatter={(value) =>
                       typeof value === 'number' ? value.toFixed(1) : value
                     }
+                    cursor={{
+                      fill: darkMode
+                        ? 'rgba(15,23,42,0.6)'
+                        : 'rgba(0,0,0,0.04)',
+                    }}
                   />
                   <Bar
                     dataKey="avg"
@@ -649,19 +804,40 @@ export default function GradePage() {
                     label={{
                       formatter: (v) =>
                         typeof v === 'number' ? v.toFixed(1) : v,
-
                       position: 'top',
+                      fill: darkMode ? '#e5e7eb' : '#111827',
                     }}
                   />
                 </BarChart>
               )}
             </ResponsiveContainer>
 
-            <div style={styles.graphBtnRow}>
+            <div
+              style={{
+                ...styles.graphBtnRow,
+                // 🌙 다크모드일 땐 테두리를 없애거나 어둡게
+                border: darkMode
+                  ? '1px solid transparent'
+                  : '1px solid #e5e7eb',
+                background: darkMode ? '#020617' : '#f8fafc',
+              }}
+            >
               <button
                 style={{
                   ...styles.graphBtn,
                   ...(graphType === 'line' ? styles.graphBtnActive : {}),
+                  background:
+                    graphType === 'line'
+                      ? '#2563eb'
+                      : darkMode
+                        ? '#020617'
+                        : '#f8fafc',
+                  color:
+                    graphType === 'line'
+                      ? '#ffffff'
+                      : darkMode
+                        ? '#e5e7eb'
+                        : '#374151',
                 }}
                 onClick={() => setGraphType('line')}
               >
@@ -672,6 +848,18 @@ export default function GradePage() {
                 style={{
                   ...styles.graphBtn,
                   ...(graphType === 'bar' ? styles.graphBtnActive : {}),
+                  background:
+                    graphType === 'bar'
+                      ? '#2563eb'
+                      : darkMode
+                        ? '#020617'
+                        : '#f8fafc',
+                  color:
+                    graphType === 'bar'
+                      ? '#ffffff'
+                      : darkMode
+                        ? '#e5e7eb'
+                        : '#374151',
                 }}
                 onClick={() => setGraphType('bar')}
               >
@@ -694,18 +882,19 @@ const styles = {
   },
 
   page: {
-    width: '97%', // 🔥 전체 폭 사용
-    maxWidth: 'none', // 🔥 1100px 제한 제거
-    margin: 0, // 🔥 중앙 정렬 제거
-    padding: '24px', // 🔥 내부 여백만 유지
+    width: '97%',
+    maxWidth: 'none',
+    margin: 0,
+    padding: '24px',
     background: '#fff',
-    borderRadius: 0, // 🔥 앱 느낌 (선택)
-    boxShadow: 'none', // 🔥 카드 느낌 제거 (선택)
+    borderRadius: 0,
+    boxShadow: 'none',
     fontFamily: 'Noto Sans KR, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     minHeight: '100vh',
   },
+
   title: {
     fontSize: 28,
     fontWeight: 700,
@@ -755,7 +944,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10, // ✅ 추가
+    marginBottom: 10,
   },
 
   scoreInput: {
@@ -765,7 +954,7 @@ const styles = {
     border: '1px solid #ccc',
     textAlign: 'center',
     fontSize: 14,
-    color: '#111', // 기본 값 색
+    color: '#111',
   },
 
   addRow: {
