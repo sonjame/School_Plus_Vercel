@@ -81,12 +81,40 @@ export default function WeeklyMealPage() {
 
   // 🌙 다크모드 초기 로드
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      setDarkMode(!!parsed.darkMode)
-    } catch {}
+    const loadTheme = () => {
+      try {
+        const userRaw = localStorage.getItem('loggedInUser')
+        if (!userRaw) {
+          setDarkMode(false)
+          return
+        }
+
+        const user = JSON.parse(userRaw)
+        if (!user?.id) {
+          setDarkMode(false)
+          return
+        }
+
+        const raw = localStorage.getItem(`theme_settings_${user.id}`)
+        if (!raw) {
+          setDarkMode(false)
+          return
+        }
+
+        const parsed = JSON.parse(raw)
+        setDarkMode(!!parsed.darkMode)
+      } catch {
+        setDarkMode(false)
+      }
+    }
+
+    loadTheme()
+
+    window.addEventListener('storage', loadTheme)
+
+    return () => {
+      window.removeEventListener('storage', loadTheme)
+    }
   }, [])
 
   // 🌙 내정보에서 토글 시 반영
