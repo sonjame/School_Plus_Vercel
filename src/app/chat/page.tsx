@@ -90,8 +90,39 @@ function formatKST(value: string) {
 function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
   const [preview, setPreview] = useState<any>(null)
 
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   useEffect(() => {
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
@@ -127,8 +158,8 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
         style={{
           borderRadius: 14,
           overflow: 'hidden',
-          background: isDark ? '#1e293b' : 'white',
-          border: isDark ? '1px solid #334155' : '1px solid #e5e7eb',
+          background: darkMode ? '#1e293b' : 'white',
+          border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
         }}
       >
@@ -174,7 +205,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
               fontWeight: 700,
               fontSize: 15,
               marginBottom: 6,
-              color: isDark ? '#e5e7eb' : '#111827',
+              color: darkMode ? '#e5e7eb' : '#111827',
             }}
           >
             {isMap ? mapTitle : preview?.title || url}
@@ -185,7 +216,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: isDark ? '#94a3b8' : '#6b7280',
+                    color: darkMode ? '#94a3b8' : '#6b7280',
                     lineHeight: 1.4,
                     marginBottom: 6,
                   }}
@@ -197,7 +228,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: isDark ? '#94a3b8' : '#6b7280',
+                    color: darkMode ? '#94a3b8' : '#6b7280',
                     lineHeight: 1.4,
                     marginBottom: 6,
                   }}
@@ -210,7 +241,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
           <div
             style={{
               fontSize: 11,
-              color: isDark ? '#64748b' : '#9ca3af',
+              color: darkMode ? '#64748b' : '#9ca3af',
             }}
           >
             {new URL(url).hostname}
@@ -230,8 +261,39 @@ export default function ChatPage() {
   const [blockMessage, setBlockMessage] = useState<string | null>(null)
 
   //다크 모드
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const [rooms, setRooms] = useState<ChatRoom[]>([])
   const [currentRoomId, setCurrentRoomId] = useState<number | null>(null)
@@ -309,22 +371,18 @@ export default function ChatPage() {
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )[0]
-
   const COLORS = {
     primary: '#4FC3F7',
-    primaryDark: '#2563eb',
 
-    bg: isDark ? '#0f172a' : '#f9fafb',
-    border: isDark ? '#334155' : '#e5e7eb',
+    bg: darkMode ? '#0f172a' : '#f9fafb',
+    border: darkMode ? '#334155' : '#e5e7eb',
 
-    text: isDark ? '#e5e7eb' : '#111827',
-    subText: isDark ? '#94a3b8' : '#6b7280',
+    text: darkMode ? '#e5e7eb' : '#111827',
+    subText: darkMode ? '#94a3b8' : '#6b7280',
 
-    danger: '#ef4444',
-
-    noticeBg: isDark ? '#3f3f1d' : '#FEF3C7',
-    noticeText: isDark ? '#fde68a' : '#92400E',
-    softBg: isDark ? '#334155' : '#f3f4f6',
+    noticeBg: darkMode ? '#3f3f1d' : '#FEF3C7',
+    noticeText: darkMode ? '#fde68a' : '#92400E',
+    softBg: darkMode ? '#334155' : '#f3f4f6',
   }
 
   const EMOJIS = [
@@ -1163,7 +1221,7 @@ export default function ChatPage() {
         height: 'calc(var(--vh, 1vh) * 100)',
         paddingTop: isMobile ? 60 : 0, // 가독성도 좋아짐
         paddingBottom: 0, // ✅ 아래 여백 완전 제거
-        background: isDark ? '#0f172a' : '#ffffff',
+        background: darkMode ? '#0f172a' : '#ffffff',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'stretch',
@@ -1180,7 +1238,7 @@ export default function ChatPage() {
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
-          background: isDark ? '#1e293b' : 'white',
+          background: darkMode ? '#1e293b' : 'white',
           boxShadow: 'none', // ✅ 그림자 제거 (카드 느낌 X)
         }}
       >
@@ -1192,7 +1250,7 @@ export default function ChatPage() {
               minWidth: 240,
               maxWidth: 520,
               borderRight: isMobile ? 'none' : `1px solid ${COLORS.border}`,
-              background: isDark ? '#1e293b' : 'white',
+              background: darkMode ? '#1e293b' : 'white',
               color: COLORS.text,
               display: 'flex',
               flexDirection: 'column',
@@ -1227,8 +1285,8 @@ export default function ChatPage() {
                     fontSize: 12,
                     padding: '4px 8px',
                     borderRadius: 6,
-                    border: '1px solid #d1d5db',
-                    background: isDark ? '#1e293b' : 'white',
+                    border: `1px solid ${COLORS.border}`,
+                    background: darkMode ? '#1e293b' : 'white',
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -1333,10 +1391,10 @@ export default function ChatPage() {
                       borderBottom: `1px solid ${COLORS.border}`,
                       cursor: 'pointer',
                       background: isActive
-                        ? isDark
+                        ? darkMode
                           ? '#1e3a5f'
                           : '#eff6ff'
-                        : isDark
+                        : darkMode
                           ? '#1e293b'
                           : 'white',
 
@@ -1425,10 +1483,10 @@ export default function ChatPage() {
                               left: 0, // ⭐ 기준 변경
                               top: 2, // ⭐ 버튼 아래로
                               transform: 'translateX(-73%)', // ⭐ 버튼 왼쪽으로
-                              background: isDark ? '#1e293b' : 'white',
+                              background: darkMode ? '#1e293b' : 'white',
                               borderRadius: 8,
                               boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
-                              border: isDark
+                              border: darkMode
                                 ? '1px solid #334155'
                                 : '1px solid #e5e7eb',
                               zIndex: 50,
@@ -1565,7 +1623,7 @@ export default function ChatPage() {
                         position: 'absolute',
                         right: -130,
                         top: '110%',
-                        background: isDark ? '#1e293b' : 'white',
+                        background: darkMode ? '#1e293b' : 'white',
                         borderRadius: 10,
                         boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
                         borderTop: `1px solid ${COLORS.border}`,
@@ -1668,7 +1726,7 @@ export default function ChatPage() {
                         style={{
                           width: '92%',
                           maxWidth: 420,
-                          background: isDark ? '#1e293b' : 'white',
+                          background: darkMode ? '#1e293b' : 'white',
                           borderRadius: 16,
                           padding: 20,
                         }}
@@ -1718,7 +1776,7 @@ export default function ChatPage() {
                               padding: '8px 14px',
                               borderRadius: 999,
                               border: `1px solid ${COLORS.border}`,
-                              background: isDark ? '#1e293b' : 'white',
+                              background: darkMode ? '#1e293b' : 'white',
                               cursor: 'pointer',
                             }}
                           >
@@ -1827,7 +1885,7 @@ export default function ChatPage() {
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
-                background: isDark ? '#0f172a' : '#f9fafb',
+                background: darkMode ? '#0f172a' : '#f9fafb',
                 padding: '12px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1925,7 +1983,7 @@ export default function ChatPage() {
                   <div
                     style={{
                       textAlign: 'center',
-                      color: isDark ? '#64748b' : '#9ca3af',
+                      color: darkMode ? '#64748b' : '#9ca3af',
                       fontSize: 14,
                     }}
                   >
@@ -2097,12 +2155,12 @@ export default function ChatPage() {
                                   ? 'transparent'
                                   : isMe
                                     ? '#4FC3F7'
-                                    : isDark
+                                    : darkMode
                                       ? '#1e293b'
                                       : 'white',
                               color: isMe
                                 ? 'white'
-                                : isDark
+                                : darkMode
                                   ? '#e5e7eb'
                                   : '#111827',
                               fontSize: 14,
@@ -2147,7 +2205,7 @@ export default function ChatPage() {
                                   borderRadius: 12,
                                   background: isMe
                                     ? '#4FC3F7'
-                                    : isDark
+                                    : darkMode
                                       ? '#1e293b'
                                       : '#f3f4f6',
 
@@ -2182,7 +2240,7 @@ export default function ChatPage() {
                                       fontSize: 11,
                                       color: isMe
                                         ? 'rgba(255,255,255,0.8)'
-                                        : isDark
+                                        : darkMode
                                           ? '#cbd5e1'
                                           : COLORS.subText,
                                     }}
@@ -2196,7 +2254,7 @@ export default function ChatPage() {
                           <span
                             style={{
                               fontSize: 10,
-                              color: isDark ? '#64748b' : '#9ca3af',
+                              color: darkMode ? '#64748b' : '#9ca3af',
                               marginTop: 2,
                               display: 'flex',
                               gap: 6,
@@ -2284,9 +2342,9 @@ export default function ChatPage() {
                       key={idx}
                       style={{
                         padding: '3px 6px',
-                        background: isDark ? '#1e293b' : 'white',
+                        background: darkMode ? '#1e293b' : 'white',
                         borderRadius: 999,
-                        border: '1px solid #d1d5db',
+                        border: `1px solid ${COLORS.border}`,
                       }}
                     >
                       {file.name}
@@ -2316,7 +2374,7 @@ export default function ChatPage() {
                   display: 'flex',
                   gap: 8,
                   overflowX: 'auto',
-                  background: isDark ? '#0f172a' : '#f9fafb',
+                  background: darkMode ? '#0f172a' : '#f9fafb',
                 }}
               >
                 {pendingImages.map((file, idx) => {
@@ -2368,7 +2426,7 @@ export default function ChatPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: isDark ? '#1e293b' : 'white',
+                background: darkMode ? '#1e293b' : 'white',
                 position: 'sticky',
                 bottom: 0,
               }}
@@ -2382,7 +2440,7 @@ export default function ChatPage() {
                     height: 32,
                     borderRadius: 999,
                     border: `1px solid ${COLORS.border}`,
-                    background: isDark ? '#1e293b' : '#f9fafb',
+                    background: darkMode ? '#1e293b' : '#f9fafb',
                     color: COLORS.text, // ⭐ 추가
                     fontSize: 18,
                     fontWeight: 700, // ⭐ 추가
@@ -2399,7 +2457,7 @@ export default function ChatPage() {
                       position: 'absolute',
                       bottom: 40,
                       left: 0,
-                      background: isDark ? '#1e293b' : 'white',
+                      background: darkMode ? '#1e293b' : 'white',
                       borderRadius: 12,
                       boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                       padding: 6,
@@ -2484,16 +2542,16 @@ export default function ChatPage() {
                   fontSize: 14,
                   outline: 'none',
                   backgroundColor: blockMessage
-                    ? isDark
+                    ? darkMode
                       ? '#334155'
                       : '#f3f4f6'
-                    : isDark
+                    : darkMode
                       ? '#1e293b'
                       : 'white',
 
                   color: blockMessage
                     ? '#9ca3af'
-                    : isDark
+                    : darkMode
                       ? '#e5e7eb'
                       : '#111827',
 
@@ -2527,8 +2585,8 @@ export default function ChatPage() {
                     width: 32,
                     height: 32,
                     borderRadius: 999,
-                    border: '1px solid #d1d5db',
-                    background: isDark ? '#0f172a' : '#f9fafb',
+                    border: `1px solid ${COLORS.border}`,
+                    background: darkMode ? '#0f172a' : '#f9fafb',
                     fontSize: 18,
                     cursor: 'pointer',
                     marginRight: 6,
@@ -2549,7 +2607,7 @@ export default function ChatPage() {
                       position: 'absolute',
                       bottom: 42,
                       right: 0,
-                      background: isDark ? '#1e293b' : 'white',
+                      background: darkMode ? '#1e293b' : 'white',
                       borderRadius: 12,
                       boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                       padding: 8,
@@ -2693,7 +2751,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 360,
-              background: isDark ? '#1e293b' : 'white',
+              background: darkMode ? '#1e293b' : 'white',
               borderRadius: 16,
               padding: 16,
             }}
@@ -2733,7 +2791,7 @@ export default function ChatPage() {
                       height: 40,
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: isDark
+                      border: darkMode
                         ? '1px solid #334155'
                         : '1px solid #e5e7eb',
                       cursor: 'pointer',
@@ -2886,7 +2944,7 @@ export default function ChatPage() {
                   padding: '8px 16px',
                   borderRadius: 999,
                   border: 'none',
-                  background: isDark ? '#334155' : '#e5e7eb',
+                  background: darkMode ? '#334155' : '#e5e7eb',
                   fontSize: 14,
                   cursor: 'pointer',
                 }}
@@ -2917,7 +2975,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 360,
-              background: isDark ? '#1e293b' : 'white',
+              background: darkMode ? '#1e293b' : 'white',
               borderRadius: 18,
               padding: '22px 20px',
               textAlign: 'center',
@@ -2999,7 +3057,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 420,
-              background: isDark ? '#1e293b' : 'white',
+              background: darkMode ? '#1e293b' : 'white',
               borderRadius: 16,
               padding: 16,
             }}
@@ -3067,7 +3125,7 @@ export default function ChatPage() {
                       height: 40,
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: isDark
+                      border: darkMode
                         ? '1px solid #334155'
                         : '1px solid #e5e7eb',
                       cursor: 'pointer', // ✅ 클릭 가능 표시
@@ -3228,15 +3286,46 @@ function InviteModal({
   onAddFriend: (friendId: number) => Promise<void>
   onToggleBlock: (targetId: number) => Promise<void> // ✅ 추가
 }) {
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const COLORS = {
-    bg: isDark ? '#1e293b' : 'white',
-    border: isDark ? '#334155' : '#e5e7eb',
-    text: isDark ? '#e5e7eb' : '#111827',
-    subText: isDark ? '#94a3b8' : '#6b7280',
-    softBg: isDark ? '#334155' : '#f3f4f6',
+    bg: darkMode ? '#1e293b' : 'white',
+    border: darkMode ? '#334155' : '#e5e7eb',
+    text: darkMode ? '#e5e7eb' : '#111827',
+    subText: darkMode ? '#94a3b8' : '#6b7280',
+    softBg: darkMode ? '#334155' : '#f3f4f6',
   }
   const [tab, setTab] = useState<'friends' | 'name' | 'class'>('friends')
   const [nameKeyword, setNameKeyword] = useState('')
@@ -3434,7 +3523,11 @@ function InviteModal({
               fontWeight: 600,
               cursor: 'pointer',
               background:
-                tab === 'name' ? (isDark ? '#0f172a' : 'white') : 'transparent',
+                tab === 'name'
+                  ? darkMode
+                    ? '#0f172a'
+                    : 'white'
+                  : 'transparent',
 
               color: tab === 'name' ? COLORS.text : COLORS.subText,
             }}
@@ -3469,7 +3562,7 @@ function InviteModal({
               borderRadius: 10,
               border: `1px solid ${COLORS.border}`,
               padding: 6,
-              background: isDark ? '#0f172a' : '#f9fafb',
+              background: darkMode ? '#0f172a' : '#f9fafb',
               marginBottom: 10,
             }}
           >
@@ -3686,7 +3779,7 @@ function InviteModal({
               borderRadius: 10,
               border: `1px solid ${COLORS.border}`,
               padding: 6,
-              background: isDark ? '#0f172a' : '#f9fafb',
+              background: darkMode ? '#0f172a' : '#f9fafb',
               marginBottom: 10,
             }}
           >
@@ -3889,7 +3982,7 @@ function InviteModal({
             style={{
               padding: '8px 14px',
               borderRadius: 999,
-              border: '1px solid #d1d5db',
+              border: `1px solid ${COLORS.border}`,
               background: COLORS.bg,
               color: COLORS.text,
               fontSize: 14,
@@ -3935,8 +4028,39 @@ function AttachItem({
   label: string
   onClick: () => void
 }) {
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   return (
     <button
@@ -3953,11 +4077,11 @@ function AttachItem({
         borderRadius: 8,
         cursor: 'pointer',
         fontSize: 14,
-        color: isDark ? '#e5e7eb' : '#111827', // ⭐ 핵심
+        color: darkMode ? '#e5e7eb' : '#111827', // ⭐ 핵심
         fontWeight: 600, // ⭐ 추가
       }}
       onMouseEnter={(e) =>
-        (e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6')
+        (e.currentTarget.style.background = darkMode ? '#334155' : '#f3f4f6')
       }
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
@@ -3976,8 +4100,39 @@ function MenuItem({
   onClick: () => void
   danger?: boolean
 }) {
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   return (
     <button
@@ -3993,10 +4148,10 @@ function MenuItem({
         fontSize: 13,
 
         // 🔥 여기 핵심 수정
-        color: danger ? '#ef4444' : isDark ? '#e5e7eb' : '#111827',
+        color: danger ? '#ef4444' : darkMode ? '#e5e7eb' : '#111827',
       }}
       onMouseEnter={(e) =>
-        (e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6')
+        (e.currentTarget.style.background = darkMode ? '#334155' : '#f3f4f6')
       }
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
@@ -4016,15 +4171,57 @@ function PollCreateModal({
   onCreated: () => Promise<void>
   onBlocked: (message: string) => void // ✅ 추가
 }) {
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const COLORS = {
-    bg: isDark ? '#1e293b' : 'white',
-    border: isDark ? '#334155' : '#e5e7eb',
-    text: isDark ? '#e5e7eb' : '#111827',
-    subText: isDark ? '#94a3b8' : '#6b7280',
-    softBg: isDark ? '#334155' : '#f3f4f6',
+    bg: darkMode ? '#1e293b' : 'white',
+    border: darkMode ? '#334155' : '#e5e7eb',
+    text: darkMode ? '#e5e7eb' : '#111827',
+    subText: darkMode ? '#94a3b8' : '#6b7280',
+    softBg: darkMode ? '#334155' : '#f3f4f6',
+  }
+
+  const cancelBtnStyle: React.CSSProperties = {
+    padding: '8px 14px',
+    borderRadius: 999,
+    border: `1px solid ${COLORS.border}`,
+    background: darkMode ? '#0f172a' : '#f9fafb',
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
   }
   const [title, setTitle] = useState('')
   const [options, setOptions] = useState(['', ''])
@@ -4133,11 +4330,14 @@ function PollCreateModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{
-              width: '100%',
+              width: '95%',
               marginTop: 10,
-              padding: '10px 0px',
+              padding: '10px 12px',
               borderRadius: 8,
-              border: '1px solid #d1d5db',
+              border: `1px solid ${COLORS.border}`,
+              background: darkMode ? '#0f172a' : 'white',
+              color: COLORS.text,
+              fontSize: 14,
             }}
           />
 
@@ -4155,7 +4355,10 @@ function PollCreateModal({
                   flex: 1,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#0f172a' : 'white',
+                  color: COLORS.text,
+                  fontSize: 14,
                 }}
               />
               {options.length > 2 && (
@@ -4164,7 +4367,20 @@ function PollCreateModal({
             </div>
           ))}
 
-          <button onClick={addOption} style={{ marginTop: 8 }}>
+          <button
+            onClick={addOption}
+            style={{
+              marginTop: 10,
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: `1px solid ${COLORS.border}`,
+              background: darkMode ? '#0f172a' : '#f9fafb',
+              color: COLORS.text,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
             + 선택지 추가
           </button>
 
@@ -4189,11 +4405,12 @@ function PollCreateModal({
               marginTop: 6,
               padding: '10px 12px',
               borderRadius: 8,
-              border: '1px solid #d1d5db',
-              background: COLORS.bg,
+              border: `1px solid ${COLORS.border}`,
+              background: darkMode ? '#0f172a' : 'white',
               color: COLORS.text,
               textAlign: 'left',
               fontSize: 14,
+              fontWeight: 500,
             }}
           >
             {deadlineDate
@@ -4213,7 +4430,9 @@ function PollCreateModal({
               marginTop: 14,
             }}
           >
-            <button onClick={onClose}>취소</button>
+            <button onClick={onClose} style={cancelBtnStyle}>
+              취소
+            </button>
             <button
               onClick={handleSubmit}
               style={{
@@ -4266,11 +4485,13 @@ function PollCreateModal({
               value={deadlineDate}
               onChange={(e) => setDeadlineDate(e.target.value)}
               style={{
-                width: '100%',
+                width: '93%',
                 marginTop: 4,
-                padding: '8px 0px',
+                padding: '8px 12px',
                 borderRadius: 8,
-                border: '1px solid #d1d5db',
+                border: `1px solid ${COLORS.border}`,
+                background: darkMode ? '#0f172a' : 'white',
+                color: COLORS.text,
               }}
             />
 
@@ -4279,12 +4500,31 @@ function PollCreateModal({
               <select
                 value={ampm}
                 onChange={(e) => setAmpm(e.target.value as any)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#0f172a' : 'white',
+                  color: COLORS.text,
+                  fontSize: 14,
+                }}
               >
                 <option value="AM">오전</option>
                 <option value="PM">오후</option>
               </select>
 
-              <select value={hour} onChange={(e) => setHour(e.target.value)}>
+              <select
+                value={hour}
+                onChange={(e) => setHour(e.target.value)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#0f172a' : 'white',
+                  color: COLORS.text,
+                  fontSize: 14,
+                }}
+              >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
                   <option key={h} value={String(h).padStart(2, '0')}>
                     {h}
@@ -4295,6 +4535,14 @@ function PollCreateModal({
               <select
                 value={minute}
                 onChange={(e) => setMinute(e.target.value)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#0f172a' : 'white',
+                  color: COLORS.text,
+                  fontSize: 14,
+                }}
               >
                 {['00', '10', '20', '30', '40', '50'].map((m) => (
                   <option key={m} value={m}>
@@ -4312,7 +4560,12 @@ function PollCreateModal({
                 marginTop: 14,
               }}
             >
-              <button onClick={() => setShowDeadlineModal(false)}>취소</button>
+              <button
+                onClick={() => setShowDeadlineModal(false)}
+                style={cancelBtnStyle}
+              >
+                취소
+              </button>
               <button
                 onClick={() => setShowDeadlineModal(false)}
                 style={{
@@ -4351,15 +4604,46 @@ function ReportModal({
     '기타',
   ]
 
-  const isDark =
-    typeof document !== 'undefined' && document.body.classList.contains('dark')
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   const COLORS = {
-    bg: isDark ? '#1e293b' : 'white',
-    border: isDark ? '#334155' : '#e5e7eb',
-    text: isDark ? '#e5e7eb' : '#111827',
-    subText: isDark ? '#94a3b8' : '#6b7280',
-    softBg: isDark ? '#334155' : '#f3f4f6',
+    bg: darkMode ? '#1e293b' : 'white',
+    border: darkMode ? '#334155' : '#e5e7eb',
+    text: darkMode ? '#e5e7eb' : '#111827',
+    subText: darkMode ? '#94a3b8' : '#6b7280',
+    softBg: darkMode ? '#334155' : '#f3f4f6',
   }
 
   const [selectedReason, setSelectedReason] = useState<string>('')
@@ -4500,18 +4784,22 @@ function ReportModal({
             style={{
               padding: '8px 16px',
               borderRadius: 999,
-              border: '1px solid #d1d5db',
-              background: isDark ? '#0f172a' : '#f9fafb',
+              border: `1px solid ${COLORS.border}`,
+              background: darkMode ? '#0f172a' : '#f9fafb',
               color: COLORS.text,
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6'
+              e.currentTarget.style.background = darkMode
+                ? '#334155'
+                : '#f3f4f6'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = isDark ? '#0f172a' : '#f9fafb'
+              e.currentTarget.style.background = darkMode
+                ? '#0f172a'
+                : '#f9fafb'
             }}
           >
             취소
