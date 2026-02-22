@@ -47,6 +47,9 @@ export default function WeeklyMealPage() {
   const [schoolCode, setSchoolCode] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
+  /* 🌙 다크모드 상태 */
+  const [darkMode, setDarkMode] = useState(false)
+
   // 🔹 저장된 학교 정보 불러오기
   useEffect(() => {
     const storedEdu = localStorage.getItem('eduCode')
@@ -56,6 +59,40 @@ export default function WeeklyMealPage() {
     setSchoolCode(storedCode ?? '7580167')
 
     setReady(true)
+  }, [])
+
+  // 🌙 다크모드 초기 로드 (user별 theme_settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const storedUser = localStorage.getItem('loggedInUser')
+      if (!storedUser) return
+
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
+    } catch {
+      setDarkMode(false)
+    }
+  }, [])
+
+  // 🌙 다른 컴포넌트에서 theme-change 이벤트 쏠 때 동기화
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
   }, [])
 
   // 🔹 아이콘 폰트 로드 보장 (아이콘 깨짐 방지)
@@ -76,11 +113,11 @@ export default function WeeklyMealPage() {
     Promise.all(
       dates.map(async (d) => {
         const res = await fetch(
-          `/api/meals?date=${d.key}&eduCode=${eduCode}&schoolCode=${schoolCode}`
+          `/api/meals?date=${d.key}&eduCode=${eduCode}&schoolCode=${schoolCode}`,
         )
         const data = await res.json()
         return { date: d.key, label: d.label, meal: data.meal }
-      })
+      }),
     ).then((results) => {
       setWeekMeals(results)
     })
@@ -91,19 +128,22 @@ export default function WeeklyMealPage() {
       style={{
         marginBottom: '32px',
         padding: '20px',
-        background: '#ffffff',
+        background: darkMode ? '#020617' : '#ffffff',
         borderRadius: '16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        boxShadow: darkMode
+          ? '0 8px 24px rgba(15,23,42,0.9)'
+          : '0 2px 8px rgba(0,0,0,0.05)',
         fontFamily: "'Noto Sans KR', sans-serif",
+        color: darkMode ? '#e5e7eb' : '#111827',
       }}
     >
       <h3
         style={{
           fontSize: '20px',
           fontWeight: 700,
-          color: '#4FC3F7',
+          color: darkMode ? '#4FC3F7' : '#4FC3F7',
           paddingBottom: '6px',
-          borderBottom: '2px solid #4FC3F7',
+          borderBottom: `2px solid ${darkMode ? '#4FC3F7' : '#4FC3F7'}`,
           marginBottom: '16px',
         }}
       >
@@ -132,10 +172,12 @@ export default function WeeklyMealPage() {
             style={{
               padding: '18px',
               borderRadius: '14px',
-              background: '#E3F2FD',
-              color: '#222',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              border: '1px solid #BBDEFB',
+              background: darkMode ? '#0f172a' : '#E3F2FD',
+              color: darkMode ? '#e5e7eb' : '#222',
+              boxShadow: darkMode
+                ? '0 4px 14px rgba(15,23,42,0.9)'
+                : '0 2px 8px rgba(0,0,0,0.08)',
+              border: darkMode ? '1px solid #1f2937' : '1px solid #BBDEFB',
             }}
           >
             <div
@@ -149,10 +191,10 @@ export default function WeeklyMealPage() {
               <span
                 className="material-symbols-outlined"
                 style={{
-                  background: '#BBDEFB',
+                  background: darkMode ? '#1f2937' : '#BBDEFB',
                   padding: '6px',
                   borderRadius: '8px',
-                  color: '#1A237E',
+                  color: darkMode ? '#cfe8ff' : '#1A237E',
                 }}
               >
                 calendar_month
@@ -162,7 +204,7 @@ export default function WeeklyMealPage() {
                 style={{
                   fontSize: '17px',
                   fontWeight: 700,
-                  color: '#0D47A1',
+                  color: darkMode ? '#bfdbfe' : '#0D47A1',
                 }}
               >
                 {d.label}
@@ -170,7 +212,15 @@ export default function WeeklyMealPage() {
             </div>
 
             {!d.meal ? (
-              <p style={{ opacity: 0.85, fontSize: 15 }}>급식 정보 없음</p>
+              <p
+                style={{
+                  opacity: 0.85,
+                  fontSize: 15,
+                  color: darkMode ? '#9ca3af' : '#374151',
+                }}
+              >
+                급식 정보 없음
+              </p>
             ) : (
               <ul
                 style={{
@@ -178,7 +228,7 @@ export default function WeeklyMealPage() {
                   paddingLeft: '18px',
                   fontSize: '15px',
                   lineHeight: 1.6,
-                  color: '#222',
+                  color: darkMode ? '#e5e7eb' : '#222',
                 }}
               >
                 {d.meal.map((m, i) => (
