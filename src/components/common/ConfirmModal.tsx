@@ -23,13 +23,17 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   if (!open) return null
 
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -41,14 +45,24 @@ export default function ConfirmModal({
         style={{
           width: '90%',
           maxWidth: 360,
-          background: 'white',
+          background: isDark ? '#1e293b' : 'white',
           borderRadius: 18,
           padding: '22px 20px',
           textAlign: 'center',
+          boxShadow: isDark
+            ? '0 10px 30px rgba(0,0,0,0.6)'
+            : '0 10px 30px rgba(0,0,0,0.15)',
         }}
       >
         {title && (
-          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 800,
+              marginBottom: 8,
+              color: isDark ? '#f1f5f9' : '#111827',
+            }}
+          >
             {title}
           </h3>
         )}
@@ -56,7 +70,7 @@ export default function ConfirmModal({
         <p
           style={{
             fontSize: 14,
-            color: '#374151',
+            color: isDark ? '#cbd5e1' : '#374151',
             lineHeight: 1.5,
             marginBottom: 20,
             whiteSpace: 'pre-line',
@@ -72,8 +86,9 @@ export default function ConfirmModal({
               flex: 1,
               padding: '10px 0',
               borderRadius: 999,
-              border: '1px solid #d1d5db',
-              background: 'white',
+              border: isDark ? '1px solid #475569' : '1px solid #d1d5db',
+              background: isDark ? '#334155' : 'white',
+              color: isDark ? '#e5e7eb' : '#111827',
               cursor: 'pointer',
               fontWeight: 600,
             }}
