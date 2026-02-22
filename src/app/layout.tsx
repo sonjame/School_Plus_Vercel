@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { ToastProvider } from '@/src/context/ToastContext'
 
 export default function RootLayout({
   children,
@@ -17,28 +16,41 @@ export default function RootLayout({
 
   const [darkMode, setDarkMode] = useState(false)
 
-  // 🔥 theme_settings에서 다크모드 불러오기 (관리자 외에 적용)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      setDarkMode(Boolean(parsed.darkMode))
-    } catch {
-      // 무시
-    }
-  }, [])
+  const effectiveDark = user?.level === 'admin' ? false : darkMode
 
-  // 🔥 다크모드 변경 브로드캐스트 수신 (내정보 등에서 변경 시)
   useEffect(() => {
-    const handleThemeChange = (e: any) => {
-      if (!e?.detail) return
-      setDarkMode(Boolean(e.detail.darkMode))
+    const loadTheme = () => {
+      const saved = localStorage.getItem('loggedInUser')
+      if (!saved) return
+
+      try {
+        const parsed = JSON.parse(saved)
+        if (!parsed?.id) return
+
+        const raw = localStorage.getItem(`theme_settings_${parsed.id}`)
+        if (!raw) {
+          setDarkMode(false)
+          return
+        }
+
+        const theme = JSON.parse(raw)
+        setDarkMode(theme.darkMode)
+      } catch {
+        setDarkMode(false)
+      }
     }
 
-    window.addEventListener('theme-change', handleThemeChange)
+    loadTheme()
+
+    // 🔥 MyInfoPage에서 토글 시 반영
+    const handler = (e: any) => {
+      setDarkMode(e.detail.darkMode)
+    }
+
+    window.addEventListener('theme-change', handler)
+
     return () => {
-      window.removeEventListener('theme-change', handleThemeChange)
+      window.removeEventListener('theme-change', handler)
     }
   }, [])
 
@@ -258,481 +270,474 @@ export default function RootLayout({
       <body
         style={{
           margin: 0,
-          background: darkMode ? '#020617' : '#f2f4f7',
-          color: darkMode ? '#e5e7eb' : '#111827',
+          background: effectiveDark ? '#0f172a' : '#f2f4f7',
+          color: effectiveDark ? '#e5e7eb' : '#111827',
           fontFamily: 'Pretendard, sans-serif',
+          transition: 'all 0.25s ease',
         }}
       >
-        <ToastProvider>
-          {/* 모바일 햄버거 버튼 */}
-          {!isPC && !sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
+        {/* 모바일 햄버거 버튼 */}
+        {!isPC && !sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              position: 'fixed',
+              top: '14px',
+              left: '14px',
+              zIndex: 999,
+              padding: '10px 14px',
+              background: '#4DB8FF',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '18px',
+              cursor: 'pointer',
+            }}
+          >
+            ☰
+          </button>
+        )}
+
+        {/* 사이드바 */}
+        <aside
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: sidebarOpen ? 0 : isPC ? 0 : '-260px',
+            width: isPC ? '220px' : '240px',
+            height: '100vh',
+            background:
+              user?.level === 'admin'
+                ? 'linear-gradient(180deg, #0F172A, #020617)'
+                : effectiveDark
+                  ? '#1e293b'
+                  : '#4DB8FF',
+
+            /* ✅ padding 분해 */
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            paddingLeft: '14px',
+            paddingRight: '14px',
+
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            transition: 'left 0.3s ease',
+            zIndex: 998,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
+          {/* 학교 이름 표시 */}
+          {/* 사이드바 헤더 */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '12px',
+            }}
+          >
+            {/* 학교 이름 (관리자일 때 숨김) */}
+            {user?.level !== 'admin' && (
+              <Link
+                href="/"
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: 'white',
+                  textDecoration: 'none',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user?.school ? `🏫 ${user.school}` : 'School Plus'}
+              </Link>
+            )}
+
+            {/* 모바일 X 버튼 */}
+            {!isPC && (
+              <button
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {banRemainMs !== null && (
+            <div
               style={{
-                position: 'fixed',
-                top: '14px',
-                left: '14px',
-                zIndex: 999,
-                padding: '10px 14px',
-                background: '#4DB8FF',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '18px',
-                cursor: 'pointer',
+                background: '#FEE2E2',
+                color: '#B91C1C',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                lineHeight: 1.4,
+                marginBottom: '8px',
               }}
             >
-              ☰
-            </button>
+              🚫 계정 이용 제한 중<br />⏳ 해제까지{' '}
+              <strong>{formatRemain(banRemainMs)}</strong>
+            </div>
           )}
 
-          {/* 사이드바 */}
-          <aside
+          {/* 메뉴 */}
+          {/* ========================= */}
+          {/* 사이드바 메뉴 */}
+          {/* ========================= */}
+
+          {user?.level === 'admin' ? (
+            <>
+              <div
+                style={{
+                  fontSize: 25,
+                  fontWeight: 700,
+                  color: '#E0F2FE',
+                  marginBottom: 6,
+                }}
+              >
+                🛡 관리자
+              </div>
+
+              <AdminMenuItem
+                icon="🔔"
+                label="관리자 알림"
+                href="/admin/notifications"
+              />
+              <AdminMenuItem icon="🚨" label="신고된 게시글" href="/admin" />
+              <AdminMenuItem
+                icon="👥"
+                label="신고자 관리"
+                href="/admin/reporters"
+              />
+              <AdminMenuItem
+                icon="🛠"
+                label="관리자 게시판"
+                href="/board/admin"
+              />
+              <AdminMenuItem
+                icon="💬"
+                label="채팅 신고 관리"
+                href="/admin/chat-report"
+              />
+              <AdminMenuItem
+                icon="♻️"
+                label="재가입 승인"
+                href="/admin/rejoin-requests"
+              />
+              <AdminMenuItem
+                icon="👤"
+                label="사용자 정보"
+                href="/admin/userinfo"
+              />
+            </>
+          ) : (
+            <>
+              {/* 👤 학생 전용 메뉴 그대로 */}
+
+              <MenuItem
+                icon="👤"
+                label="내정보"
+                href="/my-info"
+                darkMode={effectiveDark}
+              />
+
+              {/* 게시판 드롭다운 */}
+              <div
+                style={{
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
+              >
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDropOpen((prev) => !prev)
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: darkMode
+                      ? 'rgba(255,255,255,0.05)'
+                      : 'rgba(255,255,255,0.25)',
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    border: darkMode
+                      ? '1px solid rgba(255,255,255,0.1)'
+                      : '1px solid rgba(255,255,255,0.4)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>📋</span>
+                  게시판
+                </div>
+
+                {dropOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 8,
+
+                      width: 190,
+                      background: '#ffffff',
+                      borderRadius: 12,
+
+                      padding: '6px 0',
+                      boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+
+                      zIndex: 9999,
+                    }}
+                  >
+                    {dropdownItem('/board', '📚 전체 게시판')}
+                    {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
+                    {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                  </div>
+                )}
+              </div>
+
+              <MenuItem
+                icon="💬"
+                label="채팅"
+                href="/chat"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="📅"
+                label="일정"
+                href="/calendar"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="⏰"
+                label="시간표"
+                href="/timetable"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="📊"
+                label="모의고사"
+                href="/mockscores"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="📊"
+                label="내신점수"
+                href="/schooltest"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="🍚"
+                label="급식표"
+                href="/meal"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="📚"
+                label="도서관"
+                href="/Library"
+                darkMode={effectiveDark}
+              />
+              <MenuItem
+                icon="🏫"
+                label="학교인증"
+                href="/school_certification"
+                darkMode={effectiveDark}
+              />
+            </>
+          )}
+
+          {/* 로그인/로그아웃 */}
+          <div style={{ marginTop: 'auto' }}>
+            {user ? (
+              <>
+                <div
+                  style={{
+                    color: 'white',
+                    marginBottom: '10px',
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  👋 {user.name || user.username}님
+                  {user?.level === 'admin' && (
+                    <span
+                      style={{
+                        marginLeft: 4,
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: '#93C5FD',
+                      }}
+                    >
+                      (관리자)
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+
+                    background:
+                      user?.level === 'admin'
+                        ? '#1E293B' // 다크 네이비 (관리자)
+                        : '#FF6B6B', // 빨강 (학생)
+
+                    color: 'white',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <MenuItem
+                icon="🔐"
+                label="로그인"
+                href="/auth/login"
+                darkMode={effectiveDark}
+              />
+            )}
+          </div>
+        </aside>
+
+        {/* overlay */}
+        {!isPC && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)} // ⭐ 핵심
             style={{
               position: 'fixed',
               top: 0,
-              left: sidebarOpen ? 0 : isPC ? 0 : '-260px',
-              width: isPC ? '220px' : '240px',
-              height: '100vh',
-              background:
-                user?.level === 'admin'
-                  ? 'linear-gradient(180deg, #0F172A, #020617)' // 🔒 관리자 전용 테마 고정
-                  : darkMode
-                    ? '#020617' // 🌙 다크모드: 진한 네이비 배경
-                    : '#4DB8FF', // ☀️ 라이트모드: 기존 파란색
-
-              /* ✅ padding 분해 */
-              paddingTop: '20px',
-              paddingBottom: '20px',
-              paddingLeft: '14px',
-              paddingRight: '14px',
-
-              boxSizing: 'border-box',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              transition: 'left 0.3s ease',
-              zIndex: 998,
-              overflowY: 'auto',
-              overflowX: 'hidden',
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.4)',
+              zIndex: 997,
             }}
-          >
-            {/* 학교 이름 표시 */}
-            {/* 사이드바 헤더 */}
+          />
+        )}
+
+        {/* 메인 */}
+        <main
+          className="min-h-screen"
+          style={{
+            marginLeft: isPC ? '220px' : '0px',
+          }}
+        >
+          {children}
+        </main>
+
+        {/* 모달 */}
+        {modal.show && (
+          <div className="modal-backdrop">
             <div
+              className="modal-box"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px',
+                background: effectiveDark ? '#1e293b' : '#ffffff',
+                color: effectiveDark ? '#f9fafb' : '#111827',
               }}
             >
-              {/* 학교 이름 (관리자일 때 숨김) */}
-              {user?.level !== 'admin' && (
-                <Link
-                  href="/"
-                  style={{
-                    fontSize: '20px',
-                    fontWeight: 700,
-                    color: 'white',
-                    textDecoration: 'none',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {user?.school ? `🏫 ${user.school}` : '🏫 School Plus'}
-                </Link>
-              )}
+              <div className="modal-icon">✔</div>
+              <p>{modal.message}</p>
 
-              {/* 모바일 X 버튼 */}
-              {!isPC && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  style={{
-                    background: 'rgba(0,0,0,0.25)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  ✕
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: 10,
+                  marginTop: 12,
+                }}
+              >
+                {modal.type === 'confirm' && (
+                  <button className="modal-cancel" onClick={modal.onCancel}>
+                    취소
+                  </button>
+                )}
+
+                <button className="modal-confirm" onClick={modal.onConfirm}>
+                  확인
                 </button>
-              )}
-            </div>
-
-            {banRemainMs !== null && (
-              <div
-                style={{
-                  background: '#FEE2E2',
-                  color: '#B91C1C',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  lineHeight: 1.4,
-                  marginBottom: '8px',
-                }}
-              >
-                🚫 계정 이용 제한 중<br />⏳ 해제까지{' '}
-                <strong>{formatRemain(banRemainMs)}</strong>
-              </div>
-            )}
-
-            {/* 메뉴 */}
-            {/* ========================= */}
-            {/* 사이드바 메뉴 */}
-            {/* ========================= */}
-
-            {user?.level === 'admin' ? (
-              <>
-                <div
-                  style={{
-                    fontSize: 25,
-                    fontWeight: 700,
-                    color: '#E0F2FE',
-                    marginBottom: 6,
-                  }}
-                >
-                  🛡 관리자
-                </div>
-
-                <AdminMenuItem
-                  icon="🔔"
-                  label="관리자 알림"
-                  href="/admin/notifications"
-                />
-                <AdminMenuItem icon="🚨" label="신고된 게시글" href="/admin" />
-                <AdminMenuItem
-                  icon="👥"
-                  label="신고자 관리"
-                  href="/admin/reporters"
-                />
-                <AdminMenuItem
-                  icon="🛠"
-                  label="관리자 게시판"
-                  href="/board/admin"
-                />
-                <AdminMenuItem
-                  icon="💬"
-                  label="채팅 신고 관리"
-                  href="/admin/chat-report"
-                />
-                <AdminMenuItem
-                  icon="♻️"
-                  label="재가입 승인"
-                  href="/admin/rejoin-requests"
-                />
-                <AdminMenuItem
-                  icon="👤"
-                  label="사용자 정보"
-                  href="/admin/userinfo"
-                />
-              </>
-            ) : (
-              <>
-                {/* 👤 학생 전용 메뉴 그대로 */}
-
-                <MenuItem
-                  icon="👤"
-                  label="내정보"
-                  href="/my-info"
-                  darkMode={darkMode}
-                />
-
-                {/* 게시판 드롭다운 */}
-                <div
-                  style={{
-                    position: 'relative',
-                    overflow: 'visible',
-                  }}
-                >
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDropOpen((prev) => !prev)
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-
-                      background: darkMode
-                        ? 'rgba(15,23,42,0.9)'
-                        : 'rgba(255,255,255,0.25)',
-
-                      border: darkMode
-                        ? '1px solid rgba(148,163,184,0.6)'
-                        : '1px solid rgba(255,255,255,0.4)',
-
-                      color: 'white',
-                    }}
-                  >
-                    <span style={{ fontSize: '18px' }}>📋</span>
-                    게시판
-                  </div>
-
-                  {dropOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        marginTop: 8,
-
-                        width: 190,
-                        background: '#ffffff',
-                        borderRadius: 12,
-
-                        padding: '6px 0',
-                        boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-
-                        zIndex: 9999,
-                      }}
-                    >
-                      {dropdownItem('/board', '📚 전체 게시판')}
-                      {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
-                      {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
-                    </div>
-                  )}
-                </div>
-
-                <MenuItem
-                  icon="💬"
-                  label="채팅"
-                  href="/chat"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="📅"
-                  label="일정"
-                  href="/calendar"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="⏰"
-                  label="시간표"
-                  href="/timetable"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="📊"
-                  label="모의고사"
-                  href="/mockscores"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="📊"
-                  label="내신점수"
-                  href="/schooltest"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="🍚"
-                  label="급식표"
-                  href="/meal"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="📚"
-                  label="도서관"
-                  href="/Library"
-                  darkMode={darkMode}
-                />
-                <MenuItem
-                  icon="🏫"
-                  label="학교인증"
-                  href="/school_certification"
-                  darkMode={darkMode}
-                />
-              </>
-            )}
-
-            {/* 로그인/로그아웃 */}
-            <div style={{ marginTop: 'auto' }}>
-              {user ? (
-                <>
-                  <div
-                    style={{
-                      color: 'white',
-                      marginBottom: '10px',
-                      fontWeight: 600,
-                      fontSize: 14,
-                    }}
-                  >
-                    👋 {user.name || user.username}님
-                    {user?.level === 'admin' && (
-                      <span
-                        style={{
-                          marginLeft: 4,
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: '#93C5FD',
-                        }}
-                      >
-                        (관리자)
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-
-                      background:
-                        user?.level === 'admin'
-                          ? '#1E293B' // 다크 네이비 (관리자)
-                          : '#FF6B6B', // 빨강 (학생)
-
-                      color: 'white',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    로그아웃
-                  </button>
-                </>
-              ) : (
-                <MenuItem
-                  icon="🔐"
-                  label="로그인"
-                  href="/auth/login"
-                  darkMode={darkMode}
-                />
-              )}
-            </div>
-          </aside>
-
-          {/* overlay */}
-          {!isPC && sidebarOpen && (
-            <div
-              onClick={() => setSidebarOpen(false)} // ⭐ 핵심
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                background: 'rgba(0,0,0,0.4)',
-                zIndex: 997,
-              }}
-            />
-          )}
-
-          {/* 메인 */}
-          <main
-            className="min-h-screen"
-            style={{
-              marginLeft: isPC ? '220px' : '0px',
-            }}
-          >
-            {children}
-          </main>
-
-          {/* 모달 */}
-          {modal.show && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: darkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)',
-                backdropFilter: 'blur(4px)',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 9999,
-              }}
-            >
-              <div
-                style={{
-                  background: darkMode ? '#0f172a' : '#ffffff',
-                  padding: '22px 28px',
-                  borderRadius: '12px',
-                  border: darkMode
-                    ? '1px solid rgba(148,163,184,0.4)'
-                    : '2px solid #4fc3f7',
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-                  textAlign: 'center',
-                  animation: 'fadeIn 0.25s ease-out',
-                  color: darkMode ? '#e5e7eb' : '#111827',
-                }}
-              >
-                <div className="modal-icon">✔</div>
-                <p>{modal.message}</p>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: 10,
-                    marginTop: 12,
-                  }}
-                >
-                  {modal.type === 'confirm' && (
-                    <button
-                      onClick={modal.onCancel}
-                      style={{
-                        padding: '8px 14px',
-                        background: darkMode ? '#334155' : '#ddd',
-                        color: darkMode ? '#e5e7eb' : '#111827',
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      취소
-                    </button>
-                  )}
-
-                  <button
-                    onClick={modal.onConfirm}
-                    style={{
-                      padding: '8px 14px',
-                      background: darkMode ? '#2563EB' : '#4fc3f7',
-                      color: 'white',
-                      borderRadius: '6px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    확인
-                  </button>
-                </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* 모달 CSS */}
-          <style jsx>{`
-            .modal-icon {
-              color: #4fc3f7;
-              font-size: 32px;
-              font-weight: bold;
-              margin-bottom: 8px;
+        {/* 모달 CSS */}
+        <style jsx>{`
+          .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+          }
+          .modal-box {
+            background: ${effectiveDark ? '#1e293b' : '#ffffff'};
+            color: ${effectiveDark ? '#f9fafb' : '#111827'};
+            padding: 22px 28px;
+            border-radius: 12px;
+            border: 2px solid #4fc3f7;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            animation: fadeIn 0.25s ease-out;
+          }
+          .modal-icon {
+            color: #4fc3f7;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+          }
+          .modal-confirm {
+            padding: 8px 14px;
+            background: #4fc3f7;
+            color: white;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+          }
+          .modal-cancel {
+            padding: 8px 14px;
+            background: #ddd;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: scale(0.9);
             }
-            @keyframes fadeIn {
-              from {
-                opacity: 0;
-                transform: scale(0.9);
-              }
-              to {
-                opacity: 1;
-                transform: scale(1);
-              }
+            to {
+              opacity: 1;
+              transform: scale(1);
             }
-          `}</style>
-        </ToastProvider>
+          }
+        `}</style>
       </body>
     </html>
   )
@@ -758,13 +763,15 @@ function MenuItem({
         gap: '8px',
         padding: '10px 12px',
         borderRadius: '8px',
-        background: darkMode ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.25)',
+        background: darkMode
+          ? 'rgba(255,255,255,0.05)'
+          : 'rgba(255,255,255,0.25)',
         color: 'white',
         textDecoration: 'none',
         fontSize: '15px',
         fontWeight: 600,
         border: darkMode
-          ? '1px solid rgba(148,163,184,0.6)'
+          ? '1px solid rgba(255,255,255,0.1)'
           : '1px solid rgba(255,255,255,0.4)',
       }}
     >
@@ -773,7 +780,6 @@ function MenuItem({
     </Link>
   )
 }
-
 function AdminMenuItem({
   icon,
   label,
