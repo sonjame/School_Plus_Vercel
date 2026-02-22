@@ -23,18 +23,39 @@ type ThemeSettings = {
 export default function BoardMainPage() {
   const [sections, setSections] = useState<BoardSection[]>([])
 
-  const [darkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
 
     try {
-      const raw = localStorage.getItem('theme_settings')
-      if (!raw) return false
-      const parsed: ThemeSettings = JSON.parse(raw)
-      return Boolean(parsed.darkMode)
+      const parsed = JSON.parse(storedUser)
+      const userId = parsed.id
+      if (!userId) return
+
+      const raw = localStorage.getItem(`theme_settings_${userId}`)
+      if (!raw) return
+
+      const settings = JSON.parse(raw)
+      setDarkMode(Boolean(settings.darkMode))
     } catch {
-      return false
+      setDarkMode(false)
     }
-  })
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.darkMode !== undefined) {
+        setDarkMode(e.detail.darkMode)
+      }
+    }
+
+    window.addEventListener('theme-change', handler)
+    return () => window.removeEventListener('theme-change', handler)
+  }, [])
 
   useEffect(() => {
     const boards = [
