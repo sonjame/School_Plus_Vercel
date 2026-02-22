@@ -90,6 +90,9 @@ function formatKST(value: string) {
 function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
   const [preview, setPreview] = useState<any>(null)
 
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   useEffect(() => {
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then((res) => res.json())
@@ -124,8 +127,8 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
         style={{
           borderRadius: 14,
           overflow: 'hidden',
-          background: 'white',
-          border: '1px solid #e5e7eb',
+          background: isDark ? '#1e293b' : 'white',
+          border: isDark ? '1px solid #334155' : '1px solid #e5e7eb',
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
         }}
       >
@@ -171,7 +174,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
               fontWeight: 700,
               fontSize: 15,
               marginBottom: 6,
-              color: '#111827',
+              color: isDark ? '#e5e7eb' : '#111827',
             }}
           >
             {isMap ? mapTitle : preview?.title || url}
@@ -182,7 +185,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#6b7280',
+                    color: isDark ? '#94a3b8' : '#6b7280',
                     lineHeight: 1.4,
                     marginBottom: 6,
                   }}
@@ -194,7 +197,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#6b7280',
+                    color: isDark ? '#94a3b8' : '#6b7280',
                     lineHeight: 1.4,
                     marginBottom: 6,
                   }}
@@ -207,7 +210,7 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
           <div
             style={{
               fontSize: 11,
-              color: '#9ca3af',
+              color: isDark ? '#64748b' : '#9ca3af',
             }}
           >
             {new URL(url).hostname}
@@ -225,6 +228,10 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
 export default function ChatPage() {
   // 🚫 전학 / 학교 다름 차단 모달
   const [blockMessage, setBlockMessage] = useState<string | null>(null)
+
+  //다크 모드
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
 
   const [rooms, setRooms] = useState<ChatRoom[]>([])
   const [currentRoomId, setCurrentRoomId] = useState<number | null>(null)
@@ -306,13 +313,18 @@ export default function ChatPage() {
   const COLORS = {
     primary: '#4FC3F7',
     primaryDark: '#2563eb',
-    bg: '#f9fafb',
-    border: '#e5e7eb',
-    text: '#111827',
-    subText: '#6b7280',
+
+    bg: isDark ? '#0f172a' : '#f9fafb',
+    border: isDark ? '#334155' : '#e5e7eb',
+
+    text: isDark ? '#e5e7eb' : '#111827',
+    subText: isDark ? '#94a3b8' : '#6b7280',
+
     danger: '#ef4444',
-    noticeBg: '#FEF3C7',
-    noticeText: '#92400E',
+
+    noticeBg: isDark ? '#3f3f1d' : '#FEF3C7',
+    noticeText: isDark ? '#fde68a' : '#92400E',
+    softBg: isDark ? '#334155' : '#f3f4f6',
   }
 
   const EMOJIS = [
@@ -1151,7 +1163,7 @@ export default function ChatPage() {
         height: 'calc(var(--vh, 1vh) * 100)',
         paddingTop: isMobile ? 60 : 0, // 가독성도 좋아짐
         paddingBottom: 0, // ✅ 아래 여백 완전 제거
-        background: '#ffffff',
+        background: isDark ? '#0f172a' : '#ffffff',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'stretch',
@@ -1168,7 +1180,7 @@ export default function ChatPage() {
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
-          background: 'white',
+          background: isDark ? '#1e293b' : 'white',
           boxShadow: 'none', // ✅ 그림자 제거 (카드 느낌 X)
         }}
       >
@@ -1179,7 +1191,9 @@ export default function ChatPage() {
               width: isMobile ? '100%' : sidebarWidth,
               minWidth: 240,
               maxWidth: 520,
-              borderRight: isMobile ? 'none' : '1px solid #e5e7eb',
+              borderRight: isMobile ? 'none' : `1px solid ${COLORS.border}`,
+              background: isDark ? '#1e293b' : 'white',
+              color: COLORS.text,
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1187,7 +1201,7 @@ export default function ChatPage() {
             <div
               style={{
                 padding: '14px 16px',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: `1px solid ${COLORS.border}`,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 4,
@@ -1214,7 +1228,7 @@ export default function ChatPage() {
                     padding: '4px 8px',
                     borderRadius: 6,
                     border: '1px solid #d1d5db',
-                    background: 'white',
+                    background: isDark ? '#1e293b' : 'white',
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -1223,7 +1237,7 @@ export default function ChatPage() {
                 </button>
               </div>
 
-              <span style={{ fontSize: 12, color: '#6b7280' }}>
+              <span style={{ fontSize: 12, color: COLORS.subText }}>
                 {currentUser?.school
                   ? `📚 ${currentUser.school}`
                   : '로그인한 학교 기준으로만 채팅 가능'}
@@ -1235,7 +1249,7 @@ export default function ChatPage() {
                 padding: '10px 10px 0',
                 display: 'flex',
                 gap: 8,
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: `1px solid ${COLORS.border}`,
                 paddingBottom: 10,
               }}
             >
@@ -1316,9 +1330,17 @@ export default function ChatPage() {
                     style={{
                       width: '100%',
                       padding: '10px 12px',
-                      borderBottom: '1px solid #f3f4f6',
+                      borderBottom: `1px solid ${COLORS.border}`,
                       cursor: 'pointer',
-                      background: isActive ? '#eff6ff' : 'white',
+                      background: isActive
+                        ? isDark
+                          ? '#1e3a5f'
+                          : '#eff6ff'
+                        : isDark
+                          ? '#1e293b'
+                          : 'white',
+
+                      color: COLORS.text,
                       textAlign: 'left',
                     }}
                   >
@@ -1335,7 +1357,7 @@ export default function ChatPage() {
                         style={{
                           fontWeight: 600,
                           fontSize: 14,
-                          color: '#111827',
+                          color: COLORS.text,
                           flex: 1,
                           overflow: 'hidden',
                           whiteSpace: 'nowrap',
@@ -1384,7 +1406,7 @@ export default function ChatPage() {
                             background: 'transparent',
                             fontSize: 18,
                             cursor: 'pointer',
-                            color: '#111827',
+                            color: COLORS.text,
                             padding: '2px 15px',
                             position: 'relative',
                             top: -16,
@@ -1403,10 +1425,12 @@ export default function ChatPage() {
                               left: 0, // ⭐ 기준 변경
                               top: 2, // ⭐ 버튼 아래로
                               transform: 'translateX(-73%)', // ⭐ 버튼 왼쪽으로
-                              background: 'white',
+                              background: isDark ? '#1e293b' : 'white',
                               borderRadius: 8,
                               boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
-                              border: '1px solid #e5e7eb',
+                              border: isDark
+                                ? '1px solid #334155'
+                                : '1px solid #e5e7eb',
                               zIndex: 50,
                               minWidth: 120,
                             }}
@@ -1443,7 +1467,7 @@ export default function ChatPage() {
                     <p
                       style={{
                         fontSize: 12,
-                        color: '#6b7280',
+                        color: COLORS.subText,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -1513,7 +1537,7 @@ export default function ChatPage() {
             <div
               style={{
                 padding: '10px 16px',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: `1px solid ${COLORS.border}`,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -1525,7 +1549,7 @@ export default function ChatPage() {
                     onClick={() => setShowRoomMenu((v) => !v)}
                     style={{
                       border: 'none',
-                      background: '#f3f4f6',
+                      background: COLORS.softBg,
                       borderRadius: 8,
                       padding: '6px 10px',
                       fontSize: 16,
@@ -1541,10 +1565,10 @@ export default function ChatPage() {
                         position: 'absolute',
                         right: -130,
                         top: '110%',
-                        background: 'white',
+                        background: isDark ? '#1e293b' : 'white',
                         borderRadius: 10,
                         boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
-                        border: '1px solid #e5e7eb',
+                        borderTop: `1px solid ${COLORS.border}`,
                         zIndex: 100,
                         minWidth: 160,
                       }}
@@ -1644,7 +1668,7 @@ export default function ChatPage() {
                         style={{
                           width: '92%',
                           maxWidth: 420,
-                          background: 'white',
+                          background: isDark ? '#1e293b' : 'white',
                           borderRadius: 16,
                           padding: 20,
                         }}
@@ -1665,10 +1689,12 @@ export default function ChatPage() {
                           value={inputText}
                           onChange={(e) => setInputText(e.target.value)}
                           style={{
-                            width: '100%',
-                            padding: '12px -1px',
+                            width: '93%',
+                            padding: '12px',
                             borderRadius: 10,
-                            border: `2px solid ${COLORS.border}`,
+                            border: `1px solid ${COLORS.border}`,
+                            background: COLORS.bg,
+                            color: COLORS.text,
                             fontSize: 14,
                             resize: 'none',
                             outline: 'none',
@@ -1692,7 +1718,7 @@ export default function ChatPage() {
                               padding: '8px 14px',
                               borderRadius: 999,
                               border: `1px solid ${COLORS.border}`,
-                              background: 'white',
+                              background: isDark ? '#1e293b' : 'white',
                               cursor: 'pointer',
                             }}
                           >
@@ -1786,7 +1812,7 @@ export default function ChatPage() {
                     {currentRoom ? currentRoom.name : '채팅방을 선택하세요'}
                   </div>
                   {currentRoom && (
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    <div style={{ fontSize: 12, color: COLORS.subText }}>
                       {currentRoom.isGroup ? '그룹 채팅' : '1:1 채팅'}
                     </div>
                   )}
@@ -1801,7 +1827,7 @@ export default function ChatPage() {
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
-                background: '#f9fafb',
+                background: isDark ? '#0f172a' : '#f9fafb',
                 padding: '12px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1899,7 +1925,7 @@ export default function ChatPage() {
                   <div
                     style={{
                       textAlign: 'center',
-                      color: '#9ca3af',
+                      color: isDark ? '#64748b' : '#9ca3af',
                       fontSize: 14,
                     }}
                   >
@@ -1989,7 +2015,7 @@ export default function ChatPage() {
                             <span
                               style={{
                                 fontSize: 11,
-                                color: '#6b7280',
+                                color: COLORS.subText,
                                 marginBottom: 2,
                                 paddingRight: 4,
                               }}
@@ -2043,7 +2069,7 @@ export default function ChatPage() {
                           <span
                             style={{
                               fontSize: 11,
-                              color: '#6b7280',
+                              color: COLORS.subText,
                               marginBottom: 2,
                               paddingRight: 4,
                             }}
@@ -2071,7 +2097,14 @@ export default function ChatPage() {
                                   ? 'transparent'
                                   : isMe
                                     ? '#4FC3F7'
-                                    : 'white',
+                                    : isDark
+                                      ? '#1e293b'
+                                      : 'white',
+                              color: isMe
+                                ? 'white'
+                                : isDark
+                                  ? '#e5e7eb'
+                                  : '#111827',
                               fontSize: 14,
                               wordBreak: 'break-word',
                               maxWidth:
@@ -2112,7 +2145,13 @@ export default function ChatPage() {
                                   gap: 8,
                                   padding: '10px 14px',
                                   borderRadius: 12,
-                                  background: isMe ? '#e0f2fe' : '#f3f4f6',
+                                  background: isMe
+                                    ? '#4FC3F7'
+                                    : isDark
+                                      ? '#1e293b'
+                                      : '#f3f4f6',
+
+                                  color: isMe ? 'white' : COLORS.text,
                                   cursor: 'pointer',
                                   maxWidth: 320,
                                 }}
@@ -2139,7 +2178,14 @@ export default function ChatPage() {
                                     {msg.fileName}
                                   </div>
                                   <div
-                                    style={{ fontSize: 11, color: '#6b7280' }}
+                                    style={{
+                                      fontSize: 11,
+                                      color: isMe
+                                        ? 'rgba(255,255,255,0.8)'
+                                        : isDark
+                                          ? '#cbd5e1'
+                                          : COLORS.subText,
+                                    }}
                                   >
                                     파일 다운로드
                                   </div>
@@ -2150,7 +2196,7 @@ export default function ChatPage() {
                           <span
                             style={{
                               fontSize: 10,
-                              color: '#9ca3af',
+                              color: isDark ? '#64748b' : '#9ca3af',
                               marginTop: 2,
                               display: 'flex',
                               gap: 6,
@@ -2218,7 +2264,7 @@ export default function ChatPage() {
                 style={{
                   padding: '6px 12px',
                   borderTop: '1px solid #e5e7eb',
-                  background: '#f3f4f6',
+                  background: COLORS.softBg,
                   fontSize: 12,
                   display: 'flex',
                   alignItems: 'center',
@@ -2238,7 +2284,7 @@ export default function ChatPage() {
                       key={idx}
                       style={{
                         padding: '3px 6px',
-                        background: 'white',
+                        background: isDark ? '#1e293b' : 'white',
                         borderRadius: 999,
                         border: '1px solid #d1d5db',
                       }}
@@ -2270,7 +2316,7 @@ export default function ChatPage() {
                   display: 'flex',
                   gap: 8,
                   overflowX: 'auto',
-                  background: '#f9fafb',
+                  background: isDark ? '#0f172a' : '#f9fafb',
                 }}
               >
                 {pendingImages.map((file, idx) => {
@@ -2322,7 +2368,7 @@ export default function ChatPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: 'white',
+                background: isDark ? '#1e293b' : 'white',
                 position: 'sticky',
                 bottom: 0,
               }}
@@ -2335,13 +2381,12 @@ export default function ChatPage() {
                     width: 32,
                     height: 32,
                     borderRadius: 999,
-                    border: '1px solid #d1d5db',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    border: `1px solid ${COLORS.border}`,
+                    background: isDark ? '#1e293b' : '#f9fafb',
+                    color: COLORS.text, // ⭐ 추가
                     fontSize: 18,
+                    fontWeight: 700, // ⭐ 추가
                     cursor: 'pointer',
-                    background: '#f9fafb',
                   }}
                 >
                   +
@@ -2354,7 +2399,7 @@ export default function ChatPage() {
                       position: 'absolute',
                       bottom: 40,
                       left: 0,
-                      background: 'white',
+                      background: isDark ? '#1e293b' : 'white',
                       borderRadius: 12,
                       boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                       padding: 6,
@@ -2435,11 +2480,24 @@ export default function ChatPage() {
                   flex: 1,
                   padding: '10px 14px',
                   borderRadius: 999,
-                  border: '1px solid #d1d5db',
+
                   fontSize: 14,
                   outline: 'none',
-                  backgroundColor: blockMessage ? '#f3f4f6' : 'white',
-                  color: blockMessage ? '#9ca3af' : '#111827',
+                  backgroundColor: blockMessage
+                    ? isDark
+                      ? '#334155'
+                      : '#f3f4f6'
+                    : isDark
+                      ? '#1e293b'
+                      : 'white',
+
+                  color: blockMessage
+                    ? '#9ca3af'
+                    : isDark
+                      ? '#e5e7eb'
+                      : '#111827',
+
+                  border: `1px solid ${COLORS.border}`,
                   cursor: blockMessage ? 'not-allowed' : 'text',
                 }}
               />
@@ -2470,7 +2528,7 @@ export default function ChatPage() {
                     height: 32,
                     borderRadius: 999,
                     border: '1px solid #d1d5db',
-                    background: '#f9fafb',
+                    background: isDark ? '#0f172a' : '#f9fafb',
                     fontSize: 18,
                     cursor: 'pointer',
                     marginRight: 6,
@@ -2491,7 +2549,7 @@ export default function ChatPage() {
                       position: 'absolute',
                       bottom: 42,
                       right: 0,
-                      background: 'white',
+                      background: isDark ? '#1e293b' : 'white',
                       borderRadius: 12,
                       boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                       padding: 8,
@@ -2635,7 +2693,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 360,
-              background: 'white',
+              background: isDark ? '#1e293b' : 'white',
               borderRadius: 16,
               padding: 16,
             }}
@@ -2649,7 +2707,7 @@ export default function ChatPage() {
                 key={u.id}
                 style={{
                   padding: '10px 6px',
-                  borderBottom: '1px solid #e5e7eb',
+                  borderBottom: `1px solid ${COLORS.border}`,
                 }}
               >
                 <div
@@ -2675,7 +2733,9 @@ export default function ChatPage() {
                       height: 40,
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: '1px solid #e5e7eb',
+                      border: isDark
+                        ? '1px solid #334155'
+                        : '1px solid #e5e7eb',
                       cursor: 'pointer',
                     }}
                   />
@@ -2724,13 +2784,13 @@ export default function ChatPage() {
                         </span>
                       )}
 
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      <span style={{ fontSize: 11, color: COLORS.subText }}>
                         @{u.username}
                       </span>
                     </div>
 
                     {u.gradeLabel && (
-                      <div style={{ fontSize: 12, color: '#4b5563' }}>
+                      <div style={{ fontSize: 12, color: COLORS.subText }}>
                         {u.gradeLabel}
                       </div>
                     )}
@@ -2826,7 +2886,7 @@ export default function ChatPage() {
                   padding: '8px 16px',
                   borderRadius: 999,
                   border: 'none',
-                  background: '#e5e7eb',
+                  background: isDark ? '#334155' : '#e5e7eb',
                   fontSize: 14,
                   cursor: 'pointer',
                 }}
@@ -2857,7 +2917,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 360,
-              background: 'white',
+              background: isDark ? '#1e293b' : 'white',
               borderRadius: 18,
               padding: '22px 20px',
               textAlign: 'center',
@@ -2871,7 +2931,7 @@ export default function ChatPage() {
                 fontSize: 16,
                 fontWeight: 800,
                 marginBottom: 8,
-                color: '#111827',
+                color: COLORS.text,
               }}
             >
               메시지를 보낼 수 없습니다
@@ -2880,7 +2940,7 @@ export default function ChatPage() {
             <p
               style={{
                 fontSize: 14,
-                color: '#4b5563',
+                color: COLORS.subText,
                 lineHeight: 1.5,
                 marginBottom: 18,
                 whiteSpace: 'pre-line',
@@ -2939,7 +2999,7 @@ export default function ChatPage() {
             style={{
               width: '90%',
               maxWidth: 420,
-              background: 'white',
+              background: isDark ? '#1e293b' : 'white',
               borderRadius: 16,
               padding: 16,
             }}
@@ -2972,7 +3032,11 @@ export default function ChatPage() {
 
             {friends.length === 0 ? (
               <p
-                style={{ fontSize: 13, color: '#6b7280', textAlign: 'center' }}
+                style={{
+                  fontSize: 13,
+                  color: COLORS.subText,
+                  textAlign: 'center',
+                }}
               >
                 친구가 없습니다.
               </p>
@@ -2985,7 +3049,7 @@ export default function ChatPage() {
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 6px',
-                    borderBottom: '1px solid #e5e7eb',
+                    borderBottom: `1px solid ${COLORS.border}`,
                   }}
                 >
                   <img
@@ -3003,14 +3067,16 @@ export default function ChatPage() {
                       height: 40,
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: '1px solid #e5e7eb',
+                      border: isDark
+                        ? '1px solid #334155'
+                        : '1px solid #e5e7eb',
                       cursor: 'pointer', // ✅ 클릭 가능 표시
                     }}
                   />
 
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{f.name}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    <div style={{ fontSize: 12, color: COLORS.subText }}>
                       @{f.username} · {f.gradeLabel}
                     </div>
                   </div>
@@ -3067,7 +3133,7 @@ export default function ChatPage() {
                       padding: '6px 8px',
                       borderRadius: 6,
                       border: 'none',
-                      background: '#f3f4f6',
+                      background: COLORS.softBg,
                       cursor: 'pointer',
                     }}
                   >
@@ -3162,6 +3228,16 @@ function InviteModal({
   onAddFriend: (friendId: number) => Promise<void>
   onToggleBlock: (targetId: number) => Promise<void> // ✅ 추가
 }) {
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
+  const COLORS = {
+    bg: isDark ? '#1e293b' : 'white',
+    border: isDark ? '#334155' : '#e5e7eb',
+    text: isDark ? '#e5e7eb' : '#111827',
+    subText: isDark ? '#94a3b8' : '#6b7280',
+    softBg: isDark ? '#334155' : '#f3f4f6',
+  }
   const [tab, setTab] = useState<'friends' | 'name' | 'class'>('friends')
   const [nameKeyword, setNameKeyword] = useState('')
   const [grade, setGrade] = useState<'1' | '2' | '3'>('1')
@@ -3286,7 +3362,8 @@ function InviteModal({
         style={{
           width: '95%',
           maxWidth: 520,
-          background: 'white',
+          background: COLORS.bg,
+          color: COLORS.text,
           borderRadius: 16,
           padding: 18,
           boxShadow: '0 10px 30px rgba(15,23,42,0.35)',
@@ -3327,7 +3404,7 @@ function InviteModal({
           style={{
             display: 'flex',
             marginBottom: 10,
-            background: '#f3f4f6',
+            background: COLORS.softBg,
             borderRadius: 999,
             padding: 2,
           }}
@@ -3356,8 +3433,10 @@ function InviteModal({
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
-              background: tab === 'name' ? 'white' : 'transparent',
-              color: tab === 'name' ? '#111827' : '#6b7280',
+              background:
+                tab === 'name' ? (isDark ? '#0f172a' : 'white') : 'transparent',
+
+              color: tab === 'name' ? COLORS.text : COLORS.subText,
             }}
           >
             이름 검색
@@ -3388,9 +3467,9 @@ function InviteModal({
               maxHeight: 220,
               overflowY: 'auto',
               borderRadius: 10,
-              border: '1px solid #e5e7eb',
+              border: `1px solid ${COLORS.border}`,
               padding: 6,
-              background: '#f9fafb',
+              background: isDark ? '#0f172a' : '#f9fafb',
               marginBottom: 10,
             }}
           >
@@ -3418,7 +3497,8 @@ function InviteModal({
                       gap: 10,
                       padding: '6px 8px',
                       borderRadius: 8,
-                      background: 'white',
+                      background: COLORS.bg,
+                      color: COLORS.text,
                       marginBottom: 4,
                       cursor: 'pointer',
                     }}
@@ -3454,7 +3534,7 @@ function InviteModal({
                         <span
                           style={{
                             fontSize: 11,
-                            color: '#6b7280',
+                            color: COLORS.subText,
                             marginLeft: 4,
                           }}
                         >
@@ -3463,7 +3543,7 @@ function InviteModal({
                       </div>
 
                       {friend.gradeLabel && (
-                        <div style={{ fontSize: 11, color: '#4b5563' }}>
+                        <div style={{ fontSize: 11, color: COLORS.subText }}>
                           {friend.gradeLabel}
                         </div>
                       )}
@@ -3496,7 +3576,9 @@ function InviteModal({
                   flex: 1,
                   padding: '10px 14px',
                   borderRadius: 8,
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${COLORS.border}`,
+                  background: COLORS.bg,
+                  color: COLORS.text,
                   fontSize: 14,
                 }}
               />
@@ -3517,7 +3599,7 @@ function InviteModal({
                 검색
               </button>
             </div>
-            <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            <p style={{ fontSize: 11, color: COLORS.subText, marginTop: 4 }}>
               같은 학교 학생만 검색됩니다.
             </p>
           </div>
@@ -3543,7 +3625,9 @@ function InviteModal({
                   width: 90,
                   padding: '10px 14px',
                   borderRadius: 8,
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${COLORS.border}`,
+                  background: COLORS.bg,
+                  color: COLORS.text,
                   fontSize: 14,
                 }}
               >
@@ -3563,7 +3647,9 @@ function InviteModal({
                   flex: 1,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${COLORS.border}`,
+                  background: COLORS.bg,
+                  color: COLORS.text,
                   fontSize: 14,
                 }}
               />
@@ -3585,7 +3671,7 @@ function InviteModal({
                 검색
               </button>
             </div>
-            <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            <p style={{ fontSize: 11, color: COLORS.subText, marginTop: 4 }}>
               예: 1학년 3반 학생들만 불러오고 싶으면 학년=1, 반=3 으로 검색.
             </p>
           </div>
@@ -3598,9 +3684,9 @@ function InviteModal({
               maxHeight: 220,
               overflowY: 'auto',
               borderRadius: 10,
-              border: '1px solid #e5e7eb',
+              border: `1px solid ${COLORS.border}`,
               padding: 6,
-              background: '#f9fafb',
+              background: isDark ? '#0f172a' : '#f9fafb',
               marginBottom: 10,
             }}
           >
@@ -3675,7 +3761,8 @@ function InviteModal({
                       gap: 10,
                       padding: '6px 8px',
                       borderRadius: 8,
-                      background: 'white',
+                      background: COLORS.bg,
+                      color: COLORS.text,
                       marginBottom: 4,
                     }}
                   >
@@ -3702,7 +3789,7 @@ function InviteModal({
                         <span
                           style={{
                             fontSize: 11,
-                            color: '#6b7280',
+                            color: COLORS.subText,
                             marginLeft: 4,
                           }}
                         >
@@ -3711,7 +3798,7 @@ function InviteModal({
                       </div>
 
                       {user.gradeLabel && (
-                        <div style={{ fontSize: 11, color: '#4b5563' }}>
+                        <div style={{ fontSize: 11, color: COLORS.subText }}>
                           {user.gradeLabel}
                         </div>
                       )}
@@ -3774,7 +3861,7 @@ function InviteModal({
                           padding: '4px 8px',
                           borderRadius: 999,
                           background: '#e5e7eb',
-                          color: '#374151',
+                          color: COLORS.text,
                           fontWeight: 600,
                         }}
                       >
@@ -3803,7 +3890,8 @@ function InviteModal({
               padding: '8px 14px',
               borderRadius: 999,
               border: '1px solid #d1d5db',
-              background: 'white',
+              background: COLORS.bg,
+              color: COLORS.text,
               fontSize: 14,
               cursor: 'pointer',
             }}
@@ -3847,6 +3935,9 @@ function AttachItem({
   label: string
   onClick: () => void
 }) {
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   return (
     <button
       type="button"
@@ -3862,8 +3953,12 @@ function AttachItem({
         borderRadius: 8,
         cursor: 'pointer',
         fontSize: 14,
+        color: isDark ? '#e5e7eb' : '#111827', // ⭐ 핵심
+        fontWeight: 600, // ⭐ 추가
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6')
+      }
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       <span style={{ fontSize: 18 }}>{icon}</span>
@@ -3881,6 +3976,9 @@ function MenuItem({
   onClick: () => void
   danger?: boolean
 }) {
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
   return (
     <button
       type="button"
@@ -3893,9 +3991,13 @@ function MenuItem({
         textAlign: 'left',
         cursor: 'pointer',
         fontSize: 13,
-        color: danger ? '#ef4444' : '#111827',
+
+        // 🔥 여기 핵심 수정
+        color: danger ? '#ef4444' : isDark ? '#e5e7eb' : '#111827',
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6')
+      }
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       {label}
@@ -3914,6 +4016,16 @@ function PollCreateModal({
   onCreated: () => Promise<void>
   onBlocked: (message: string) => void // ✅ 추가
 }) {
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
+  const COLORS = {
+    bg: isDark ? '#1e293b' : 'white',
+    border: isDark ? '#334155' : '#e5e7eb',
+    text: isDark ? '#e5e7eb' : '#111827',
+    subText: isDark ? '#94a3b8' : '#6b7280',
+    softBg: isDark ? '#334155' : '#f3f4f6',
+  }
   const [title, setTitle] = useState('')
   const [options, setOptions] = useState(['', ''])
   const [anonymous, setAnonymous] = useState(false)
@@ -4006,7 +4118,8 @@ function PollCreateModal({
           style={{
             width: '92%',
             maxWidth: 500,
-            background: 'white',
+            background: COLORS.bg,
+            color: COLORS.text,
             borderRadius: 16,
             padding: 20,
             maxHeight: 'calc(100vh - 100px)',
@@ -4077,7 +4190,8 @@ function PollCreateModal({
               padding: '10px 12px',
               borderRadius: 8,
               border: '1px solid #d1d5db',
-              background: 'white',
+              background: COLORS.bg,
+              color: COLORS.text,
               textAlign: 'left',
               fontSize: 14,
             }}
@@ -4087,7 +4201,7 @@ function PollCreateModal({
               : '⏰ 투표 마감 시간 선택'}
           </button>
 
-          <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+          <p style={{ fontSize: 11, color: COLORS.subText, marginTop: 4 }}>
             설정하지 않으면 방장이 직접 마감해야 합니다.
           </p>
 
@@ -4135,7 +4249,8 @@ function PollCreateModal({
             style={{
               width: '90%',
               maxWidth: 360,
-              background: 'white',
+              background: COLORS.bg,
+              color: COLORS.text,
               borderRadius: 16,
               padding: 16,
             }}
@@ -4236,6 +4351,17 @@ function ReportModal({
     '기타',
   ]
 
+  const isDark =
+    typeof document !== 'undefined' && document.body.classList.contains('dark')
+
+  const COLORS = {
+    bg: isDark ? '#1e293b' : 'white',
+    border: isDark ? '#334155' : '#e5e7eb',
+    text: isDark ? '#e5e7eb' : '#111827',
+    subText: isDark ? '#94a3b8' : '#6b7280',
+    softBg: isDark ? '#334155' : '#f3f4f6',
+  }
+
   const [selectedReason, setSelectedReason] = useState<string>('')
   const [customReason, setCustomReason] = useState('')
 
@@ -4291,7 +4417,8 @@ function ReportModal({
         style={{
           width: '90%',
           maxWidth: 420,
-          background: 'white',
+          background: COLORS.bg,
+          color: COLORS.text,
           borderRadius: 16,
           padding: 20,
         }}
@@ -4303,7 +4430,7 @@ function ReportModal({
           style={{
             marginTop: 10,
             padding: 10,
-            background: '#f3f4f6',
+            background: COLORS.softBg,
             borderRadius: 8,
             fontSize: 13,
           }}
@@ -4350,7 +4477,9 @@ function ReportModal({
               marginTop: 8,
               padding: 10,
               borderRadius: 8,
-              border: '1px solid #d1d5db',
+              border: `1px solid ${COLORS.border}`,
+              background: COLORS.bg,
+              color: COLORS.text,
               fontSize: 14,
             }}
           />
@@ -4372,17 +4501,17 @@ function ReportModal({
               padding: '8px 16px',
               borderRadius: 999,
               border: '1px solid #d1d5db',
-              background: '#f9fafb',
-              color: '#374151',
+              background: isDark ? '#0f172a' : '#f9fafb',
+              color: COLORS.text,
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f3f4f6'
+              e.currentTarget.style.background = isDark ? '#334155' : '#f3f4f6'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f9fafb'
+              e.currentTarget.style.background = isDark ? '#0f172a' : '#f9fafb'
             }}
           >
             취소
