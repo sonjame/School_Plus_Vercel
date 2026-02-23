@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { useRouter } from 'next/navigation'
+import RichTextEditor from '@/src/components/RichTextEditor'
 
 export default function WritePage() {
   const [category, setCategory] = useState('free')
@@ -198,6 +199,7 @@ export default function WritePage() {
   }
 
   /* 글 작성 */
+
   const submit = async () => {
     if (!title.trim() || !content.trim()) {
       showAlert('제목과 내용을 모두 입력해주세요.')
@@ -212,6 +214,20 @@ export default function WritePage() {
 
     const userId = Number(rawUserId)
 
+    function cleanContent(html: string) {
+      return (
+        html
+          // ❌ font-family 제거 줄 삭제 (폰트 유지하려면)
+          // .replace(/font-family:[^;"]+;?/g, '')
+
+          // 빈 style="" 제거
+          .replace(/\sstyle=""/g, '')
+
+          // 완전 빈 p 제거
+          .replace(/<p>\s*<\/p>/g, '')
+          .replace(/<p>(?:&nbsp;|\s)*<\/p>/g, '')
+      )
+    }
     const res = await fetch('/api/posts', {
       method: 'POST',
       headers: {
@@ -220,7 +236,7 @@ export default function WritePage() {
       },
       body: JSON.stringify({
         title,
-        content,
+        content: cleanContent(content),
         category,
         images,
         attachments,
@@ -308,11 +324,10 @@ export default function WritePage() {
 
           {/* 내용 */}
           <label style={label}>내용</label>
-          <textarea
+          <RichTextEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="내용을 입력하세요"
-            style={textArea(darkMode)}
+            onChange={setContent}
+            darkMode={darkMode}
           />
 
           {/* 투표 스위치 */}
@@ -792,7 +807,6 @@ const pageWrap = (darkMode: boolean): React.CSSProperties => ({
 })
 
 const card = (darkMode: boolean): React.CSSProperties => ({
-  position: 'relative',
   width: '100%',
   maxWidth: 'min(960px, 92vw)',
   background: darkMode ? '#1e293b' : '#fff',
@@ -1049,8 +1063,8 @@ const centerOkBtn: React.CSSProperties = {
 
 const closeBtn = (darkMode: boolean): React.CSSProperties => ({
   position: 'absolute',
-  top: 20,
-  right: 16,
+  top: 60,
+  right: 330,
   width: 40,
   height: 40,
   borderRadius: '50%',
