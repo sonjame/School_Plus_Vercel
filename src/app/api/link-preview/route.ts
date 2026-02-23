@@ -237,7 +237,7 @@ export async function GET(req: Request) {
       }
 
       // 🔥 place 이름 추출
-      let placeQuery = extractPlaceNameFromGoogleUrl(realUrl)
+      let placeQuery: string | null = extractPlaceNameFromGoogleUrl(realUrl)
 
       // 🔥 추출 실패하면 og:title 사용
       if (!placeQuery && finalTitle) {
@@ -247,6 +247,18 @@ export async function GET(req: Request) {
       // 🔥 그래도 없으면 URL 전체 사용
       if (!placeQuery) {
         placeQuery = realUrl
+      }
+
+      // ✅ 여기서 타입 확정
+      if (!placeQuery) {
+        return NextResponse.json({
+          title: '📍 Google 지도',
+          description: '',
+          image: rawImage,
+          url: realUrl,
+          type: 'map',
+          provider: 'google',
+        })
       }
 
       const placeData = await fetchGooglePlaceData(placeQuery)
