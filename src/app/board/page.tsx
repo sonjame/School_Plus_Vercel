@@ -194,7 +194,7 @@ const getOuterStyle = (darkMode: boolean): React.CSSProperties => ({
 
 const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
   width: '100%', // 🔥 전체 폭 사용
-  maxWidth: '100%',
+  maxWidth: '95%',
 
   marginTop: 0,
   marginBottom: 0,
