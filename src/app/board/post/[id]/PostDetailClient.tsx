@@ -1171,7 +1171,10 @@ export default function PostDetailPage() {
             </div>
           )}
 
-          <div style={getPostBody(darkMode)}>{post.content}</div>
+          <div
+            style={getPostBody(darkMode)}
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
 
           {/* 🔥 투표 영역 (좋아요 버튼 위에 위치) */}
           {hasVote && (
