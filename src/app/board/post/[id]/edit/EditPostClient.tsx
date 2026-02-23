@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type React from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
+import RichTextEditor from '@/src/components/RichTextEditor'
 
 export default function EditPostPage() {
   const params = useParams<{ id: string }>()
@@ -37,8 +38,6 @@ export default function EditPostPage() {
   const [voteEnabled, setVoteEnabled] = useState(false)
   const [voteOptions, setVoteOptions] = useState<string[]>([])
   const [voteEndAt, setVoteEndAt] = useState<string>('') // yyyy-mm-ddTHH:mm
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   /* 모달 상태 */
   const [modal, setModal] = useState({
@@ -168,14 +167,6 @@ export default function EditPostPage() {
     loadPost()
   }, [postId])
 
-  /* textarea 자동 높이 조절 */
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
-    }
-  }, [content])
-
   /* 이미지 업로드 */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -222,12 +213,27 @@ export default function EditPostPage() {
       return
     }
 
+    function cleanContent(html: string) {
+      return (
+        html
+          // ❌ font-family 제거 줄 삭제 (폰트 유지하려면)
+          // .replace(/font-family:[^;"]+;?/g, '')
+
+          // 빈 style="" 제거
+          .replace(/\sstyle=""/g, '')
+
+          // 완전 빈 p 제거
+          .replace(/<p>\s*<\/p>/g, '')
+          .replace(/<p>(?:&nbsp;|\s)*<\/p>/g, '')
+      )
+    }
+
     showConfirm('정말 수정하시겠습니까?', async () => {
       const res = await apiFetch(`/api/posts/${postId}`, {
         method: 'PUT',
         body: JSON.stringify({
           title,
-          content,
+          content: cleanContent(content),
           images,
           attachments,
           vote: voteEnabled
@@ -352,7 +358,6 @@ export default function EditPostPage() {
           />
 
           {/* 내용 */}
-          {/* 내용 */}
           <label
             style={{
               ...label,
@@ -361,17 +366,11 @@ export default function EditPostPage() {
           >
             내용
           </label>
-          <textarea
-            ref={textareaRef}
+
+          <RichTextEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="내용을 입력하세요"
-            style={{
-              ...textArea,
-              background: darkMode ? '#0b1220' : '#F9FAFB',
-              color: darkMode ? '#e2e8f0' : '#111827',
-              border: darkMode ? '1px solid #334155' : '1px solid #CFD8DC',
-            }}
+            onChange={setContent}
+            darkMode={darkMode}
           />
 
           {/* 이미지 업로드 */}
