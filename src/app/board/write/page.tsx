@@ -792,6 +792,7 @@ const pageWrap = (darkMode: boolean): React.CSSProperties => ({
 })
 
 const card = (darkMode: boolean): React.CSSProperties => ({
+  position: 'relative',
   width: '100%',
   maxWidth: 'min(960px, 92vw)',
   background: darkMode ? '#1e293b' : '#fff',
@@ -1048,8 +1049,8 @@ const centerOkBtn: React.CSSProperties = {
 
 const closeBtn = (darkMode: boolean): React.CSSProperties => ({
   position: 'absolute',
-  top: 60,
-  right: 330,
+  top: 20,
+  right: 16,
   width: 40,
   height: 40,
   borderRadius: '50%',
