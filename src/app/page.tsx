@@ -123,6 +123,21 @@ export default function HomePage() {
     }
   }, [])
 
+  function cleanContent(html: string) {
+    return (
+      html
+        // 빈 style 제거
+        .replace(/\sstyle=""/g, '')
+
+        // 완전 빈 p 제거
+        .replace(/<p>\s*<\/p>/g, '')
+        .replace(/<p>(?:&nbsp;|\s)*<\/p>/g, '')
+
+        // 모든 HTML 태그 제거 (🔥 핵심)
+        .replace(/<[^>]+>/g, '')
+    )
+  }
+
   // 🌙 내정보 등에서 theme-change 발생 시 반영
   useEffect(() => {
     const handleThemeChange = (e: any) => {
@@ -149,17 +164,18 @@ export default function HomePage() {
     const latest = data[0]
 
     // 🔥 이전 알림과 다를 때만 토스트
-    if (
-      latest.id !== prevLatestNotificationIdRef.current &&
-      (latest.type === 'post_commented' || latest.type === 'comment_reply')
-    ) {
-      showToast(
-        latest.type === 'post_commented'
-          ? '💬 내 게시글에 댓글'
-          : '↪️ 내 댓글에 답글',
-        latest.message,
-        latest.type === 'post_commented' ? 'postComment' : 'commentReply',
-      )
+    if (latest.id !== prevLatestNotificationIdRef.current) {
+      if (latest.type === 'post_commented') {
+        showToast('💬 내 게시글에 댓글', latest.message, 'postComment')
+      }
+
+      if (latest.type === 'comment_reply') {
+        showToast('↪️ 내 댓글에 답글', latest.message, 'commentReply')
+      }
+
+      if (latest.type.startsWith('admin_')) {
+        showToast('📢 새로운 공지', latest.message)
+      }
     }
 
     // ⭐ 현재 최신 id 저장
@@ -258,7 +274,12 @@ export default function HomePage() {
     message: string,
     type?: 'chat' | 'postComment' | 'commentReply',
   ) => {
-    const raw = localStorage.getItem('notification_settings')
+    const userRaw = localStorage.getItem('loggedInUser')
+    if (!userRaw) return
+
+    const user = JSON.parse(userRaw)
+    const raw = localStorage.getItem(`notification_settings_${user.id}`)
+
     if (raw) {
       const settings = JSON.parse(raw)
 
@@ -275,7 +296,6 @@ export default function HomePage() {
       setToastList((prev) => prev.filter((t) => t.id !== id))
     }, 4000)
   }
-
   const loadUnreadChatSummary = async () => {
     const token = localStorage.getItem('accessToken')
     if (!token) return
@@ -311,17 +331,6 @@ export default function HomePage() {
     const data = await res.json()
 
     setUnreadNotifyCount(data.unreadCount || 0)
-
-    if (
-      !isFirstLoadRef.current &&
-      data.unreadCount > prevNotifyCountRef.current
-    ) {
-      showToast(
-        '📢 새로운 알림',
-        '새로운 공지/알림이 도착했습니다.',
-        'postComment', // 또는 'commentReply'
-      )
-    }
 
     prevNotifyCountRef.current = data.unreadCount
     isFirstLoadRef.current = false
@@ -1397,7 +1406,7 @@ export default function HomePage() {
                           WebkitBoxOrient: 'vertical',
                         }}
                       >
-                        {p.content}
+                        {cleanContent(p.content)}
                       </p>
 
                       <div
