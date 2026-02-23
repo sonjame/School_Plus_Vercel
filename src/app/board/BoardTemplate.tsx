@@ -15,6 +15,10 @@ interface Post {
   commentCount: number // ✅ 추가
 }
 
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>?/gm, '')
+}
+
 export default function BoardTemplate({
   title,
   category,
@@ -470,7 +474,7 @@ export default function BoardTemplate({
                       overflow: 'hidden',
                     }}
                   >
-                    {p.content}
+                    {stripHtml(p.content)}
                   </p>
 
                   <div
