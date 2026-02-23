@@ -231,27 +231,47 @@ export async function GET(req: Request) {
     if (mapType === 'google') {
       let realUrl = finalUrl
 
+      // 🔥 maps.app.goo.gl 리디렉트 해석
       if (realUrl.includes('maps.app.goo.gl')) {
         realUrl = await resolveGoogleShortUrl(realUrl)
       }
 
-      const placeName = extractPlaceNameFromGoogleUrl(realUrl)
+      // 🔥 place 이름 추출
+      let placeQuery = extractPlaceNameFromGoogleUrl(realUrl)
 
-      if (placeName) {
-        const placeData = await fetchGooglePlaceData(placeName)
-
-        if (placeData) {
-          return NextResponse.json({
-            title: `📍 ${placeData.name}`,
-            description: placeData.address,
-            image: placeData.photo || rawImage, // 🔥 사진 없으면 OG fallback
-            rating: placeData.rating,
-            url: realUrl,
-            type: 'map',
-            provider: 'google',
-          })
-        }
+      // 🔥 추출 실패하면 og:title 사용
+      if (!placeQuery && finalTitle) {
+        placeQuery = finalTitle
       }
+
+      // 🔥 그래도 없으면 URL 전체 사용
+      if (!placeQuery) {
+        placeQuery = realUrl
+      }
+
+      const placeData = await fetchGooglePlaceData(placeQuery)
+
+      if (placeData) {
+        return NextResponse.json({
+          title: `📍 ${placeData.name}`,
+          description: placeData.address,
+          image: placeData.photo || rawImage,
+          rating: placeData.rating,
+          url: realUrl,
+          type: 'map',
+          provider: 'google',
+        })
+      }
+
+      // 🔥 완전 실패 fallback
+      return NextResponse.json({
+        title: '📍 Google 지도',
+        description: '',
+        image: rawImage,
+        url: realUrl,
+        type: 'map',
+        provider: 'google',
+      })
     }
 
     /* =========================
