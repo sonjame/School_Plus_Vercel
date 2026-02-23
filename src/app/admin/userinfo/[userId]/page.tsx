@@ -50,6 +50,21 @@ export default function AdminUserDetailPage() {
 
   const router = useRouter()
 
+  function cleanContent(html: string) {
+    return (
+      html
+        // 빈 style 제거
+        .replace(/\sstyle=""/g, '')
+
+        // 완전 빈 p 제거
+        .replace(/<p>\s*<\/p>/g, '')
+        .replace(/<p>(?:&nbsp;|\s)*<\/p>/g, '')
+
+        // 모든 HTML 태그 제거 (🔥 핵심)
+        .replace(/<[^>]+>/g, '')
+    )
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -139,7 +154,9 @@ export default function AdminUserDetailPage() {
 
               {/* 🔥 게시글 내용 추가 */}
               <div style={{ marginTop: 6, fontSize: 13 }}>
-                {post.is_hidden ? '🚫 블라인드된 게시글입니다.' : post.content}
+                {post.is_hidden
+                  ? '🚫 블라인드된 게시글입니다.'
+                  : cleanContent(post.content)}
               </div>
             </div>
 
@@ -157,7 +174,7 @@ export default function AdminUserDetailPage() {
         {comments.map((comment) => (
           <div key={comment.id} style={listItem}>
             <div>
-              {comment.content}
+              {cleanContent(comment.content)}
               <div style={subText}>
                 {new Date(comment.created_at).toLocaleString()}
               </div>
