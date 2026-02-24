@@ -78,6 +78,7 @@ export async function GET(
     p.likes,
     p.images,
     p.attachments,
+    p.thumbnail, 
     p.is_hidden,
     DATE_FORMAT(
       CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
@@ -202,8 +203,37 @@ export async function PUT(
       content,
       images = [],
       attachments = [],
+      thumbnail = null,
       vote,
     } = await req.json()
+
+    // 🔥 link-preview 호출해서 thumbnail 보강 (PUT용)
+    const baseUrl = new URL(req.url).origin
+
+    const enrichedAttachments = await Promise.all(
+      (attachments ?? []).map(async (a: any) => {
+        if (a.type === 'link') {
+          try {
+            const previewRes = await fetch(
+              `${baseUrl}/api/link-preview?url=${encodeURIComponent(a.url)}`,
+            )
+
+            if (!previewRes.ok) return a
+
+            const preview = await previewRes.json()
+
+            return {
+              ...a,
+              thumbnail: preview.image ?? null,
+            }
+          } catch {
+            return a
+          }
+        }
+
+        return a
+      }),
+    )
 
     /* 🔐 인증 */
     const authHeader = req.headers.get('authorization')
@@ -313,20 +343,55 @@ export async function PUT(
       }
     }
 
+    function convertYoutubeToThumbnail(url: string | null) {
+      if (!url) return null
+
+      const regExp =
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/
+
+      const match = url.match(regExp)
+      const videoId = match?.[1]
+
+      if (!videoId) return url
+
+      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+    }
+
+    // 🔥 대표 썸네일 자동 보정 (PUT용)
+    let finalThumbnail = thumbnail
+
+    // 1️⃣ 유튜브 변환
+    if (finalThumbnail) {
+      finalThumbnail = convertYoutubeToThumbnail(finalThumbnail)
+    }
+
+    // 2️⃣ 대표설정 안 한 경우 자동 선택
+    if (!finalThumbnail) {
+      if (finalImages.length > 0) {
+        finalThumbnail = finalImages[0]
+      } else {
+        const firstAttachmentWithThumb = enrichedAttachments.find(
+          (a: any) => a.thumbnail,
+        )
+        finalThumbnail = firstAttachmentWithThumb?.thumbnail ?? null
+      }
+    }
+
     /* ==============================
        게시글 수정
     ============================== */
     await db.query(
       `
   UPDATE posts
-  SET title = ?, content = ?, images = ?, attachments = ?
+  SET title = ?, content = ?, images = ?, attachments = ?, thumbnail = ?
   WHERE id = ?
   `,
       [
         title,
         content,
         JSON.stringify(finalImages),
-        JSON.stringify(attachments ?? []),
+        JSON.stringify(enrichedAttachments ?? []),
+        finalThumbnail,
         postId,
       ],
     )
