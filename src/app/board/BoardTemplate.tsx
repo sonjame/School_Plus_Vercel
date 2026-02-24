@@ -12,7 +12,15 @@ interface Post {
   author: string
   likes: number
   created_at: string
-  commentCount: number // ✅ 추가
+  commentCount: number
+  images?: string[] // 🔥 추가
+  image?: string // 🔥 단일 이미지 대비
+  thumbnail?: string
+  attachments?: {
+    type: 'link' | 'video'
+    url: string
+    thumbnail?: string
+  }[]
 }
 
 function stripHtml(html: string) {
@@ -42,6 +50,18 @@ export default function BoardTemplate({
   const getCommentCount = (id: string) => {
     const data = JSON.parse(localStorage.getItem(`comments_${id}`) || '[]')
     return data.length
+  }
+
+  const getYoutubeThumbnail = (url: string) => {
+    const regExp =
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&?/]+)/
+
+    const match = url.match(regExp)
+    const videoId = match ? match[1] : null
+
+    return videoId
+      ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+      : null
   }
 
   const parseDate = (value: string) => {
@@ -85,6 +105,10 @@ export default function BoardTemplate({
     }
 
     return false // ✅ 정상
+  }
+
+  const isVideo = (url: string) => {
+    return /\.(mp4|webm|ogg|mov)$/i.test(url)
   }
 
   const [darkMode, setDarkMode] = useState(false)
@@ -435,7 +459,51 @@ export default function BoardTemplate({
         ) : (
           sorted.map((p) => {
             const authorName = p.author
+            let thumbnail: string | null = null
 
+            // 0️⃣ 대표 썸네일 최우선
+            if (p.thumbnail) {
+              thumbnail = p.thumbnail
+            }
+
+            // 1️⃣ 이미지 우선
+            if (!thumbnail && p.images && p.images.length > 0) {
+              thumbnail = p.images[0]
+            } else if (!thumbnail && p.image) {
+              thumbnail = p.image
+            }
+
+            // 2️⃣ 이미지 없으면 attachments 확인
+
+            if (!thumbnail && p.attachments) {
+              // 1️⃣ link 중 대표 썸네일 먼저 찾기
+              const linkAttachment = p.attachments.find(
+                (a) => a.type === 'link' && a.thumbnail,
+              )
+
+              if (linkAttachment?.thumbnail) {
+                thumbnail = linkAttachment.thumbnail
+              }
+
+              // 2️⃣ 그 다음 video 처리
+              if (!thumbnail) {
+                const videoAttachment = p.attachments.find(
+                  (a) => a.type === 'video',
+                )
+
+                if (videoAttachment) {
+                  const url = videoAttachment.url
+
+                  if (url.includes('youtube') || url.includes('youtu.be')) {
+                    thumbnail = getYoutubeThumbnail(url)
+                  } else if (videoAttachment.thumbnail) {
+                    thumbnail = videoAttachment.thumbnail
+                  } else if (isVideo(url)) {
+                    thumbnail = url
+                  }
+                }
+              }
+            }
             return (
               <Link
                 key={p.id}
@@ -452,21 +520,105 @@ export default function BoardTemplate({
                     padding: 16,
                     marginBottom: 14,
                     cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column', // ⭐ 핵심
+                    gap: 8,
                   }}
                 >
+                  {/* 🔥 제목 */}
                   <h3
                     style={{
                       fontSize: 20,
                       fontWeight: 600,
                       color: darkMode ? '#f1f5f9' : '#111827',
+                      margin: 0,
                     }}
                   >
                     {p.title}
                   </h3>
 
+                  {/* 🔥 썸네일 (제목 아래) */}
+                  {thumbnail &&
+                    (isVideo(thumbnail) ? (
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          aspectRatio: '16 / 9',
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          background: '#000',
+                        }}
+                      >
+                        <video
+                          src={thumbnail}
+                          muted
+                          preload="metadata"
+                          playsInline
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 42,
+                            color: 'white',
+                          }}
+                        >
+                          ▶
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          maxWidth: isMobile ? '100%' : '250px', // 🔥 핵심
+                          margin: isMobile ? '0' : '0 auto 0 0', // 🔥 PC에서는 가운데 정렬
+                          aspectRatio: '16 / 9',
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <img
+                          src={thumbnail}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+
+                        {/* 유튜브 오버레이 */}
+                        {thumbnail.includes('img.youtube.com') && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 42,
+                              color: 'white',
+                              textShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                            }}
+                          >
+                            ▶
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  {/* 🔥 내용 */}
                   <p
                     style={{
-                      marginTop: 6,
+                      marginTop: 4,
                       color: darkMode ? '#94a3b8' : '#666',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -477,9 +629,10 @@ export default function BoardTemplate({
                     {stripHtml(p.content)}
                   </p>
 
+                  {/* 🔥 하단 정보 */}
                   <div
                     style={{
-                      marginTop: 10,
+                      marginTop: 6,
                       display: 'flex',
                       justifyContent: 'space-between',
                       fontSize: 13,
