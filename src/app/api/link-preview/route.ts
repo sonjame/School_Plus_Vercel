@@ -213,7 +213,10 @@ export async function GET(req: Request) {
       $('meta[name="description"]').attr('content') ??
       ''
 
-    const rawImage = $('meta[property="og:image"]').attr('content') ?? null
+    let rawImage =
+      $('meta[property="og:image"]').attr('content') ??
+      $('meta[name="twitter:image"]').attr('content') ??
+      null
 
     const title = rawTitle ? he.decode(rawTitle) : ''
     const description = rawDescription ? he.decode(rawDescription) : ''
@@ -230,6 +233,15 @@ export async function GET(req: Request) {
     ========================= */
     if (mapType === 'google') {
       let realUrl = finalUrl
+
+      // 🔥 상대경로 → 절대경로 변환
+      if (rawImage) {
+        try {
+          rawImage = new URL(rawImage, finalUrl).href
+        } catch {
+          rawImage = null
+        }
+      }
 
       // 🔥 maps.app.goo.gl 리디렉트 해석
       if (realUrl.includes('maps.app.goo.gl')) {
