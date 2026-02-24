@@ -14,6 +14,18 @@ export default function EditPostPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  function convertYoutubeToThumbnail(url: string) {
+    const regExp =
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/
+
+    const match = url.match(regExp)
+    const videoId = match?.[1]
+
+    if (!videoId) return null
+
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+  }
+
   const boardKeys = [
     'board_free',
     'board_promo',
@@ -23,7 +35,6 @@ export default function EditPostPage() {
     'board_grade3',
   ]
 
-  const [storageKey, setStorageKey] = useState<string>('')
   const [post, setPost] = useState<any>(null)
 
   const [title, setTitle] = useState('')
@@ -31,13 +42,16 @@ export default function EditPostPage() {
   const [images, setImages] = useState<string[]>([])
   /* 🔥 첨부 링크/영상 수정 */
   const [attachments, setAttachments] = useState<
-    { type: 'link' | 'video'; url: string }[]
+    { type: 'link' | 'video'; url: string; thumbnail?: string }[]
   >([])
 
   /* 🔥 투표 수정 상태 */
   const [voteEnabled, setVoteEnabled] = useState(false)
   const [voteOptions, setVoteOptions] = useState<string[]>([])
   const [voteEndAt, setVoteEndAt] = useState<string>('') // yyyy-mm-ddTHH:mm
+
+  //대표 썸네일 수정
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
 
   /* 모달 상태 */
   const [modal, setModal] = useState({
@@ -141,6 +155,7 @@ export default function EditPostPage() {
       setContent(data.content)
       setImages(Array.isArray(data.images) ? data.images : [])
       setAttachments(Array.isArray(data.attachments) ? data.attachments : [])
+      setThumbnail(data.thumbnail ?? null)
 
       /* 🔥 기존 투표 데이터 복원 */
       if (data.vote?.enabled) {
@@ -213,7 +228,6 @@ export default function EditPostPage() {
       return
     }
 
-
     function cleanContent(html: string) {
       return (
         html
@@ -237,6 +251,7 @@ export default function EditPostPage() {
           content: cleanContent(content),
           images,
           attachments,
+          thumbnail,
           vote: voteEnabled
             ? {
                 enabled: true,
@@ -399,32 +414,167 @@ export default function EditPostPage() {
           </label>
 
           {images.length > 0 && (
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {images.map((url, idx) => (
-                <div key={idx} style={{ position: 'relative' }}>
-                  <img
-                    src={url}
-                    style={{
-                      width: 120,
-                      height: 120,
-                      objectFit: 'cover',
-                      borderRadius: 12,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    }}
-                  />
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                flexWrap: 'wrap',
+                marginBottom: 40, // 🔥 이미지 아래 여백
+              }}
+            >
+              {images.map((url, idx) => {
+                const isSelected = thumbnail === url
 
-                  {/* 삭제 버튼 */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setImages((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    style={deleteBtn}
+                return (
+                  <div key={idx} style={{ position: 'relative' }}>
+                    <img
+                      src={url}
+                      style={{
+                        width: 120,
+                        height: 120,
+                        objectFit: 'cover',
+                        borderRadius: 12,
+                        border: isSelected
+                          ? '3px solid #4FC3F7'
+                          : '1px solid #ddd',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setThumbnail(url)}
+                    />
+
+                    {/* 🔥 대표 설정 버튼 */}
+                    <button
+                      onClick={() => setThumbnail(url)}
+                      style={{
+                        position: 'absolute',
+                        bottom: -30,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: isSelected ? '#4FC3F7' : 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '4px 10px',
+                        fontSize: 10,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isSelected ? '대표' : '대표 설정'}
+                    </button>
+
+                    {/* 삭제 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImages((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      style={deleteBtn}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div style={{ marginBottom: 40 }}>
+              {attachments.map((a, idx) => {
+                const thumb =
+                  a.thumbnail ||
+                  (a.type === 'video' ? convertYoutubeToThumbnail(a.url) : null)
+
+                const isSelected = thumbnail === thumb
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      position: 'relative',
+                      padding: '14px', // 🔥 아래 공간 확보
+                      border: isSelected
+                        ? '2px solid #4FC3F7'
+                        : darkMode
+                          ? '1px solid #334155'
+                          : '1px solid #CFD8DC',
+                      borderRadius: 10,
+                      marginBottom: 16,
+                    }}
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 6,
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <span>{a.type === 'video' ? '🎬' : '🔗'}</span>
+
+                      <span
+                        style={{
+                          flex: 1,
+                          wordBreak: 'break-all',
+                          overflowWrap: 'anywhere',
+                          fontSize: 14,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {a.url}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: 'flex',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          const thumb =
+                            a.thumbnail ||
+                            (a.type === 'video'
+                              ? convertYoutubeToThumbnail(a.url)
+                              : null)
+
+                          setThumbnail(thumb)
+                        }}
+                        style={{
+                          background: isSelected ? '#4FC3F7' : '#90A4AE',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '6px 14px',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isSelected ? '대표 설정됨' : '대표 설정'}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
 
