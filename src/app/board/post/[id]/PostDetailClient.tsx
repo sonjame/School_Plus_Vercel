@@ -11,11 +11,11 @@ export default function PostDetailPage() {
   const router = useRouter()
 
   const [post, setPost] = useState<any>(null)
-  const [storageKey, setStorageKey] = useState<string>('')
+  const [storageKey] = useState<string>('')
 
   const [comments, setComments] = useState<any[]>([])
   const [username, setUsername] = useState<string>('')
-  const [myName, setMyName] = useState<string>('') // 실명 저장
+  const [setMyName] = useState<string>('') // 실명 저장
 
   const [commentValue, setCommentValue] = useState('')
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
