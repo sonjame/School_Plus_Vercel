@@ -7,6 +7,7 @@ import {
   S3Client,
   CopyObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3'
 
 /* =========================
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
   p.category,
   p.images,
   p.attachments,
+  p.thumbnail,
   CASE
     WHEN u.level = 'admin' THEN '관리자'
     ELSE u.name
@@ -207,8 +209,37 @@ export async function POST(req: Request) {
       category,
       images = [],
       attachments = [],
+      thumbnail = null, // 🔥 추가
       vote,
     } = await req.json()
+
+    // 🔥 link-preview 호출해서 thumbnail 보강
+    const baseUrl = new URL(req.url).origin
+
+    const enrichedAttachments = await Promise.all(
+      (attachments ?? []).map(async (a: any) => {
+        if (a.type === 'link') {
+          try {
+            const previewRes = await fetch(
+              `${baseUrl}/api/link-preview?url=${encodeURIComponent(a.url)}`,
+            )
+
+            if (!previewRes.ok) return a
+
+            const preview = await previewRes.json()
+
+            return {
+              ...a,
+              thumbnail: preview.image ?? null,
+            }
+          } catch {
+            return a
+          }
+        }
+
+        return a
+      }),
+    )
 
     if (!title || !content || !category) {
       return NextResponse.json({ message: '필수 값 누락' }, { status: 400 })
@@ -221,9 +252,27 @@ export async function POST(req: Request) {
     ============================== */
     const finalImages: string[] = []
 
+    const bucketUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/`
+
     for (const url of images) {
-      if (url.includes('/temp/')) {
-        const key = url.split('.amazonaws.com/')[1]
+      // 🔥 temp 폴더 정확히 체크
+      if (url.startsWith(bucketUrl + 'temp/')) {
+        const key = url.replace(bucketUrl, '')
+
+        // 🔥 존재 확인 (없으면 그냥 통과)
+        try {
+          await s3.send(
+            new HeadObjectCommand({
+              Bucket: process.env.AWS_S3_BUCKET!,
+              Key: key,
+            }),
+          )
+        } catch {
+          // 이미 이동되었거나 존재 안함
+          finalImages.push(url)
+          continue
+        }
+
         const fileName = key.split('/').pop()
         const newKey = `posts/${postId}/${fileName}`
 
@@ -242,9 +291,7 @@ export async function POST(req: Request) {
           }),
         )
 
-        finalImages.push(
-          `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${newKey}`,
-        )
+        finalImages.push(`${bucketUrl}${newKey}`)
       } else {
         finalImages.push(url)
       }
@@ -254,6 +301,23 @@ export async function POST(req: Request) {
        게시글 INSERT
     ============================== */
     const authorName = decoded.level === 'admin' ? '관리자' : decoded.name
+
+    // 🔥 대표 썸네일 자동 보정
+    let finalThumbnail = thumbnail
+
+    if (!finalThumbnail) {
+      // 1️⃣ 이미지 있으면 첫 이미지 사용
+      if (finalImages.length > 0) {
+        finalThumbnail = finalImages[0]
+      }
+      // 2️⃣ 링크 썸네일 있으면 첫 링크 썸네일 사용
+      else {
+        const firstAttachmentWithThumb = enrichedAttachments.find(
+          (a: any) => a.thumbnail,
+        )
+        finalThumbnail = firstAttachmentWithThumb?.thumbnail ?? null
+      }
+    }
 
     await db.query(
       `
@@ -265,11 +329,12 @@ export async function POST(req: Request) {
     content,
     images,
     attachments,
+    thumbnail,
     likes,
     school_code,
     author
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
       [
         postId,
@@ -278,7 +343,9 @@ export async function POST(req: Request) {
         title,
         content,
         JSON.stringify(finalImages),
-        JSON.stringify(attachments ?? []),
+        JSON.stringify(enrichedAttachments ?? []),
+        finalThumbnail,
+        0,
         schoolCode,
         authorName,
       ],
