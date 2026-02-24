@@ -28,9 +28,12 @@ export default function WritePage() {
   const [viewerImage, setViewerImage] = useState<string | null>(null)
   const [viewerIndex, setViewerIndex] = useState<number>(0)
 
+  //썸네일 설정
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
+
   //URL / 영상 링크 추가
   const [attachments, setAttachments] = useState<
-    { type: 'link' | 'video'; url: string }[]
+    { type: 'link' | 'video'; url: string; thumbnail?: string }[]
   >([])
 
   /* 모달 */
@@ -200,6 +203,20 @@ export default function WritePage() {
 
   /* 글 작성 */
 
+  const fetchPreview = async (url: string) => {
+    try {
+      const res = await fetch(
+        `/api/link-preview?url=${encodeURIComponent(url)}`,
+      )
+
+      if (!res.ok) return null
+
+      return await res.json()
+    } catch {
+      return null
+    }
+  }
+
   const submit = async () => {
     if (!title.trim() || !content.trim()) {
       showAlert('제목과 내용을 모두 입력해주세요.')
@@ -240,6 +257,7 @@ export default function WritePage() {
         category,
         images,
         attachments,
+        thumbnail,
         vote: voteEnabled
           ? {
               enabled: true,
@@ -507,7 +525,7 @@ export default function WritePage() {
           <input
             placeholder="https:// (Enter를 누르면 추가)"
             style={inputBox(darkMode)}
-            onKeyDown={(e) => {
+            onKeyDown={async (e) => {
               if (e.key !== 'Enter') return
 
               const input = e.currentTarget
@@ -517,11 +535,31 @@ export default function WritePage() {
               const isVideo =
                 url.includes('youtube.com') || url.includes('youtu.be')
 
+              let previewThumbnail: string | undefined = undefined
+
+              // 🔥 유튜브가 아닌 일반 링크면 link-preview 호출
+              if (isVideo) {
+                const regExp =
+                  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/
+                const match = url.match(regExp)
+                const videoId = match?.[1]
+
+                if (videoId) {
+                  previewThumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                }
+              } else {
+                const preview = await fetchPreview(url)
+                if (preview?.image) {
+                  previewThumbnail = preview.image
+                }
+              }
+
               setAttachments((prev) => [
                 ...prev,
                 {
                   type: isVideo ? 'video' : 'link',
                   url,
+                  thumbnail: previewThumbnail, // 🔥 핵심 추가
                 },
               ])
 
@@ -535,32 +573,52 @@ export default function WritePage() {
                 <div
                   key={idx}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    position: 'relative',
                     padding: '10px 14px',
                     border: darkMode
                       ? '1px solid #334155'
                       : '1px solid #CFD8DC',
-                    background: darkMode ? '#0f172a' : '#fff',
-                    color: darkMode ? '#f1f5f9' : '#111827',
                     borderRadius: 10,
                     marginBottom: 6,
                   }}
                 >
-                  <span style={{ fontSize: 14 }}>
+                  <span>
                     {a.type === 'video' ? '🎬 영상' : '🔗 링크'} · {a.url}
                   </span>
+
+                  {/* 🔥 대표 설정 버튼 */}
+                  <button
+                    onClick={() => setThumbnail(a.thumbnail ?? null)}
+                    style={{
+                      position: 'absolute',
+                      right: 50,
+                      top: 8,
+                      background:
+                        thumbnail === (a.thumbnail ?? null)
+                          ? '#4FC3F7'
+                          : 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {thumbnail === (a.thumbnail ?? null) ? '대표' : '대표 설정'}
+                  </button>
 
                   <button
                     onClick={() =>
                       setAttachments((prev) => prev.filter((_, i) => i !== idx))
                     }
                     style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: 8,
                       border: 'none',
                       background: 'transparent',
                       cursor: 'pointer',
-                      fontSize: 16,
                     }}
                   >
                     ✕
@@ -583,13 +641,37 @@ export default function WritePage() {
                 <div key={idx} style={previewBox}>
                   <img
                     src={src}
-                    style={{ ...previewImg, cursor: 'zoom-in' }}
+                    style={{
+                      ...previewImg,
+                      cursor: 'zoom-in',
+                      border: thumbnail === src ? '3px solid #4FC3F7' : 'none', // 🔥 선택 표시
+                    }}
                     onClick={() => {
                       setViewerIndex(idx)
                       setViewerImage(src)
                       setViewerOpen(true)
                     }}
                   />
+
+                  {/* 🔥 대표 썸네일 버튼 */}
+                  <button
+                    onClick={() => setThumbnail(src)}
+                    style={{
+                      position: 'absolute',
+                      bottom: 6,
+                      left: 6,
+                      background:
+                        thumbnail === src ? '#4FC3F7' : 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {thumbnail === src ? '대표' : '대표 설정'}
+                  </button>
 
                   <button
                     style={deleteBtn}
