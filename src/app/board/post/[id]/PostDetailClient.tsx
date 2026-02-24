@@ -15,7 +15,7 @@ export default function PostDetailPage() {
 
   const [comments, setComments] = useState<any[]>([])
   const [username, setUsername] = useState<string>('')
-  const [setMyName] = useState<string>('') // 실명 저장
+  const [myName, setMyName] = useState<string>('') // 실명 저장
 
   const [commentValue, setCommentValue] = useState('')
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
