@@ -1,5 +1,3 @@
-// app/board/post/[id]/opengraph-image.tsx
-
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
@@ -45,6 +43,49 @@ export default async function Image({
 
   const post = await res.json()
 
+  let youtubeThumb: string | null = null
+
+  if (Array.isArray(post.attachments)) {
+    const youtube = post.attachments.find((a: any) => a.type === 'video')
+
+    if (youtube?.url) {
+      const videoId = youtube.url.includes('youtu.be')
+        ? youtube.url.split('youtu.be/')[1]
+        : youtube.url.split('v=')[1]?.split('&')[0]
+
+      if (videoId) {
+        youtubeThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+      }
+    }
+  }
+
+  // 🔥 유튜브가 있으면 중앙 배치
+  if (youtubeThumb) {
+    return new ImageResponse(
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'black',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img
+          src={youtubeThumb}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain', // 🔥 핵심: 잘림 방지
+          }}
+        />
+      </div>,
+      size,
+    )
+  }
+
+  // 🔥 기본 제목 카드
   return new ImageResponse(
     <div
       style={{
@@ -52,7 +93,6 @@ export default async function Image({
         height: '100%',
         background: 'linear-gradient(135deg, #4FC3F7, #0288D1)',
         display: 'flex',
-        flexDirection: 'column', // 🔥 핵심 추가
         alignItems: 'center',
         justifyContent: 'center',
         padding: 80,
@@ -61,14 +101,11 @@ export default async function Image({
         fontFamily: 'sans-serif',
       }}
     >
-      {/* 제목 */}
       <div
         style={{
           fontSize: 72,
           fontWeight: 800,
-          lineHeight: 1.2,
           maxWidth: 1000,
-          wordBreak: 'break-word',
         }}
       >
         {post.title}
