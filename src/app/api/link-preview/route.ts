@@ -212,12 +212,14 @@ export async function GET(req: Request) {
     const finalUrl = request?.res?.responseUrl || url
 
     let resolvedUrl = finalUrl
-    const mapType = detectMapType(resolvedUrl)
 
-    // 🔥 Google 단축 URL 먼저 해석
+    // 🔥 1️⃣ 단축 URL 먼저 해석
     if (resolvedUrl.includes('maps.app.goo.gl')) {
       resolvedUrl = await resolveGoogleShortUrl(resolvedUrl)
     }
+
+    // 🔥 2️⃣ 그 다음 mapType 판단
+    const mapType = detectMapType(resolvedUrl)
 
     let googlePlaceData = null
 
