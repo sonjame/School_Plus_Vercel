@@ -211,6 +211,19 @@ function LinkPreview({ url, isMe }: { url: string; isMe?: boolean }) {
             {isMap ? mapTitle : preview?.title || url}
           </div>
 
+          {isMap && preview?.rating && (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#f59e0b',
+                marginBottom: 6,
+              }}
+            >
+              ⭐ {preview.rating}
+            </div>
+          )}
+
           {isMap
             ? mapAddress && (
                 <div
