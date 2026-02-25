@@ -69,6 +69,16 @@ export default function HomePage() {
   const [unreadNotifyCount, setUnreadNotifyCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
 
+  // 📢 관리자 공지 모달
+  const [adminNoticeModal, setAdminNoticeModal] = useState<{
+    id: number
+    title: string
+    message: string
+    link: string
+  } | null>(null)
+
+  const [dontShowAgain, setDontShowAgain] = useState(false)
+
   const [banInfo, setBanInfo] = useState<{
     reason: string
     remainHours?: number
@@ -163,7 +173,7 @@ export default function HomePage() {
 
     const latest = data[0]
 
-    // 🔥 이전 알림과 다를 때만 토스트
+    // 🔔 일반 알림은 id 변경 시에만 토스트
     if (latest.id !== prevLatestNotificationIdRef.current) {
       if (latest.type === 'post_commented') {
         showToast('💬 내 게시글에 댓글', latest.message, 'postComment')
@@ -172,13 +182,23 @@ export default function HomePage() {
       if (latest.type === 'comment_reply') {
         showToast('↪️ 내 댓글에 답글', latest.message, 'commentReply')
       }
+    }
 
-      if (latest.type.startsWith('admin_')) {
-        showToast('📢 새로운 공지', latest.message)
+    // 📢 관리자 공지는 id 비교와 상관없이 항상 체크
+    if (latest.type.startsWith('admin_')) {
+      const hidden = localStorage.getItem(`admin_notice_hidden_${latest.id}`)
+
+      if (!hidden && !adminNoticeModal) {
+        setAdminNoticeModal({
+          id: latest.id,
+          title: latest.title,
+          message: latest.message,
+          link: latest.link,
+        })
       }
     }
 
-    // ⭐ 현재 최신 id 저장
+    // ⭐ 마지막에 id 저장
     prevLatestNotificationIdRef.current = latest.id
   }
 
@@ -629,6 +649,124 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* 📢 관리자 공지 모달 */}
+      {adminNoticeModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+        >
+          <div
+            style={{
+              width: '90%',
+              maxWidth: '460px',
+              background: themeSetting.darkMode ? '#1e293b' : '#fff',
+              color: themeSetting.darkMode ? '#f9fafb' : '#111827',
+              borderRadius: '16px',
+              padding: '24px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            }}
+          >
+            {adminNoticeModal.title !== '관리자 공지사항' && (
+              <h3
+                style={{
+                  fontSize: 25,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: '#4FC3F7',
+                }}
+              >
+                {adminNoticeModal.title}
+              </h3>
+            )}
+            <div
+              style={{
+                fontSize: 20,
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+              dangerouslySetInnerHTML={{
+                __html: adminNoticeModal.message || '',
+              }}
+            />
+
+            {/* 더이상 보지 않기 */}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 13,
+                marginBottom: 16,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+              />
+              더 이상 보지 않기
+            </label>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              {/* 게시글 이동 */}
+              <button
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#4FC3F7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  window.location.href = adminNoticeModal.link
+                }}
+              >
+                게시글로 이동
+              </button>
+
+              {/* 확인 */}
+              <button
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#94a3b8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  if (dontShowAgain) {
+                    localStorage.setItem(
+                      `admin_notice_hidden_${adminNoticeModal.id}`,
+                      'true',
+                    )
+                  }
+
+                  setAdminNoticeModal(null)
+                  setDontShowAgain(false)
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🚫 계정 정지 모달 */}
       {banInfo && !isLoggingOut && (
         <div
@@ -928,7 +1066,17 @@ export default function HomePage() {
                           ✕
                         </button>
 
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        <div
+                          style={{
+                            fontSize: n.type.startsWith('admin_') ? 16 : 13,
+                            fontWeight: n.type.startsWith('admin_') ? 700 : 600,
+                            color: n.type.startsWith('admin_')
+                              ? '#4FC3F7'
+                              : themeSetting.darkMode
+                                ? '#e5e7eb'
+                                : '#111827',
+                          }}
+                        >
                           {n.type === 'post_commented'}
                           {n.type === 'comment_reply'}
                           {n.type.startsWith('admin_') && '📢 '}
