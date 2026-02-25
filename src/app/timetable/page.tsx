@@ -133,6 +133,14 @@ export default function TimetablePage() {
 
   const CURRENT_YEAR = new Date().getFullYear()
 
+  //채팅방에 URL 보내기
+  const [shareOpen, setShareOpen] = useState(false)
+  const [myRooms, setMyRooms] = useState<any[]>([])
+
+  // 🔥 새 채팅방 만들기
+  const [friendOpen, setFriendOpen] = useState(false)
+  const [friends, setFriends] = useState<any[]>([])
+
   const YEARS = Array.from(
     { length: 3 + 1 + 1 }, // 과거3 + 현재1 + 미래1
     (_, i) => CURRENT_YEAR - 3 + i,
@@ -265,6 +273,85 @@ export default function TimetablePage() {
     return `${window.location.origin}/timetable?data=${encoded}`
   }
 
+  const openShareToChat = async () => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return alert('로그인이 필요합니다.')
+
+    const res = await apiFetch('/api/chat/rooms')
+
+    if (!res.ok) {
+      alert('채팅방을 불러오지 못했습니다.')
+      return
+    }
+
+    const data = await res.json()
+    setMyRooms(data)
+    setShareOpen(true)
+  }
+
+  const sendTimetableToRoom = async (roomId: number) => {
+    const url = getShareURL()
+
+    // 1️⃣ 제목 메시지
+    await apiFetch('/api/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        roomId,
+        type: 'text',
+        content: `🕑 ${term.year}년 ${term.semester} 시간표`,
+      }),
+    })
+
+    // 2️⃣ URL 메시지 (🔥 URL만 보내야 함)
+    const res = await apiFetch('/api/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        roomId,
+        type: 'url',
+        content: url,
+      }),
+    })
+
+    if (!res.ok) {
+      alert('전송 실패')
+      return
+    }
+
+    setShareOpen(false)
+    alert('채팅방에 전송되었습니다!')
+  }
+
+  const createRoomAndSend = async (friendId: number) => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return alert('로그인이 필요합니다.')
+
+    // 1️⃣ 방 생성
+    const createRes = await fetch('/api/chat/create-room', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        isGroup: false,
+        userIds: [friendId],
+      }),
+    })
+
+    if (!createRes.ok) {
+      const err = await createRes.json()
+      alert(err.message || '채팅방 생성 실패')
+      return
+    }
+
+    const { roomId } = await createRes.json()
+
+    // 2️⃣ 시간표 전송
+    await sendTimetableToRoom(roomId)
+
+    setFriendOpen(false)
+  }
+
   /* ----------------- 캡처 함수 ----------------- */
   const captureImage = async () => {
     if (!tableRef.current) return null
@@ -304,15 +391,20 @@ export default function TimetablePage() {
   /* ----------------- URL 공유 ----------------- */
   const shareURL = async () => {
     const url = getShareURL()
+
     try {
-      await navigator.share({
-        title: '내 시간표',
-        text: '시간표입니다!',
-        url,
-      })
-    } catch {
-      navigator.clipboard.writeText(url)
-      alert('공유 미지원 환경입니다. URL 복사 완료!')
+      if (navigator.share) {
+        await navigator.share({
+          title: `🕑 ${term.year}년 ${term.semester} 시간표`,
+          text: '내 시간표를 공유합니다!',
+          url,
+        })
+      } else {
+        await navigator.clipboard.writeText(url)
+        alert('공유 미지원 환경입니다. URL 복사 완료!')
+      }
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -321,12 +413,8 @@ export default function TimetablePage() {
     const canvas = await captureImage()
     if (!canvas) return alert('캡처 실패')
 
-    const link = document.createElement('a')
-    link.download = 'timetable.png'
-    link.href = canvas.toDataURL()
-    link.click()
-
     const url = getShareURL()
+
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((b) => resolve(b), 'image/png'),
     )
@@ -334,20 +422,23 @@ export default function TimetablePage() {
 
     const file = new File([blob], 'timetable.png', { type: 'image/png' })
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: '내 시간표',
-          text: '시간표입니다!',
+          title: `🕑 ${term.year}년 ${term.semester} 시간표`,
+          text: '내 시간표입니다!',
           url,
           files: [file],
         })
         return
-      } catch {}
-    }
+      }
 
-    navigator.clipboard.writeText(url)
-    alert('공유 미지원 환경입니다. URL 복사 완료!')
+      // 파일 공유 미지원 환경
+      await navigator.clipboard.writeText(url)
+      alert('공유 미지원 환경입니다. URL 복사 완료!')
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   /* ----------------- 셀 수정 ----------------- */
@@ -798,6 +889,16 @@ export default function TimetablePage() {
               </button>
 
               <button
+                style={btn('#4FC3F7')}
+                onClick={() => {
+                  setExportOpen(false)
+                  openShareToChat()
+                }}
+              >
+                💬 채팅방으로 보내기
+              </button>
+
+              <button
                 style={btn('#FFB74D')}
                 onClick={() => {
                   saveImageAndShare()
@@ -807,6 +908,100 @@ export default function TimetablePage() {
                 📸 + 🔗 이미지 저장 & 공유
               </button>
             </Modal>
+          )}
+
+          {shareOpen && (
+            <div style={shareOverlay}>
+              <div style={shareBox}>
+                <h3 style={shareTitle}>📨 공유할 채팅방 선택</h3>
+
+                {myRooms.length === 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    참여 중인 채팅방이 없습니다.
+                  </div>
+                )}
+
+                {myRooms.map((room) => (
+                  <button
+                    key={room.id}
+                    style={shareRoomBtn}
+                    onClick={() => sendTimetableToRoom(room.id)}
+                  >
+                    {room.name || `채팅방 ${room.id}`}
+                  </button>
+                ))}
+
+                {/* 🔥 새 채팅방 만들기 버튼 */}
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    marginTop: 10,
+                    borderRadius: 10,
+                    border: '1px dashed #4FC3F7',
+                    background: 'transparent',
+                    color: '#4FC3F7',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onClick={async () => {
+                    setShareOpen(false)
+
+                    const token = localStorage.getItem('accessToken')
+                    const friendRes = await fetch('/api/friends', {
+                      headers: { Authorization: `Bearer ${token}` },
+                    })
+
+                    if (!friendRes.ok) {
+                      alert('친구 목록을 불러오지 못했습니다.')
+                      return
+                    }
+
+                    const friendData = await friendRes.json()
+                    setFriends(friendData)
+                    setFriendOpen(true)
+                  }}
+                >
+                  ＋ 새 채팅방 만들기
+                </button>
+
+                <button
+                  style={shareCloseBtn}
+                  onClick={() => setShareOpen(false)}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
+
+          {friendOpen && (
+            <div style={shareOverlay}>
+              <div style={shareBox}>
+                <h3 style={shareTitle}>👥 친구 선택</h3>
+
+                {friends.length === 0 && (
+                  <div style={{ marginBottom: 12 }}>친구가 없습니다.</div>
+                )}
+
+                {friends.map((f) => (
+                  <button
+                    key={f.id}
+                    style={shareRoomBtn}
+                    onClick={() => createRoomAndSend(f.id)}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+
+                <button
+                  style={shareCloseBtn}
+                  onClick={() => setFriendOpen(false)}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
           )}
 
           {/* ----------------- 수업 추가 모달 ----------------- */}
@@ -1640,3 +1835,49 @@ const smallBtn = (color: string): React.CSSProperties => ({
   width: 'fit-content',
   marginLeft: 'auto',
 })
+
+const shareOverlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.35)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 9999,
+}
+
+const shareBox: React.CSSProperties = {
+  background: '#ffffff',
+  borderRadius: 16,
+  padding: '24px 20px',
+  width: 'min(90vw, 360px)',
+  textAlign: 'center',
+  boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+}
+
+const shareTitle: React.CSSProperties = {
+  fontSize: 20,
+  fontWeight: 700,
+  marginBottom: 16,
+}
+
+const shareRoomBtn: React.CSSProperties = {
+  width: '100%',
+  padding: '12px',
+  marginBottom: 10,
+  borderRadius: 10,
+  border: '1px solid #ddd',
+  background: '#f2f2f2',
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+const shareCloseBtn: React.CSSProperties = {
+  marginTop: 10,
+  padding: '8px 18px',
+  borderRadius: 8,
+  border: 'none',
+  background: '#dcdcdc',
+  cursor: 'pointer',
+  fontWeight: 600,
+}
