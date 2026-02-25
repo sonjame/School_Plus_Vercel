@@ -16,6 +16,7 @@ type ChatRoom = {
   isGroup: boolean
   lastMessage?: string
   unreadCount?: number
+  participants?: UserSummary[]
 }
 
 type ChatMessage = {
@@ -64,6 +65,27 @@ type Friend = {
   username: string
   profileImageUrl?: string | null
   gradeLabel?: string
+}
+function getRoomDisplayName(
+  room: ChatRoom,
+  currentUserId?: number,
+  participants?: UserSummary[],
+) {
+  if (!participants || participants.length === 0) {
+    return room.name
+  }
+
+  if (!room.isGroup) {
+    const other = participants.find((p) => p.id !== currentUserId)
+    return other?.name ?? '1:1 채팅'
+  }
+
+  const owner = participants.find((p) => p.isOwner)
+  const others = participants.length - 1
+
+  if (!owner) return room.name
+
+  return others > 0 ? `${owner.name} 외에 ${others}명` : owner.name
 }
 
 // 한국 시간
@@ -1438,7 +1460,11 @@ export default function ChatPage() {
                           gap: 6,
                         }}
                       >
-                        {room.name}
+                        {getRoomDisplayName(
+                          room,
+                          currentUser?.id,
+                          room.participants,
+                        )}
 
                         {Number(room.unreadCount) > 0 && (
                           <span
