@@ -40,6 +40,14 @@ export default function PostDetailPage() {
 
   const [openCommentMenu, setOpenCommentMenu] = useState<string | null>(null)
 
+  //채팅창에 URL 바로 보내기
+  const [shareOpen, setShareOpen] = useState(false)
+  const [myRooms, setMyRooms] = useState<any[]>([])
+
+  //채팅창에 방없을때 방을 만들기
+  const [friendOpen, setFriendOpen] = useState(false)
+  const [friends, setFriends] = useState<any[]>([])
+
   /* 🔒 댓글 작성 권한 (학년별) */
   const myGrade =
     typeof window !== 'undefined' ? localStorage.getItem('userGrade') : null
@@ -506,10 +514,103 @@ export default function PostDetailPage() {
     setScrapped(data.scrapped)
   }
 
-  const copyLink = () => {
+  const copyLink = async () => {
     const url = window.location.href
-    navigator.clipboard.writeText(url)
-    showAlert('링크가 복사되었습니다!')
+
+    try {
+      // 📱 모바일/지원 브라우저: 공유 시트 열기 (카톡 포함)
+      if (navigator.share) {
+        await navigator.share({
+          title: post.title,
+          text: `${post.title}`,
+          url: url,
+        })
+      } else {
+        // 💻 데스크탑 등 미지원 환경: 클립보드 복사
+        await navigator.clipboard.writeText(url)
+        showAlert('링크가 복사되었습니다!')
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const openShareModal = async () => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return showAlert('로그인이 필요합니다.')
+
+    const res = await fetch('/api/chat/rooms', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    if (!res.ok) {
+      showAlert('채팅방을 불러오지 못했습니다.')
+      return
+    }
+
+    const data = await res.json()
+    setMyRooms(data) // 🔥 방이 없어도 그냥 열기
+    setShareOpen(true)
+  }
+
+  const sendPostToRoom = async (roomId: number) => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return showAlert('로그인이 필요합니다.')
+
+    const url = window.location.href
+
+    const res = await fetch('/api/chat/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        roomId,
+        type: 'url',
+        content: url,
+      }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      showAlert(data?.message || '전송 실패')
+      return
+    }
+
+    setShareOpen(false)
+    showAlert('채팅방에 전송되었습니다!')
+  }
+
+  const createRoomAndSend = async (friendId: number) => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    // 1️⃣ 방 생성
+    const createRes = await fetch('/api/chat/create-room', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        isGroup: false,
+        userIds: [friendId],
+      }),
+    })
+
+    if (!createRes.ok) {
+      const err = await createRes.json()
+      showAlert(err.message || '채팅방 생성 실패')
+      return
+    }
+
+    const { roomId } = await createRes.json()
+
+    // 2️⃣ URL 전송
+    await sendPostToRoom(roomId)
+
+    setFriendOpen(false)
   }
 
   /* 🔥 투표 클릭 처리 (투표 취소 + 재투표 지원) */
@@ -961,6 +1062,18 @@ export default function PostDetailPage() {
                   }}
                 >
                   🔗 게시물 공유
+                </button>
+              )}
+
+              {!isAdmin && (
+                <button
+                  style={menuItem}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    openShareModal()
+                  }}
+                >
+                  💬 채팅방으로 보내기
                 </button>
               )}
 
@@ -1568,6 +1681,112 @@ export default function PostDetailPage() {
                 ›
               </button>
             )}
+          </div>
+        )}
+
+        {shareOpen && (
+          <div style={modalBg}>
+            <div style={getModalBox(darkMode)}>
+              <h3>📨 공유할 채팅방 선택</h3>
+
+              <div style={{ marginTop: 10 }}>
+                {myRooms.map((room) => (
+                  <button
+                    key={room.id}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      marginBottom: '6px',
+                      borderRadius: 8,
+                      border: '1px solid #ddd',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => sendPostToRoom(room.id)}
+                  >
+                    {room.name || `채팅방 ${room.id}`}
+                  </button>
+                ))}
+
+                {/* 🔥 새 채팅방 만들기 버튼 */}
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    marginTop: 8,
+                    borderRadius: 8,
+                    border: '1px dashed #4FC3F7',
+                    background: 'transparent',
+                    color: '#4FC3F7',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onClick={async () => {
+                    setShareOpen(false)
+
+                    const token = localStorage.getItem('accessToken')
+                    const friendRes = await fetch('/api/friends', {
+                      headers: { Authorization: `Bearer ${token}` },
+                    })
+
+                    if (!friendRes.ok) {
+                      showAlert('친구 목록을 불러오지 못했습니다.')
+                      return
+                    }
+
+                    const friendData = await friendRes.json()
+                    setFriends(friendData)
+                    setFriendOpen(true)
+                  }}
+                >
+                  ＋ 새 채팅방 만들기
+                </button>
+              </div>
+
+              <button
+                style={{ ...btnGray, marginTop: 10 }}
+                onClick={() => setShareOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
+
+        {friendOpen && (
+          <div style={modalBg}>
+            <div style={getModalBox(darkMode)}>
+              <h3>👥 친구 선택</h3>
+
+              {friends.length === 0 && (
+                <p style={{ marginTop: 10 }}>친구가 없습니다.</p>
+              )}
+
+              <div style={{ marginTop: 10 }}>
+                {friends.map((f) => (
+                  <button
+                    key={f.id}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      marginBottom: '6px',
+                      borderRadius: 8,
+                      border: '1px solid #ddd',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => createRoomAndSend(f.id)}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                style={{ ...btnGray, marginTop: 10 }}
+                onClick={() => setFriendOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
           </div>
         )}
         <style jsx>{`
