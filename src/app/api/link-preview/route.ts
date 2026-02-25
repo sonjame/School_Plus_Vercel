@@ -50,10 +50,19 @@ async function fetchGooglePlaceData(query: string) {
   if (place.photos && place.photos.length > 0) {
     const photoRef = place.photos[0].photo_reference
 
-    // 🔥 더 안정적인 photo URL
-    photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference=${photoRef}&language=ko&key=${apiKey}`
-  }
+    const photoRequestUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference=${photoRef}&key=${apiKey}`
 
+    try {
+      const photoRes = await axios.get(photoRequestUrl, {
+        maxRedirects: 0,
+        validateStatus: (status) => status === 302,
+      })
+
+      photoUrl = photoRes.headers.location
+    } catch {
+      photoUrl = null
+    }
+  }
   return {
     name: place.name,
     address: place.formatted_address,
@@ -201,7 +210,16 @@ export async function GET(req: Request) {
     })
 
     const finalUrl = request?.res?.responseUrl || url
-    const mapType = detectMapType(finalUrl)
+
+    let resolvedUrl = finalUrl
+    const mapType = detectMapType(resolvedUrl)
+
+    // 🔥 Google 단축 URL 먼저 해석
+    if (resolvedUrl.includes('maps.app.goo.gl')) {
+      resolvedUrl = await resolveGoogleShortUrl(resolvedUrl)
+    }
+
+    let googlePlaceData = null
 
     const $ = cheerio.load(data)
 
@@ -228,16 +246,24 @@ export async function GET(req: Request) {
       finalTitle = cleanTitle(finalTitle, mapType)
     }
 
+    if (mapType) {
+      const query = finalTitle || description
+
+      if (query) {
+        googlePlaceData = await fetchGooglePlaceData(query)
+      }
+    }
+
     /* =========================
     🔥 Google 지도 → Places API
     ========================= */
     if (mapType === 'google') {
-      let realUrl = finalUrl
+      let realUrl = resolvedUrl
 
       // 🔥 상대경로 → 절대경로 변환
       if (rawImage) {
         try {
-          rawImage = new URL(rawImage, finalUrl).href
+          rawImage = new URL(rawImage, resolvedUrl).href
         } catch {
           rawImage = null
         }
@@ -279,8 +305,8 @@ export async function GET(req: Request) {
         return NextResponse.json({
           title: `📍 ${placeData.name}`,
           description: placeData.address,
+          rating: placeData.rating ?? null,
           image: placeData.photo || rawImage,
-          rating: placeData.rating,
           url: realUrl,
           type: 'map',
           provider: 'google',
@@ -303,7 +329,7 @@ export async function GET(req: Request) {
 ========================= */
 
     if (mapType === 'kakao') {
-      let realUrl = finalUrl
+      let realUrl = resolvedUrl
 
       // 🔥 kko.to 단축링크면 한 번 더 요청해서 실제 URL 얻기
       if (realUrl.includes('kko.to')) {
@@ -330,8 +356,9 @@ export async function GET(req: Request) {
 
       return NextResponse.json({
         title: `📍 ${cleanedTitle || '카카오맵'}`,
-        description: ogDesc,
-        image: ogImage,
+        description: googlePlaceData?.address || ogDesc,
+        rating: googlePlaceData?.rating || null,
+        image: googlePlaceData?.photo || ogImage,
         url: realUrl,
         type: 'map',
         provider: 'kakao',
@@ -343,7 +370,7 @@ export async function GET(req: Request) {
     ========================= */
 
     if (mapType === 'naver') {
-      let realUrl = finalUrl
+      let realUrl = resolvedUrl
 
       if (realUrl.includes('naver.me')) {
         realUrl = await resolveNaverShortUrl(realUrl)
@@ -373,8 +400,9 @@ export async function GET(req: Request) {
 
       return NextResponse.json({
         title: `📍 ${placeName || '네이버 지도'}`,
-        description: placeAddress || description,
-        image: rawImage,
+        description: googlePlaceData?.address || placeAddress || description,
+        rating: googlePlaceData?.rating || null,
+        image: googlePlaceData?.photo || rawImage,
         url: realUrl,
         type: 'map',
         provider: 'naver',
@@ -385,7 +413,7 @@ export async function GET(req: Request) {
       title: mapType ? `📍 ${finalTitle}` : title,
       description,
       image: rawImage, // 🔥 그대로 사용
-      url: finalUrl,
+      url: resolvedUrl,
       type: mapType ? 'map' : 'link',
       provider: mapType,
     })
