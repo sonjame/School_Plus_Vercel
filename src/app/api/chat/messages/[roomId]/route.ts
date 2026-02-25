@@ -162,3 +162,72 @@ export async function GET(
     return NextResponse.json({ message: 'SERVER_ERROR' }, { status: 500 })
   }
 }
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ roomId: string }> },
+) {
+  try {
+    /* 1️⃣ 토큰 확인 */
+    const auth = req.headers.get('authorization')
+    if (!auth) {
+      return NextResponse.json({ message: 'NO_TOKEN' }, { status: 401 })
+    }
+
+    const token = auth.replace('Bearer ', '')
+
+    let userId: number
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+        id: number
+      }
+
+      userId = decoded.id
+    } catch (e) {
+      return NextResponse.json({ message: 'INVALID_TOKEN' }, { status: 401 })
+    }
+
+    /* 2️⃣ params */
+    const { roomId } = await params
+    const roomIdNum = Number(roomId)
+
+    if (!Number.isFinite(roomIdNum)) {
+      return NextResponse.json({ message: 'INVALID_ROOM_ID' }, { status: 400 })
+    }
+
+    /* 3️⃣ body */
+    const body = await req.json()
+
+    const { type, content, postId, title, url } = body
+
+    if (!type) {
+      return NextResponse.json({ message: 'INVALID_TYPE' }, { status: 400 })
+    }
+
+    /* 4️⃣ 메시지 저장 */
+    const [result]: any = await db.query(
+      `
+      INSERT INTO chat_messages
+        (room_id, sender_id, type, content, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+      `,
+      [
+        roomIdNum,
+        userId,
+        type,
+        type === 'post'
+          ? JSON.stringify({ postId, title, url })
+          : (content ?? null),
+      ],
+    )
+
+    return NextResponse.json({
+      success: true,
+      messageId: result.insertId,
+    })
+  } catch (e) {
+    console.error('[POST MESSAGE ERROR]', e)
+    return NextResponse.json({ message: 'SERVER_ERROR' }, { status: 500 })
+  }
+}
