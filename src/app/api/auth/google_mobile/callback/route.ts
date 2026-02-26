@@ -1,48 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+function pickStr(v: string | null) {
+  return typeof v === 'string' ? v : ''
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
 
-  const code = searchParams.get('code')
-  const state = searchParams.get('state')
+  const code = pickStr(searchParams.get('code'))
+  const state = pickStr(searchParams.get('state'))
+  const error = pickStr(searchParams.get('error'))
+  const error_description = pickStr(searchParams.get('error_description'))
+
+  // ✅ Google이 error로 돌아온 경우도 앱으로 전달
+  if (error) {
+    const to = new URL('myapp://oauth')
+    to.searchParams.set('provider', 'google')
+    if (state) to.searchParams.set('state', state)
+    to.searchParams.set('ok', 'false')
+    to.searchParams.set('error', error)
+    if (error_description) to.searchParams.set('error_description', error_description)
+
+    return NextResponse.redirect(to.toString())
+  }
 
   if (!code) {
     return NextResponse.json({ ok: false, error: 'No code' }, { status: 400 })
   }
 
-  const redirectUri =
-    'https://school-plus-vercel.vercel.app/api/auth/google_mobile/callback'
+  // ✅ 토큰 교환은 “앱”이 한다. 서버는 code만 넘긴다.
+  const to = new URL('myapp://oauth')
+  to.searchParams.set('provider', 'google')
+  to.searchParams.set('ok', 'true')
+  to.searchParams.set('code', code)
+  if (state) to.searchParams.set('state', state)
 
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code'
-    })
-  })
-
-  const tokenData = await tokenRes.json()
-
-  if (!tokenRes.ok) {
-    return NextResponse.json({ ok: false, error: tokenData }, { status: 400 })
-  }
-
-  const userRes = await fetch(
-    'https://www.googleapis.com/oauth2/v2/userinfo',
-    {
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`
-      }
-    }
-  )
-
-  const user = await userRes.json()
-
-  return NextResponse.redirect(
-    `myapp://oauth?email=${user.email}&name=${user.name}`
-  )
+  return NextResponse.redirect(to.toString())
 }
