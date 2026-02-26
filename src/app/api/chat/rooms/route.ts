@@ -31,45 +31,82 @@ export async function GET(req: Request) {
     /* 2️⃣ DB 조회 */
     const [rows] = await db.query(
       `
-  SELECT
-    r.id,
-    r.name,
-    r.is_group AS isGroup,
-    r.is_self AS isSelf, 
+SELECT
+  r.id,
 
-    (
-      SELECT m.content
-      FROM chat_messages m
-      WHERE m.room_id = r.id
-      ORDER BY m.id DESC
+  /* 🔥 채팅방 이름 자동 계산 */
+  CASE
+    WHEN r.is_group = 0 AND r.is_self = 0 THEN (
+      SELECT u.name
+      FROM chat_room_members rm2
+      JOIN users u ON u.id = rm2.user_id
+      WHERE rm2.room_id = r.id
+        AND rm2.user_id != ?
       LIMIT 1
-    ) AS lastMessage,
+    )
 
+WHEN r.is_group = 1 THEN (
+  SELECT CONCAT(
+    /* 방장 이름 */
+    (
+      SELECT u2.name
+      FROM chat_room_members rm3
+      JOIN users u2 ON u2.id = rm3.user_id
+      WHERE rm3.room_id = r.id
+      ORDER BY rm3.joined_at ASC
+      LIMIT 1
+    ),
+    ' 외에 ',
     (
       SELECT COUNT(*)
-      FROM chat_messages m
-      WHERE m.room_id = r.id
-        AND m.sender_id != ?
-        AND m.id > COALESCE(rm.last_read_message_id, 0)
-        AND m.sender_id NOT IN (
-          SELECT blocked_id
-          FROM blocks
-          WHERE user_id = ?
-        )
-    ) AS unreadCount
+      FROM chat_room_members rm4
+      WHERE rm4.room_id = r.id
+    ) - 1,
+    '명'
+  )
+)
 
-  FROM chat_rooms r
-  JOIN chat_room_members rm
-    ON rm.room_id = r.id
-  WHERE rm.user_id = ?
-  ORDER BY
-    r.is_self DESC,
-    r.id DESC
-  `,
+    ELSE r.name
+  END AS name,
+
+  r.is_group AS isGroup,
+  r.is_self AS isSelf,
+
+  (
+    SELECT m.content
+    FROM chat_messages m
+    WHERE m.room_id = r.id
+    ORDER BY m.id DESC
+    LIMIT 1
+  ) AS lastMessage,
+
+  (
+    SELECT COUNT(*)
+    FROM chat_messages m
+    WHERE m.room_id = r.id
+      AND m.sender_id != ?
+      AND m.id > COALESCE(rm.last_read_message_id, 0)
+      AND m.sender_id NOT IN (
+        SELECT blocked_id
+        FROM blocks
+        WHERE user_id = ?
+      )
+  ) AS unreadCount
+
+FROM chat_rooms r
+JOIN chat_room_members rm
+  ON rm.room_id = r.id
+WHERE rm.user_id = ?
+GROUP BY r.id
+ORDER BY
+  r.is_self DESC,
+  r.id DESC
+`,
       [
-        userId, // m.sender_id != ?
-        userId, // blocks.user_id = ?
-        userId, // rm.user_id = ?
+        userId, // 🔥 1:1 채팅 상대 조회용
+        userId, // unreadCount
+        userId, // blocks
+        userId, // rm.user_id
       ],
     )
 
