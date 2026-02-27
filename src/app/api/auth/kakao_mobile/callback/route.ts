@@ -36,4 +36,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.redirect(deepLink)
 }
-이 카카오 서버코드를 수정해주세요
