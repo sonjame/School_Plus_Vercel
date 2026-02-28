@@ -400,12 +400,13 @@ export default function ChatPage() {
   }>({ open: false, message: '' })
 
   // 🔥 최신 공지 1개 추출
-  const latestNotice = [...messages]
-    .filter((m) => m.type === 'notice')
+  const latestNotice = messages
+    .filter((m) => m.roomId === currentRoomId && m.type === 'notice')
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )[0]
+
   const COLORS = {
     primary: '#4FC3F7',
 
@@ -853,7 +854,29 @@ export default function ChatPage() {
     }
   }
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messageContainerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const container = messageContainerRef.current
+    if (!container) return
+
+    const threshold = 80
+
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight <
+      threshold
+
+    if (isNearBottom) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
+    const container = messageContainerRef.current
+    if (!container) return
+
+    container.scrollTop = container.scrollHeight
+  }, [currentRoomId])
 
   /* -------------------------
    로그인 유저 로드
@@ -887,11 +910,6 @@ export default function ChatPage() {
   }, [])
 
   // 메시지 바닥으로 스크롤
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages, currentRoomId])
 
   // 모바일 웹
   useEffect(() => {
@@ -1393,6 +1411,7 @@ export default function ChatPage() {
             </div>
 
             <div
+              ref={messageContainerRef}
               style={{
                 flex: 1,
                 overflowY: 'auto',
@@ -1971,6 +1990,10 @@ export default function ChatPage() {
                 {currentRoom && latestNotice && !hideNotice && (
                   <div
                     style={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10,
+
                       background: COLORS.noticeBg,
                       color: COLORS.noticeText,
                       padding: '10px 14px',
@@ -1978,6 +2001,7 @@ export default function ChatPage() {
                       marginBottom: 12,
                       fontSize: 13,
                       fontWeight: 600,
+
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -2360,8 +2384,6 @@ export default function ChatPage() {
                       </div>
                     )
                   })}
-
-                <div ref={messagesEndRef} />
               </div>
             </div>
 
