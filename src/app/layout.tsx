@@ -895,29 +895,51 @@ function ToastWatcher() {
   useEffect(() => {
     const checkNotifications = async () => {
       const token = localStorage.getItem('accessToken')
-      if (!token) return
+      const savedUser = localStorage.getItem('loggedInUser')
+      if (!token || !savedUser) return
 
+      const user = JSON.parse(savedUser)
+
+      // 🔥 알림 설정 읽기
+      const raw = localStorage.getItem(`notification_settings_${user.id}`)
+
+      const settings = raw
+        ? JSON.parse(raw)
+        : {
+            chat: true,
+            postComment: true,
+            commentReply: true,
+          }
+
+      /* ===================== */
       /* 💬 채팅 */
-      const chatRes = await fetch('/api/chat/unread-summary', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      /* ===================== */
 
-      if (chatRes.ok) {
-        const data = await chatRes.json()
+      if (settings.chat) {
+        const chatRes = await fetch('/api/chat/unread-summary', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-        if (
-          !isFirstLoadRef.current &&
-          data.unreadCount > prevChatCountRef.current &&
-          data.messages?.length > 0
-        ) {
-          const latest = data.messages[0]
-          showToast(`💬 ${latest.senderName}`, latest.content, 'chat')
+        if (chatRes.ok) {
+          const data = await chatRes.json()
+
+          if (
+            !isFirstLoadRef.current &&
+            data.unreadCount > prevChatCountRef.current &&
+            data.messages?.length > 0
+          ) {
+            const latest = data.messages[0]
+            showToast(`💬 ${latest.senderName}`, latest.content, 'chat')
+          }
+
+          prevChatCountRef.current = data.unreadCount
         }
-
-        prevChatCountRef.current = data.unreadCount
       }
 
+      /* ===================== */
       /* 📢 댓글 */
+      /* ===================== */
+
       const notifyRes = await fetch('/api/notifications', {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -932,11 +954,11 @@ function ToastWatcher() {
             !isFirstLoadRef.current &&
             latest.id !== prevNotifyIdRef.current
           ) {
-            if (latest.type === 'post_commented') {
+            if (latest.type === 'post_commented' && settings.postComment) {
               showToast('💬 내 게시글에 댓글', latest.message, 'postComment')
             }
 
-            if (latest.type === 'comment_reply') {
+            if (latest.type === 'comment_reply' && settings.commentReply) {
               showToast('↪️ 내 댓글에 답글', latest.message, 'commentReply')
             }
           }
