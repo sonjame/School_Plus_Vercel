@@ -1092,10 +1092,20 @@ export default function ChatPage() {
   useEffect(() => {
     if (!currentRoomId) return
 
-    apiFetch(`/api/chat/messages/${currentRoomId}`)
-      .then((res) => safeJson<ChatMessage[]>(res))
-      .then((data) => setMessages(Array.isArray(data) ? data : []))
-      .catch(() => setMessages([]))
+    const fetchMessages = async () => {
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const data = await safeJson<ChatMessage[]>(res)
+      setMessages(Array.isArray(data) ? data : [])
+    }
+
+    // 처음 1회 실행
+    fetchMessages()
+
+    // 3초마다 반복
+    const interval = setInterval(fetchMessages, 3000)
+
+    // 방 바뀌거나 컴포넌트 언마운트 시 정리
+    return () => clearInterval(interval)
   }, [currentRoomId])
 
   /* -------------------------
