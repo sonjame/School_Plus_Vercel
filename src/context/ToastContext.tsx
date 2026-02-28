@@ -7,12 +7,12 @@ type Toast = {
   id: number
   title: string
   message: string
+  type?: 'chat' | 'postComment' | 'commentReply' | 'success' | 'error'
 }
 
 const ToastContext = createContext<{
-  showToast: (title: string, message: string) => void
+  showToast: (title: string, message: string, type?: Toast['type']) => void
 } | null>(null)
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() // 🔥 추가
   const [toastList, setToastList] = useState<Toast[]>([])
@@ -22,10 +22,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  const showToast = (title: string, message: string) => {
+  const showToast = (title: string, message: string, type?: Toast['type']) => {
     const id = Date.now()
 
-    setToastList((prev) => [...prev, { id, title, message }])
+    setToastList((prev) => [...prev, { id, title, message, type }])
 
     setTimeout(() => {
       setToastList((prev) => prev.filter((t) => t.id !== id))
