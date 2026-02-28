@@ -7,6 +7,7 @@ import TimetablePreview from '../components/Dashboard/TimetablePreview'
 import Link from 'next/link'
 import { apiFetch } from '@/src/lib/apiFetch'
 import { useRef } from 'react'
+import { useToast } from '@/src/context/ToastContext'
 
 interface Post {
   id: string
@@ -65,6 +66,8 @@ export default function HomePage() {
   const isFirstLoadRef = useRef(true)
   const isFirstChatLoadRef = useRef(true)
 
+  const { showToast } = useToast()
+
   // 🔔 관리자 알림
   const [unreadNotifyCount, setUnreadNotifyCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
@@ -83,11 +86,6 @@ export default function HomePage() {
     reason: string
     remainHours?: number
   } | null>(null)
-
-  // 🔔 토스트 알림
-  const [toastList, setToastList] = useState<
-    { id: number; title: string; message: string }[]
-  >([])
 
   // 🌙 다크모드 상태
   const [themeSetting, setThemeSetting] = useState<{ darkMode: boolean }>({
@@ -289,33 +287,6 @@ export default function HomePage() {
     loadUnreadChat()
   }, [])
 
-  const showToast = (
-    title: string,
-    message: string,
-    type?: 'chat' | 'postComment' | 'commentReply',
-  ) => {
-    const userRaw = localStorage.getItem('loggedInUser')
-    if (!userRaw) return
-
-    const user = JSON.parse(userRaw)
-    const raw = localStorage.getItem(`notification_settings_${user.id}`)
-
-    if (raw) {
-      const settings = JSON.parse(raw)
-
-      if (type && settings[type] === false) {
-        return // 🔥 설정 꺼져있으면 토스트 안 띄움
-      }
-    }
-
-    const id = Date.now()
-
-    setToastList((prev) => [...prev, { id, title, message }])
-
-    setTimeout(() => {
-      setToastList((prev) => prev.filter((t) => t.id !== id))
-    }, 4000)
-  }
   const loadUnreadChatSummary = async () => {
     const token = localStorage.getItem('accessToken')
     if (!token) return
@@ -1576,55 +1547,6 @@ export default function HomePage() {
             </div>
           )}
         </section>
-      </div>
-
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          zIndex: 99999,
-        }}
-      >
-        {toastList.map((toast) => (
-          <div
-            key={toast.id}
-            style={{
-              minWidth: '260px',
-              maxWidth: '320px',
-              background: themeSetting.darkMode ? '#0f172a' : '#fff',
-              padding: '14px 16px',
-              borderRadius: '14px',
-              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-              transform: 'translateX(0)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 700,
-                marginBottom: 4,
-                color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
-              }}
-            >
-              {toast.title}
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: themeSetting.darkMode ? '#cbd5f5' : '#555',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {toast.message}
-            </div>
-          </div>
-        ))}
       </div>
     </>
   )
