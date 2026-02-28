@@ -371,7 +371,7 @@ export default function RootLayout({
             style={{
               position: 'fixed',
               top: 0,
-              left: sidebarOpen ? 0 : isPC ? 0 : '-260px',
+              left: sidebarOpen ? 0 : isPC ? '-220px' : '-260px',
               width: isPC ? '220px' : '240px',
               height: '100vh',
               background:
@@ -421,6 +421,23 @@ export default function RootLayout({
                 >
                   {user?.school ? `🏫 ${user.school}` : 'School Plus'}
                 </Link>
+              )}
+
+              {isPC && sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  style={{
+                    background: 'rgba(0,0,0,0.25)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                  }}
+                >
+                  ⮜
+                </button>
               )}
 
               {/* 모바일 X 버튼 */}
@@ -690,6 +707,29 @@ export default function RootLayout({
             </div>
           </aside>
 
+          {/* PC 열기 버튼 (사이드바 밖) */}
+          {isPC && !sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                position: 'fixed',
+                top: '20px',
+                left: '10px',
+                zIndex: 999,
+                background: '#4DB8FF',
+                color: 'white',
+                border: 'none',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                fontSize: '16px',
+              }}
+            >
+              ⮞
+            </button>
+          )}
+
           {/* overlay */}
           {!isPC && sidebarOpen && (
             <div
@@ -710,7 +750,7 @@ export default function RootLayout({
           <main
             className="min-h-screen"
             style={{
-              marginLeft: isPC ? '220px' : '0px',
+              marginLeft: isPC ? (sidebarOpen ? '220px' : '0px') : '0px',
             }}
           >
             {children}
