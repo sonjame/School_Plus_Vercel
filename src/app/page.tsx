@@ -827,6 +827,7 @@ export default function HomePage() {
         style={{
           width: '100%',
           maxWidth: '1600px',
+          position: 'relative',
           margin: '0 auto',
           padding: 'clamp(8px, 3vw, 16px)',
           backgroundColor: themeSetting.darkMode ? '#020617' : '#fff',
