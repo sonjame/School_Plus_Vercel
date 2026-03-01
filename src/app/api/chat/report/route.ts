@@ -133,14 +133,54 @@ export async function POST(req: NextRequest) {
    7️⃣ 관리자 알림 생성
 ===================== */
 
-    type RoomRow = RowDataPacket & { name: string }
+    type RoomRow = RowDataPacket & { name: string | null }
 
     const [roomRows] = await db.query<RoomRow[]>(
-      `SELECT name FROM chat_rooms WHERE id = ? LIMIT 1`,
-      [roomId],
+      `
+  SELECT
+    CASE
+      WHEN r.is_group = 0 AND r.is_self = 0 THEN (
+        SELECT u.name
+        FROM chat_room_members rm2
+        JOIN users u ON u.id = rm2.user_id
+        WHERE rm2.room_id = r.id
+          AND rm2.user_id != ?
+        LIMIT 1
+      )
+
+      WHEN r.is_group = 1 THEN (
+        SELECT CONCAT(
+          (
+            SELECT u2.name
+            FROM chat_room_members rm3
+            JOIN users u2 ON u2.id = rm3.user_id
+            WHERE rm3.room_id = r.id
+            ORDER BY rm3.joined_at ASC
+            LIMIT 1
+          ),
+          ' 외에 ',
+          (
+            SELECT COUNT(*)
+            FROM chat_room_members rm4
+            WHERE rm4.room_id = r.id
+          ) - 1,
+          '명'
+        )
+      )
+
+      ELSE r.name
+    END AS name
+  FROM chat_rooms r
+  WHERE r.id = ?
+  LIMIT 1
+  `,
+      [user.id, roomId],
     )
 
-    const roomName = roomRows.length ? roomRows[0].name : '알 수 없는 채팅방'
+    const roomName =
+      roomRows.length && roomRows[0].name
+        ? roomRows[0].name
+        : '알 수 없는 채팅방'
 
     const [admins] = await db.query<AdminRow[]>(
       `SELECT id FROM users WHERE level = 'admin'`,
