@@ -4745,11 +4745,21 @@ function ReportModal({
       }),
     })
 
-    if (!res.ok) {
-      alert('신고 접수 실패')
+    const data = await res.json().catch(() => ({}))
+
+    // ✅ 이미 신고한 경우
+    if (res.status === 409) {
+      alert(data.message || '이미 신고한 메시지입니다.')
       return
     }
 
+    // ❌ 기타 실패
+    if (!res.ok) {
+      alert(data.message || '신고 접수 실패')
+      return
+    }
+
+    // ✅ 성공
     alert('신고가 접수되었습니다')
     onClose()
   }
