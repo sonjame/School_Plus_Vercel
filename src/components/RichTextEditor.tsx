@@ -111,23 +111,23 @@ export default function RichTextEditor({
             <option value="inherit">기본</option>
 
             {/* 기본계열 */}
-            <option value="'Pretendard'">프리텐다드</option>
-            <option value="'Noto Sans KR'">노토 산스</option>
-            <option value="'Nanum Gothic'">나눔고딕</option>
-            <option value="'IBM Plex Sans KR'">IBM 플렉스 산스</option>
-            <option value="'Gowun Dodum'">고운돋움</option>
+            <option value="inherit">Default</option>
 
-            {/* 감성계열 */}
-            <option value="'Black Han Sans'">검정고딕</option>
-            <option value="'Do Hyeon'">도현체</option>
-            <option value="'Jua'">주아체</option>
-            <option value="'Poor Story'">푸어스토리</option>
+            <option value="'Pretendard'">Pretendard</option>
+            <option value="'Noto Sans KR'">Noto Sans KR</option>
+            <option value="'Nanum Gothic'">Nanum Gothic</option>
+            <option value="'IBM Plex Sans KR'">IBM Plex Sans KR</option>
+            <option value="'Gowun Dodum'">Gowun Dodum</option>
 
-            {/* 명조계열 */}
-            <option value="'Nanum Myeongjo'">나눔명조</option>
-            <option value="'Noto Serif KR'">노토 세리프</option>
-            <option value="'Song Myung'">송명체</option>
-            <option value="'Hahmlet'">함렛</option>
+            <option value="'Black Han Sans'">Black Han Sans</option>
+            <option value="'Do Hyeon'">Do Hyeon</option>
+            <option value="'Jua'">Jua</option>
+            <option value="'Poor Story'">Poor Story</option>
+
+            <option value="'Nanum Myeongjo'">Nanum Myeongjo</option>
+            <option value="'Noto Serif KR'">Noto Serif KR</option>
+            <option value="'Song Myung'">Song Myung</option>
+            <option value="'Hahmlet'">Hahmlet</option>
           </select>
 
           <IconBtn
