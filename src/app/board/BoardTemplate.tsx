@@ -38,12 +38,18 @@ export default function BoardTemplate({
   const [searchTerm, setSearchTerm] = useState('')
   const [sortType, setSortType] = useState<'latest' | 'likes'>('latest')
 
-  // 🔒 학년별 작성 권한 체크
-  const myGrade =
-    typeof window !== 'undefined' ? localStorage.getItem('userGrade') : null
+  // 🔒 학년 상태
+  const [myGrade, setMyGrade] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const grade = localStorage.getItem('userGrade')
+    setMyGrade(grade)
+  }, [])
+
+  // 🔒 작성 권한 체크
   const canWrite =
-    category === 'admin' || // 🔥 관리자 게시판은 누구나 작성 가능
+    category === 'admin' ||
     ['free', 'promo', 'club'].includes(category) ||
     category === myGrade
 
