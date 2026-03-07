@@ -26,7 +26,7 @@ type ChatMessage = {
   senderName: string
   content: string
   createdAt: string
-  type: 'text' | 'image' | 'file' | 'url' | 'notice' | 'poll'
+  type: 'text' | 'image' | 'file' | 'url' | 'notice' | 'poll' | 'video'
   fileUrl?: string
   fileName?: string
   readCount?: number
@@ -1140,6 +1140,11 @@ export default function ChatPage() {
         setPendingImages((prev) => [...prev, file])
       }
 
+      // 🎥 동영상
+      else if (file.type.startsWith('video/')) {
+        await handleSendVideo(file)
+      }
+
       // 📄 문서 파일
       else {
         await handleSendFile(file)
@@ -1245,6 +1250,59 @@ export default function ChatPage() {
     /* =====================
      3️⃣ 성공 시 메시지 갱신
   ===================== */
+    const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+    const data = await safeJson<ChatMessage[]>(res)
+    setMessages(Array.isArray(data) ? data : [])
+  }
+
+  const handleSendVideo = async (file: File) => {
+    if (isChatBanned) return
+    if (!currentRoomId || !currentUser?.token) return
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // 1️⃣ S3 업로드
+    const uploadRes = await fetch('/api/upload/chat', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}))
+
+      if (err?.error === 'FILE_TOO_LARGE') {
+        setAlert({
+          open: true,
+          title: '업로드 제한',
+          message: '100MB 이상 영상은 업로드할 수 없습니다.',
+        })
+        return
+      }
+
+      setBlockMessage('동영상 업로드 실패')
+      return
+    }
+    const { url, name } = await uploadRes.json()
+
+    // 2️⃣ 메시지 저장
+    const sendRes = await apiFetch('/api/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId: currentRoomId,
+        type: 'video', // 🔥 핵심
+        fileUrl: url,
+        fileName: name,
+      }),
+    })
+
+    if (!sendRes.ok) {
+      setBlockMessage('동영상 전송 실패')
+      return
+    }
+
+    // 3️⃣ 메시지 갱신
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
@@ -2191,7 +2249,12 @@ export default function ChatPage() {
                       >
                         <div
                           style={{
-                            maxWidth: '75%',
+                            maxWidth:
+                              msg.type === 'image' ||
+                              msg.type === 'file' ||
+                              msg.type === 'video'
+                                ? 'none'
+                                : '75%',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: isMe ? 'flex-end' : 'flex-start',
@@ -2212,19 +2275,24 @@ export default function ChatPage() {
                               padding:
                                 msg.type === 'image' ||
                                 msg.type === 'file' ||
-                                msg.type === 'url'
+                                msg.type === 'url' ||
+                                msg.type === 'video'
                                   ? 0
                                   : '10px 14px',
+
                               borderRadius:
                                 msg.type === 'image' ||
                                 msg.type === 'file' ||
-                                msg.type === 'url'
+                                msg.type === 'url' ||
+                                msg.type === 'video'
                                   ? 0
                                   : 12,
+
                               background:
                                 msg.type === 'image' ||
                                 msg.type === 'file' ||
-                                msg.type === 'url'
+                                msg.type === 'url' ||
+                                msg.type === 'video'
                                   ? 'transparent'
                                   : isMe
                                     ? '#4FC3F7'
@@ -2321,6 +2389,21 @@ export default function ChatPage() {
                                     파일 다운로드
                                   </div>
                                 </div>
+                              </div>
+                            )}
+
+                            {msg.type === 'video' && msg.fileUrl && (
+                              <div style={{ maxWidth: 320 }}>
+                                <video
+                                  controls
+                                  style={{
+                                    width: '100%',
+                                    borderRadius: 14,
+                                    display: 'block',
+                                  }}
+                                >
+                                  <source src={msg.fileUrl} />
+                                </video>
                               </div>
                             )}
                           </div>
@@ -2553,6 +2636,22 @@ export default function ChatPage() {
                     />
 
                     <AttachItem
+                      icon="🎥"
+                      label="동영상"
+                      onClick={() => {
+                        if (isChatBanned) {
+                          setBlockMessage(
+                            '채팅 이용이 제한되어 동영상을 보낼 수 없습니다.',
+                          )
+                          return
+                        }
+
+                        setShowAttachMenu(false)
+                        fileInputRef.current?.click()
+                      }}
+                    />
+
+                    <AttachItem
                       icon="📄"
                       label="파일"
                       onClick={() => {
@@ -2643,7 +2742,7 @@ export default function ChatPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
+                accept="video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
               />
