@@ -91,6 +91,11 @@ export default function LoginPage() {
 
     localStorage.setItem('level', data.user.level)
 
+    localStorage.setItem(
+      'userGrade',
+      'grade' + String(data.user.grade).replace('학년', ''),
+    )
+
     if (data.user.eduCode) localStorage.setItem('eduCode', data.user.eduCode)
     if (data.user.schoolCode)
       localStorage.setItem('schoolCode', data.user.schoolCode)
