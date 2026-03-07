@@ -18,13 +18,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'NO_FILE' }, { status: 400 })
   }
 
+  // 🔥 100MB 제한
+  const MAX_SIZE = 100 * 1024 * 1024
+  if (file.size > MAX_SIZE) {
+    return NextResponse.json({ error: 'FILE_TOO_LARGE' }, { status: 400 })
+  }
+
+  // 🔥 허용 타입
+  const allowedTypes = ['image/', 'video/', 'application/', 'text/']
+
+  const isAllowed = allowedTypes.some((type) => file.type.startsWith(type))
+
+  if (!isAllowed) {
+    return NextResponse.json({ error: 'INVALID_FILE_TYPE' }, { status: 400 })
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  // 🔐 안전한 파일명
   const ext = file.name.split('.').pop()
   const safeName = crypto.randomUUID()
 
-  // ✅ 채팅 전용 폴더
   const key = `upload/chat/${Date.now()}-${safeName}.${ext}`
 
   await s3.send(
@@ -33,7 +46,6 @@ export async function POST(req: Request) {
       Key: key,
       Body: buffer,
       ContentType: file.type,
-      // ❌ ACL 절대 넣지 말 것
     }),
   )
 
