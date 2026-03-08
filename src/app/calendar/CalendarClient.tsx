@@ -1411,6 +1411,13 @@ export default function CalendarPage() {
           color: #e5e7eb;
         }
 
+        .page-wrapper.dark
+          input[type='date']::-webkit-calendar-picker-indicator,
+        .page-wrapper.dark
+          input[type='time']::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+        }
+
         .page-wrapper.dark .modal input::placeholder,
         .page-wrapper.dark .modal textarea::placeholder {
           color: #6b7280;
