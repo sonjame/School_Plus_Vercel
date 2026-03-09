@@ -305,6 +305,16 @@ export async function POST(req: Request) {
     // 🔥 대표 썸네일 자동 보정
     let finalThumbnail = thumbnail
 
+    if (finalThumbnail?.startsWith(bucketUrl + 'temp/')) {
+      const fileName = finalThumbnail.split('/').pop()
+
+      const moved = finalImages.find((img) => img.includes(fileName))
+
+      if (moved) {
+        finalThumbnail = moved
+      }
+    }
+
     if (!finalThumbnail) {
       // 1️⃣ 이미지 있으면 첫 이미지 사용
       if (finalImages.length > 0) {
