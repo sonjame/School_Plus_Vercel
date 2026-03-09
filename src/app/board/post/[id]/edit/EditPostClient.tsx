@@ -157,6 +157,10 @@ export default function EditPostPage() {
       setAttachments(Array.isArray(data.attachments) ? data.attachments : [])
       setThumbnail(data.thumbnail ?? null)
 
+      if (data.thumbnail && !data.images?.includes(data.thumbnail)) {
+        setImages((prev) => [data.thumbnail, ...prev])
+      }
+
       /* 🔥 기존 투표 데이터 복원 */
       if (data.vote?.enabled) {
         setVoteEnabled(true)
