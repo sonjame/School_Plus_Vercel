@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import db from '@/src/lib/db'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
+import { containsProfanity } from '@/src/lib/profanityFilter'
 
 /* 댓글 목록 */
 export async function GET(
@@ -91,6 +92,13 @@ export async function POST(
 
     if (!content) {
       return NextResponse.json({ message: 'content required' }, { status: 400 })
+    }
+
+    if (containsProfanity(content)) {
+      return NextResponse.json(
+        { message: '🚫 욕설 또는 비속어가 포함된 댓글은 작성할 수 없습니다.' },
+        { status: 400 },
+      )
     }
 
     const authHeader = req.headers.get('authorization')
