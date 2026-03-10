@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
+import { containsProfanity } from '@/src/lib/profanityFilter'
 
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>()
@@ -307,6 +308,11 @@ export default function PostDetailPage() {
 
     if (!commentValue.trim()) return
 
+    if (containsProfanity(commentValue)) {
+      showAlert('🚫 욕설 또는 비속어가 포함된 댓글은 작성할 수 없습니다.')
+      return
+    }
+
     const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
       body: JSON.stringify({
@@ -339,6 +345,11 @@ export default function PostDetailPage() {
 
     if (!replyValue.trim() || !replyTarget) return
 
+    if (containsProfanity(replyValue)) {
+      showAlert('🚫 욕설 또는 비속어가 포함된 댓글은 작성할 수 없습니다.')
+      return
+    }
+
     const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
       body: JSON.stringify({
@@ -362,6 +373,11 @@ export default function PostDetailPage() {
   /* 댓글 수정 */
   const saveEdit = async () => {
     if (!editId) return
+
+    if (containsProfanity(editValue)) {
+      showAlert('🚫 욕설 또는 비속어가 포함된 댓글은 저장할 수 없습니다.')
+      return
+    }
 
     const res = await apiFetch(`/api/comments/${editId}`, {
       method: 'PUT',
