@@ -96,6 +96,19 @@ export default function MyInfoPagePreview() {
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    check()
+    window.addEventListener('resize', check)
+
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   // 🔐 재로그인 안내 모달
   const [showReloginModal, setShowReloginModal] = useState(false)
   const [reloginReason, setReloginReason] = useState<
@@ -906,7 +919,7 @@ export default function MyInfoPagePreview() {
           {/* 기존 필드 디자인과 동일한 배치 */}
           <div
             style={{
-              width: '85%',
+              width: isMobile ? '90%' : '85%',
               margin: '0 auto',
               display: 'flex',
               alignItems: 'center',
@@ -961,7 +974,7 @@ export default function MyInfoPagePreview() {
           {showSchoolForm && (
             <div
               style={{
-                width: '85%', // 📌 input과 동일 비율
+                width: isMobile ? '90%' : '85%', // 📌 input과 동일 비율
                 margin: '6px auto 0',
                 borderRadius: 10,
                 background: themeSetting.darkMode ? '#0f172a' : '#f9fafb',
@@ -1035,7 +1048,11 @@ export default function MyInfoPagePreview() {
                           border: 'none',
                           background: isSelected ? '#e0f2fe' : 'transparent',
                           cursor: 'pointer',
-                          borderBottom: '1px solid #f3f4f6',
+                          borderBottom: themeSetting.darkMode
+                            ? '1px solid #334155'
+                            : '1px solid #f3f4f6',
+
+                          color: themeSetting.darkMode ? '#f1f5f9' : '#111827', // ⭐ 핵심
                         }}
                       >
                         <div style={{ fontSize: 14, fontWeight: 600 }}>
@@ -1123,7 +1140,7 @@ export default function MyInfoPagePreview() {
 
           <div
             style={{
-              width: '85%',
+              width: isMobile ? '90%' : '85%',
               margin: '0 auto',
               display: 'flex',
               alignItems: 'center',
@@ -1277,7 +1294,10 @@ export default function MyInfoPagePreview() {
                   placeholder="새 비밀번호"
                   value={newPw}
                   onChange={(e) => setNewPw(e.target.value)}
-                  style={{ ...getPwInputStyle, paddingRight: 40 }}
+                  style={{
+                    ...getPwInputStyle(themeSetting.darkMode),
+                    paddingRight: 40,
+                  }}
                 />
 
                 {/* 🔐 비밀번호 조건 안내 (회원가입과 동일) */}
@@ -1345,7 +1365,10 @@ export default function MyInfoPagePreview() {
                   placeholder="새 비밀번호 확인"
                   value={newPw2}
                   onChange={(e) => setNewPw2(e.target.value)}
-                  style={{ ...getPwInputStyle, paddingRight: 40 }}
+                  style={{
+                    ...getPwInputStyle(themeSetting.darkMode),
+                    paddingRight: 40,
+                  }}
                 />
               </div>
 
