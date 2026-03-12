@@ -265,11 +265,16 @@ export default function LoginPage() {
 
         .modal-box {
           background: #ffffff;
-          padding: 22px 28px;
-          border-radius: 12px;
+          padding: 32px 36px;
+          border-radius: 14px;
           border: 2px solid #4fc3f7;
-          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
           text-align: center;
+
+          width: 90%;
+          max-width: 150px; /* ⭐ PC에서 적당한 크기 */
+          min-width: 100px;
+
           animation: fadeIn 0.25s ease-out;
         }
 
