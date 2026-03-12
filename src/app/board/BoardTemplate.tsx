@@ -359,7 +359,7 @@ export default function BoardTemplate({
             alignItems: 'center',
             gap: 12,
             marginBottom: 20,
-            flexWrap: 'wrap',
+            flexWrap: isMobile ? 'wrap' : 'nowrap',
           }}
         >
           {/* 왼쪽 영역 */}
@@ -425,6 +425,7 @@ export default function BoardTemplate({
                 justifyContent: 'center',
                 border: 'none',
                 cursor: 'pointer',
+                width: isMobile ? '100%' : 'auto',
               }}
             >
               ✏ 글쓰기
