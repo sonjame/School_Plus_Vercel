@@ -223,7 +223,7 @@ export default function RootLayout({
   }
 
   /* 메뉴 섹션 UI */
-  function dropdownItem(href: string, label: string) {
+  function dropdownItem(href: string, label: string, dark: boolean) {
     return (
       <Link
         href={href}
@@ -236,7 +236,7 @@ export default function RootLayout({
           padding: '10px 16px',
           fontSize: 14,
           fontWeight: 500,
-          color: '#111827',
+          color: dark ? '#e5e7eb' : '#111827',
           textDecoration: 'none',
           cursor: 'pointer',
         }}
@@ -579,20 +579,28 @@ export default function RootLayout({
                         top: '100%',
                         left: 0,
                         marginTop: 8,
-
                         width: 190,
-                        background: '#ffffff',
-                        borderRadius: 12,
 
+                        background: effectiveDark ? '#1e293b' : '#ffffff',
+                        border: effectiveDark ? '1px solid #334155' : 'none',
+
+                        borderRadius: 12,
                         padding: '6px 0',
                         boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-
                         zIndex: 9999,
                       }}
                     >
-                      {dropdownItem('/board', '📚 전체 게시판')}
-                      {dropdownItem('/board/myposts', '✏ 내가 쓴 글')}
-                      {dropdownItem('/board/scrap', '⭐ 스크랩한 글')}
+                      {dropdownItem('/board', '📚 전체 게시판', effectiveDark)}
+                      {dropdownItem(
+                        '/board/myposts',
+                        '✏ 내가 쓴 글',
+                        effectiveDark,
+                      )}
+                      {dropdownItem(
+                        '/board/scrap',
+                        '⭐ 스크랩한 글',
+                        effectiveDark,
+                      )}
                     </div>
                   )}
                 </div>
