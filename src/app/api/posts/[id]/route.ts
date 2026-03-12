@@ -365,18 +365,6 @@ export async function PUT(
       finalThumbnail = convertYoutubeToThumbnail(finalThumbnail)
     }
 
-    // 2️⃣ 대표설정 안 한 경우 자동 선택
-    if (!finalThumbnail) {
-      if (finalImages.length > 0) {
-        finalThumbnail = finalImages[0]
-      } else {
-        const firstAttachmentWithThumb = enrichedAttachments.find(
-          (a: any) => a.thumbnail,
-        )
-        finalThumbnail = firstAttachmentWithThumb?.thumbnail ?? null
-      }
-    }
-
     /* ==============================
        게시글 수정
     ============================== */
