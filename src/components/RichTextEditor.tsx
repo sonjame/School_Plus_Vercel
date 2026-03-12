@@ -7,7 +7,6 @@ import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import TextAlign from '@tiptap/extension-text-align'
-import FontFamily from '@tiptap/extension-font-family'
 
 interface Props {
   value: string
@@ -26,7 +25,6 @@ export default function RichTextEditor({
       Underline,
       TextStyle,
       Color.configure({ types: ['textStyle'] }),
-      FontFamily,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -66,6 +64,8 @@ export default function RichTextEditor({
             padding: '8px 12px',
             borderBottom: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
             background: darkMode ? '#1e293b' : '#f8fafc',
+            overflowX: 'auto', // ⭐ 가로 스크롤
+            whiteSpace: 'nowrap',
           }}
         >
           {/* 제목 드롭다운 */}
@@ -93,41 +93,6 @@ export default function RichTextEditor({
             <option value="0">본문</option>
             <option value="2">제목 1</option>
             <option value="3">제목 2</option>
-          </select>
-
-          {/* 🔥 폰트 선택 드롭다운 추가 */}
-          <select
-            onChange={(e) => {
-              editor.chain().focus().setFontFamily(e.target.value).run()
-            }}
-            style={{
-              padding: '4px 6px',
-              borderRadius: 6,
-              border: darkMode ? '1px solid #475569' : '1px solid #cbd5e1',
-              background: darkMode ? '#1e293b' : '#ffffff',
-              color: darkMode ? '#f1f5f9' : '#111827',
-            }}
-          >
-            <option value="inherit">기본</option>
-
-            {/* 기본계열 */}
-            <option value="inherit">Default</option>
-
-            <option value="'Pretendard'">Pretendard</option>
-            <option value="'Noto Sans KR'">Noto Sans KR</option>
-            <option value="'Nanum Gothic'">Nanum Gothic</option>
-            <option value="'IBM Plex Sans KR'">IBM Plex Sans KR</option>
-            <option value="'Gowun Dodum'">Gowun Dodum</option>
-
-            <option value="'Black Han Sans'">Black Han Sans</option>
-            <option value="'Do Hyeon'">Do Hyeon</option>
-            <option value="'Jua'">Jua</option>
-            <option value="'Poor Story'">Poor Story</option>
-
-            <option value="'Nanum Myeongjo'">Nanum Myeongjo</option>
-            <option value="'Noto Serif KR'">Noto Serif KR</option>
-            <option value="'Song Myung'">Song Myung</option>
-            <option value="'Hahmlet'">Hahmlet</option>
           </select>
 
           <IconBtn
@@ -221,6 +186,7 @@ export default function RichTextEditor({
         .ProseMirror {
           line-height: 1.4;
           font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+          outline: none;
         }
 
         .dark .ProseMirror {
@@ -271,6 +237,7 @@ function IconBtn({
         padding: 6,
         borderRadius: 6,
         cursor: 'pointer',
+        flexShrink: 0,
       }}
     >
       <span className="material-symbols-rounded">{icon}</span>
