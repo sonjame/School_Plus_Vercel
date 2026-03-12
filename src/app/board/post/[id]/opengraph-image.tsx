@@ -54,7 +54,7 @@ export default async function Image({
         : youtube.url.split('v=')[1]?.split('&')[0]
 
       if (videoId) {
-        youtubeThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+        youtubeThumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
       }
     }
   }
