@@ -448,7 +448,9 @@ export default function EditPostPage() {
 
                     {/* 🔥 대표 설정 버튼 */}
                     <button
-                      onClick={() => setThumbnail(url)}
+                      onClick={() =>
+                        setThumbnail((prev) => (prev === url ? null : url))
+                      }
                       style={{
                         position: 'absolute',
                         bottom: -30,
@@ -542,7 +544,9 @@ export default function EditPostPage() {
                               ? convertYoutubeToThumbnail(a.url)
                               : null)
 
-                          setThumbnail(thumb)
+                          setThumbnail((prev) =>
+                            prev === thumb ? null : thumb,
+                          )
                         }}
                         style={{
                           background: isSelected ? '#4FC3F7' : '#90A4AE',
