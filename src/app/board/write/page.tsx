@@ -573,56 +573,80 @@ export default function WritePage() {
                 <div
                   key={idx}
                   style={{
-                    position: 'relative',
-                    padding: '10px 14px',
+                    padding: '12px 14px',
                     border: darkMode
                       ? '1px solid #334155'
                       : '1px solid #CFD8DC',
                     borderRadius: 10,
-                    marginBottom: 6,
+                    marginBottom: 8,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'wrap', // 🔥 모바일 줄바꿈
                   }}
                 >
-                  <span>
+                  <span
+                    style={{
+                      wordBreak: 'break-all',
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
                     {a.type === 'video' ? '🎬 영상' : '🔗 링크'} · {a.url}
                   </span>
 
                   {/* 🔥 대표 설정 버튼 */}
-                  <button
-                    onClick={() => setThumbnail(a.thumbnail ?? null)}
+                  <div
                     style={{
-                      position: 'absolute',
-                      right: 50,
-                      top: 8,
-                      background:
-                        thumbnail === (a.thumbnail ?? null)
-                          ? '#4FC3F7'
-                          : 'rgba(0,0,0,0.6)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 8,
-                      padding: '4px 8px',
-                      fontSize: 12,
-                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: 8,
+                      marginTop: 4,
                     }}
                   >
-                    {thumbnail === (a.thumbnail ?? null) ? '대표' : '대표 설정'}
-                  </button>
+                    <button
+                      onClick={() =>
+                        setThumbnail((prev) =>
+                          prev === (a.thumbnail ?? null)
+                            ? null
+                            : (a.thumbnail ?? null),
+                        )
+                      }
+                      style={{
+                        background:
+                          thumbnail === (a.thumbnail ?? null)
+                            ? '#4FC3F7'
+                            : 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '4px 8px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {thumbnail === (a.thumbnail ?? null)
+                        ? '대표'
+                        : '대표 설정'}
+                    </button>
 
-                  <button
-                    onClick={() =>
-                      setAttachments((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    style={{
-                      position: 'absolute',
-                      right: 10,
-                      top: 8,
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ✕
-                  </button>
+                    <button
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
