@@ -1521,13 +1521,13 @@ export default function CalendarPage() {
           .modal {
             width: 80%;
             height: auto;
-            height: auto;
             border-radius: 16px 16px 0 0;
             position: fixed;
             bottom: 0;
-            top: 20%; /* ← 위로 올리는 핵심 */
-            left: 15;
-            right: 0;
+            top: 20%;
+            left: 50%; /* ⭐ 핵심 */
+            transform: translateX(-50%); /* ⭐ 가운데 정렬 */
+            right: auto;
             overflow-y: auto;
             padding: 16px 14px calc(env(safe-area-inset-bottom) + 20px);
           }
