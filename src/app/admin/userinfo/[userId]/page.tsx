@@ -65,6 +65,21 @@ export default function AdminUserDetailPage() {
     )
   }
 
+  function getBanType(bannedUntil?: string) {
+    if (!bannedUntil) return '영구 정지'
+
+    const now = new Date().getTime()
+    const until = new Date(bannedUntil).getTime()
+
+    const diffHours = Math.round((until - now) / (1000 * 60 * 60))
+
+    if (diffHours <= 24) return '24시간 정지'
+    if (diffHours <= 72) return '72시간 정지'
+    if (diffHours <= 168) return '7일 정지'
+
+    return '장기 정지'
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -133,8 +148,24 @@ export default function AdminUserDetailPage() {
           <strong>가입일:</strong> {new Date(user.created_at).toLocaleString()}
         </p>
         <p>
-          <strong>정지 여부:</strong> {user.is_banned ? '🚫 정지됨' : '정상'}
+          <strong>정지 상태:</strong>{' '}
+          {user.is_banned ? `🚫 ${getBanType(user.banned_until)}` : '정상'}
         </p>
+
+        {user.is_banned && (
+          <>
+            <p>
+              <strong>정지 사유:</strong> {user.banned_reason || '없음'}
+            </p>
+
+            <p>
+              <strong>정지 해제:</strong>{' '}
+              {user.banned_until
+                ? new Date(user.banned_until).toLocaleString()
+                : '영구 정지'}
+            </p>
+          </>
+        )}
       </div>
 
       {/* ================= 게시글 ================= */}
