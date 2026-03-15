@@ -21,35 +21,36 @@ export async function GET(req: Request) {
     =============================== */
 
     const [users]: any = await db.query(`
-  SELECT 
-    u.id,
-    u.username,
-    u.name,
-    u.email,
-    u.school,
-    u.grade,
-    u.class_num,
-    u.provider,
-    u.created_at,
-    u.is_banned,
-    u.level,
+SELECT 
+  u.id,
+  u.username,
+  u.name,
+  u.email,
+  u.school,
+  u.edu_code,
+  u.grade,
+  u.class_num,
+  u.provider,
+  u.created_at,
+  u.is_banned,
+  u.level,
 
-    COUNT(DISTINCT p.id) AS postCount,
-    COUNT(DISTINCT c.id) AS commentCount
+  COUNT(DISTINCT p.id) AS postCount,
+  COUNT(DISTINCT c.id) AS commentCount
 
-  FROM users u
+FROM users u
 
-  LEFT JOIN posts p 
-    ON p.user_id = u.id
+LEFT JOIN posts p 
+  ON p.user_id = u.id
 
-  LEFT JOIN post_comments c 
-    ON c.user_id = u.id
+LEFT JOIN post_comments c 
+  ON c.user_id = u.id
 
-  GROUP BY u.id
+GROUP BY u.id
 
-  ORDER BY 
-    CASE WHEN u.level = 'admin' THEN 0 ELSE 1 END,
-    u.created_at DESC
+ORDER BY 
+  CASE WHEN u.level = 'admin' THEN 0 ELSE 1 END,
+  u.created_at DESC
 `)
 
     return NextResponse.json(users)
