@@ -297,6 +297,56 @@ export default function ScoresPage() {
     return '6등급 이하'
   }
 
+  function gradeToNumber(grade: string) {
+    if (!grade || grade === '-') return null
+    const num = parseInt(grade.replace('등급', ''))
+    return isNaN(num) ? null : num
+  }
+
+  function calculateAverageGrade() {
+    const grades: number[] = []
+
+    // 필수 과목
+    const korean = gradeToNumber(getRawGrade(scores.korean))
+    const math = gradeToNumber(getRawGrade(scores.math))
+    const english = gradeToNumber(getEnglishGrade(scores.english))
+    const history = gradeToNumber(getHistoryGrade(scores.history))
+
+    if (korean) grades.push(korean)
+    if (math) grades.push(math)
+    if (english) grades.push(english)
+    if (history) grades.push(history)
+
+    // 탐구
+    if (grade === 1) {
+      const e1 = gradeToNumber(getExploreGrade(exploreScores.sub1))
+      const e2 = gradeToNumber(getExploreGrade(exploreScores.sub2))
+      if (e1) grades.push(e1)
+      if (e2) grades.push(e2)
+    } else {
+      if (explorationSubjects[0]) {
+        const e1 = gradeToNumber(getExploreGrade(exploreScores.sub1))
+        if (e1) grades.push(e1)
+      }
+      if (explorationSubjects[1]) {
+        const e2 = gradeToNumber(getExploreGrade(exploreScores.sub2))
+        if (e2) grades.push(e2)
+      }
+    }
+
+    // 제2외국어
+    if (grade === 3 && secondLang) {
+      const lang = gradeToNumber(getSecondLangGrade(secondLangScore))
+      if (lang) grades.push(lang)
+    }
+
+    if (grades.length === 0) return '-'
+
+    const avg = grades.reduce((sum, g) => sum + g, 0) / grades.length
+
+    return avg.toFixed(2) + '등급'
+  }
+
   // ---------------------------------------------
   // ⭐ 저장된 점수 로드 (학년 변경/초기)
   // ---------------------------------------------
@@ -1132,8 +1182,104 @@ export default function ScoresPage() {
                       <td>{getSecondLangGrade(secondLangScore)}</td>
                     </tr>
                   )}
+
+                  <tr>
+                    <td colSpan={2} style={{ fontWeight: 700 }}>
+                      평균 등급
+                    </td>
+                    <td style={{ fontWeight: 700, color: '#2563EB' }}>
+                      {calculateAverageGrade()}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
+            </div>
+            <div style={{ marginTop: 20 }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  marginBottom: 10,
+                  fontWeight: 700,
+                }}
+              >
+                🎯 더 자세한 입시 분석
+              </h3>
+
+              <p style={{ fontSize: 13, marginBottom: 12, color: '#6B7280' }}>
+                현재 평균 등급 기준으로 입시 가능성을 확인해보세요
+              </p>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() =>
+                    window.open('https://www.jinhak.com/', '_blank')
+                  }
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    border: `1px solid ${darkMode ? '#334155' : '#ccc'}`,
+                    background: darkMode ? '#020617' : '#fff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#4d8dff'
+                    e.currentTarget.style.color = '#fff'
+                    e.currentTarget.style.borderColor = '#4d8dff'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = darkMode
+                      ? '#020617'
+                      : '#fff'
+                    e.currentTarget.style.color = darkMode
+                      ? '#e5e7eb'
+                      : '#111827'
+                    e.currentTarget.style.borderColor = darkMode
+                      ? '#334155'
+                      : '#ccc'
+                  }}
+                >
+                  진학사 분석 보기
+                </button>
+
+                <button
+                  onClick={() => window.open('https://www.uway.com/', '_blank')}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    border: `1px solid ${darkMode ? '#334155' : '#ccc'}`,
+                    background: darkMode ? '#020617' : '#fff',
+                    color: darkMode ? '#e5e7eb' : '#111827',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#4d8dff'
+                    e.currentTarget.style.color = '#fff'
+                    e.currentTarget.style.borderColor = '#4d8dff'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = darkMode
+                      ? '#020617'
+                      : '#fff'
+                    e.currentTarget.style.color = darkMode
+                      ? '#e5e7eb'
+                      : '#111827'
+                    e.currentTarget.style.borderColor = darkMode
+                      ? '#334155'
+                      : '#ccc'
+                  }}
+                >
+                  유웨이 분석 보기
+                </button>
+              </div>
+
+              <p style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
+                ※ 실제 합격 여부는 대학별 반영 비율에 따라 달라질 수 있습니다.
+              </p>
             </div>
           </div>
         </div>
