@@ -261,7 +261,7 @@ export default function ScoresPage() {
     return '9등급'
   }
 
-  const getEnglishGrade = (score: string) => {
+  const getEnglishGrade = (score?: string) => {
     if (!score || isNaN(Number(score))) return '-'
     const s = Number(score)
     if (s >= 90) return '1등급'
@@ -273,6 +273,7 @@ export default function ScoresPage() {
     if (s >= 30) return '7등급'
     if (s >= 20) return '8등급'
     if (s >= 10) return '9등급'
+    return '-'
   }
 
   const getHistoryGrade = (score: string) => {
