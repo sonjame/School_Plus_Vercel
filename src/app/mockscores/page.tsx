@@ -276,7 +276,7 @@ export default function ScoresPage() {
     return '-'
   }
 
-  const getHistoryGrade = (score: string) => {
+  const getHistoryGrade = (score?: string) => {
     if (!score || isNaN(Number(score))) return '-'
     const s = Number(score)
     if (s >= 40) return '1등급'
@@ -285,6 +285,7 @@ export default function ScoresPage() {
     if (s >= 25) return '4등급'
     if (s >= 20) return '5등급'
     if (s >= 10) return '6등급'
+    return '-' // ⭐ 추가
   }
 
   const getSecondLangGrade = (score: string) => {
