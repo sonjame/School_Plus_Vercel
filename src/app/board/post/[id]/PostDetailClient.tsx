@@ -393,6 +393,11 @@ export default function PostDetailPage() {
 
   /* 게시글 삭제 */
   const deletePost = async () => {
+    if (post?.is_reported) {
+      showAlert('🚫 신고된 게시글은 삭제할 수 없습니다.')
+      return
+    }
+
     showConfirm('게시글을 삭제하시겠습니까?', async () => {
       const userId = localStorage.getItem('userId')
       if (!userId) {
