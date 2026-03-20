@@ -42,6 +42,19 @@ export default function TimetablePreview() {
   const [selectedDay, setSelectedDay] = useState(days[todayIndex - 1] || '월')
   const [timetable, setTimetable] = useState<ClassPeriod[]>([])
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+
+    check() // 처음 실행
+    window.addEventListener('resize', check)
+
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
@@ -116,6 +129,12 @@ export default function TimetablePreview() {
   const filtered = timetable
     .filter((c) => c.day === selectedDay && c.subject?.trim())
     .sort((a, b) => a.period - b.period)
+    .reduce((acc: ClassPeriod[], cur) => {
+      if (!acc.find((item) => item.period === cur.period)) {
+        acc.push(cur)
+      }
+      return acc
+    }, [])
 
   return (
     <section style={{ marginBottom: '35px' }}>
@@ -170,8 +189,14 @@ export default function TimetablePreview() {
           backgroundColor: darkMode ? '#1e293b' : '#E1F5FE',
           borderRadius: '10px',
           padding: '16px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+
+          // 🔥 여기 변경
+          display: isMobile ? 'flex' : 'grid',
+          gridTemplateColumns: isMobile
+            ? undefined
+            : 'repeat(auto-fit, minmax(180px, 1fr))',
+          overflowX: isMobile ? 'auto' : 'visible',
+
           gap: '10px',
         }}
       >
@@ -192,11 +217,13 @@ export default function TimetablePreview() {
               <div
                 key={i}
                 style={{
+                  minWidth: isMobile ? '140px' : 'auto', // 🔥 추가
+                  flexShrink: 0, // 🔥 추가
+
                   backgroundColor: bg,
                   borderRadius: '8px',
                   padding: '12px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  // 👇 카드 안 글자 색은 항상 진한 색으로 고정
                   color: '#111827',
                 }}
               >
