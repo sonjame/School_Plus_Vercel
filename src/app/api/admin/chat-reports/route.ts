@@ -47,29 +47,41 @@ export async function GET(req: NextRequest) {
     ===================== */
     type ReportRow = RowDataPacket & {
       id: number
+      message_id: number
       reporter: string
       reported: string
       reason: string
       created_at: string
+      summary: string
+      is_deleted: number
     }
 
-    const [rows] = await db.query<ReportRow[]>(
-      `
-    SELECT
+    const [rows] = await db.query<ReportRow[]>(`
+  SELECT
     r.id,
+    r.message_id,
     r.reason,
     r.created_at,
-    r.reporter_id,          
-    r.reported_user_id,     
+
     u1.username AS reporter,
-    u2.username AS reported
+    u2.username AS reported,
+
+    CONCAT(u1.username, '님이 ', u2.username, '님을 신고했습니다') AS summary,
+
+    CASE 
+      WHEN m.id IS NULL THEN 1
+      ELSE 0
+    END AS is_deleted   -- 🔥 추가
+
   FROM chat_reports r
+
+  LEFT JOIN chat_messages m ON m.id = r.message_id  -- 🔥 핵심
+
   JOIN users u1 ON u1.id = r.reporter_id
   JOIN users u2 ON u2.id = r.reported_user_id
-  ORDER BY r.created_at DESC
 
-      `,
-    )
+  ORDER BY r.created_at DESC
+`)
 
     return NextResponse.json(rows)
   } catch (err) {
