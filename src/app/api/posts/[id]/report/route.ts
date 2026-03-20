@@ -182,21 +182,33 @@ export async function POST(
     /* 🔥 [3] 신고 누적 수 확인 */
     const [[{ cnt }]]: any = await db.query(
       `
-      SELECT COUNT(*) AS cnt
-      FROM post_reports
-      WHERE post_id = ?
-      `,
+    SELECT COUNT(*) AS cnt
+    FROM post_reports
+    WHERE post_id = ?
+    `,
       [postId],
     )
 
-    /* 🔥 [4] 3회 이상이면 자동 블라인드 */
+    /* 🔥 [4] 1번이라도 신고 → 삭제 금지 */
+    if (cnt >= 1) {
+      await db.query(
+        `
+    UPDATE posts
+    SET is_reported = 1
+    WHERE id = ?
+    `,
+        [postId],
+      )
+    }
+
+    /* 🔥 [5] 3회 이상 → 숨김 처리 */
     if (cnt >= 3) {
       await db.query(
         `
-        UPDATE posts
-        SET is_hidden = 1
-        WHERE id = ?
-        `,
+    UPDATE posts
+    SET is_hidden = 1
+    WHERE id = ?
+    `,
         [postId],
       )
     }
