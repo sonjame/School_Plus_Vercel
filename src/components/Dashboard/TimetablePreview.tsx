@@ -217,7 +217,7 @@ export default function TimetablePreview() {
               <div
                 key={i}
                 style={{
-                  minWidth: isMobile ? '140px' : 'auto', // 🔥 추가
+                  minWidth: isMobile ? '146px' : 'auto', // 🔥 추가
                   flexShrink: 0, // 🔥 추가
 
                   backgroundColor: bg,
