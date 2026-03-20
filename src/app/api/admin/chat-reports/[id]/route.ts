@@ -20,20 +20,32 @@ export async function GET(
 
   const [rows] = await db.query<DetailRow[]>(
     `
-    SELECT
-      r.id,
-      r.reason,
-      m.content,
-      r.reported_user_id,
-      u.username AS reported_username,
-      u.is_banned,
-      u.banned_at
-    FROM chat_reports r
-    JOIN chat_messages m ON m.id = r.message_id
-    JOIN users u ON u.id = r.reported_user_id
-    WHERE r.id = ?
-    LIMIT 1
-    `,
+  SELECT
+    r.id,
+    r.reason,
+
+    COALESCE(m.content, s.content) AS content,
+
+    CASE 
+      WHEN m.id IS NULL THEN 1 
+      ELSE 0 
+    END AS is_deleted,
+
+    r.reported_user_id,
+    u.username AS reported_username,
+    u.is_banned,
+    u.banned_at
+
+  FROM chat_reports r
+
+  LEFT JOIN chat_messages m ON m.id = r.message_id   -- 🔥 수정
+  LEFT JOIN chat_message_snapshots s ON s.message_id = r.message_id  -- 🔥 추가
+
+  JOIN users u ON u.id = r.reported_user_id
+
+  WHERE r.id = ?
+  LIMIT 1
+  `,
     [id],
   )
 
