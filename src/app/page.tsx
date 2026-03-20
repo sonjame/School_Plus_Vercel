@@ -1703,7 +1703,7 @@ function TodayTimetable({
           <div
             key={i}
             style={{
-              minWidth: isMobile ? '140px' : 'auto', // 🔥 핵심
+              minWidth: isMobile ? '150px' : 'auto', // 🔥 핵심
               flexShrink: 0,
 
               background: bg,
