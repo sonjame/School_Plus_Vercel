@@ -1520,20 +1520,22 @@ export default function CalendarPage() {
           /* ===== 🔥 모달 덮어쓰기 (핵심) ===== */
           .modal {
             width: 80%;
+            max-height: 90vh;
             height: auto;
-            border-radius: 16px 16px 0 0;
+
             position: fixed;
-            bottom: 0;
-            top: 20%;
-            left: 50%; /* ⭐ 핵심 */
-            transform: translateX(-50%); /* ⭐ 가운데 정렬 */
-            right: auto;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+
+            border-radius: 16px; /* 🔥 전체 둥글게 */
             overflow-y: auto;
+
             padding: 16px 14px calc(env(safe-area-inset-bottom) + 20px);
           }
 
           .modal-backdrop {
-            align-items: flex-end;
+            align-items: center; /* 🔥 중앙 정렬 */
           }
 
           /* ===== 기타 모바일 조정 ===== */
