@@ -826,10 +826,12 @@ export default function HomePage() {
       <div
         style={{
           width: '100%',
+          boxSizing: 'border-box',
           maxWidth: '1600px',
           position: 'relative',
           margin: '0 auto',
           padding: 'clamp(8px, 3vw, 16px)',
+          overflowX: 'hidden',
           backgroundColor: themeSetting.darkMode ? '#020617' : '#fff',
           color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
           borderRadius: '14px',
@@ -1172,7 +1174,8 @@ export default function HomePage() {
                     style={{
                       textDecoration: 'none',
                       color: 'inherit',
-                      flex: '0 0 clamp(240px, 80vw, 320px)',
+                      flex: '0 0 93vw',
+                      maxWidth: '420px',
 
                       // 🔥 카드 고정 폭
                     }}
@@ -1270,7 +1273,8 @@ export default function HomePage() {
                     style={{
                       textDecoration: 'none',
                       color: 'inherit',
-                      flex: '0 0 clamp(240px, 80vw, 320px)',
+                      flex: '0 0 93vw',
+                      maxWidth: '420px',
 
                       // 🔥 카드 고정 폭
                     }}
