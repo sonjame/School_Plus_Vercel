@@ -31,36 +31,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {!pathname.startsWith('/admin') && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            zIndex: 99999,
-          }}
-        >
-          {toastList.map((toast) => (
-            <div
-              key={toast.id}
-              style={{
-                minWidth: '260px',
-                maxWidth: '320px',
-                background: '#fff',
-                padding: '14px 16px',
-                borderRadius: '14px',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-              }}
-            >
-              <div style={{ fontWeight: 700 }}>{toast.title}</div>
-              <div style={{ fontSize: 13, color: '#555' }}>{toast.message}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          zIndex: 99999,
+        }}
+      >
+        {toastList.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              minWidth: '260px',
+              maxWidth: '320px',
+              background: '#fff',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{toast.title}</div>
+            <div style={{ fontSize: 13, color: '#555' }}>{toast.message}</div>
+          </div>
+        ))}
+      </div>
     </ToastContext.Provider>
   )
 }
