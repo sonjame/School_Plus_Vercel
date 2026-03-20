@@ -866,6 +866,7 @@ export default function ChatPage() {
       container.scrollHeight - container.scrollTop - container.clientHeight <
       threshold
 
+    // 🔥 처음 로드 or 아래 근처일 때
     if (isNearBottom) {
       container.scrollTop = container.scrollHeight
     }
@@ -875,7 +876,9 @@ export default function ChatPage() {
     const container = messageContainerRef.current
     if (!container) return
 
-    container.scrollTop = container.scrollHeight
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight
+    }, 0)
   }, [currentRoomId])
 
   /* -------------------------
@@ -1060,6 +1063,12 @@ export default function ChatPage() {
     // 🔹 optimistic UI
     setMessages((prev) => [...prev, newMessage])
     setInputText('')
+
+    setTimeout(() => {
+      const container = messageContainerRef.current
+      if (!container) return
+      container.scrollTop = container.scrollHeight
+    }, 0)
 
     const sendRes = await apiFetch('/api/chat/messages', {
       method: 'POST',
@@ -1346,13 +1355,15 @@ export default function ChatPage() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'stretch',
-        overflow: 'hidden', // ✅ 스크롤 여백 방지
+        overflow: 'hidden',
+        overflowX: 'hidden',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: '100%', // ✅ PC에서도 풀 폭
+          maxWidth: '100%',
+          boxSizing: 'border-box',
           height: isMobile
             ? 'calc(var(--vh, 1vh) * 100 - 60px)'
             : 'calc(var(--vh, 1vh) * 100)',
@@ -1375,6 +1386,7 @@ export default function ChatPage() {
               color: COLORS.text,
               display: 'flex',
               flexDirection: 'column',
+              overflowX: 'hidden',
             }}
           >
             <div
@@ -1467,12 +1479,11 @@ export default function ChatPage() {
                 그룹 채팅
               </button>
             </div>
-
             <div
-              ref={messageContainerRef}
               style={{
                 flex: 1,
                 overflowY: 'auto',
+                overflowX: 'hidden',
               }}
             >
               {rooms.map((room) => {
@@ -1485,27 +1496,32 @@ export default function ChatPage() {
                     onClick={async () => {
                       setCurrentRoomId(room.id)
 
+                      // 🔥 먼저 강제로 맨 아래 보내기 (UI 초기화 느낌)
+                      setTimeout(() => {
+                        const container = messageContainerRef.current
+                        if (!container) return
+                        container.scrollTop = container.scrollHeight
+                      }, 0)
+
                       if (!currentUser?.token) return
 
-                      // 🔥 읽음 처리
-                      if (currentUser?.token) {
-                        await apiFetch(`/api/chat/messages/${room.id}/read`, {
-                          method: 'POST',
-                        })
+                      await apiFetch(`/api/chat/messages/${room.id}/read`, {
+                        method: 'POST',
+                      })
 
-                        // 🔄 방 목록 다시 불러와서 unreadCount 갱신
-                        apiFetch('/api/chat/rooms')
-                          .then((res) => safeJson<ChatRoom[]>(res))
-                          .then((data) =>
-                            setRooms(Array.isArray(data) ? data : []),
-                          )
-                      }
-                      // ✅ 메시지 다시 불러오기 (readCount 즉시 반영)
-                      apiFetch(`/api/chat/messages/${room.id}`)
-                        .then((res) => safeJson<ChatMessage[]>(res))
-                        .then((data) =>
-                          setMessages(Array.isArray(data) ? data : []),
-                        )
+                      const res = await apiFetch(
+                        `/api/chat/messages/${room.id}`,
+                      )
+                      const data = await safeJson<ChatMessage[]>(res)
+
+                      setMessages(Array.isArray(data) ? data : [])
+
+                      // 🔥 메시지 로딩 후 한번 더 (핵심)
+                      setTimeout(() => {
+                        const container = messageContainerRef.current
+                        if (!container) return
+                        container.scrollTop = container.scrollHeight
+                      }, 0)
                     }}
                     style={{
                       width: '100%',
@@ -2006,6 +2022,7 @@ export default function ChatPage() {
 
             {/* 메시지 영역 */}
             <div
+              ref={messageContainerRef} // 🔥 여기로 이동
               style={{
                 flex: 1,
                 overflowY: 'auto',
@@ -2022,10 +2039,6 @@ export default function ChatPage() {
                   flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent:
-                    !currentRoom || roomMessages.length === 0
-                      ? 'center'
-                      : 'flex-start',
                 }}
               >
                 {latestNotice && hideNotice && (
