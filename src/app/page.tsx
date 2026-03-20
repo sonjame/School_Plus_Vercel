@@ -1604,6 +1604,14 @@ function TodayTimetable({
   today: string
   darkMode: boolean
 }) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   const [todayList, setTodayList] = useState<any[]>([])
 
   useEffect(() => {
@@ -1638,6 +1646,13 @@ function TodayTimetable({
         const filtered = data
           .filter((c) => c.day === todayShort && c.subject && c.subject.trim())
           .sort((a, b) => a.period - b.period)
+          .reduce((acc: any[], cur) => {
+            // 🔥 같은 교시 있으면 하나만 남김
+            if (!acc.find((item) => item.period === cur.period)) {
+              acc.push(cur)
+            }
+            return acc
+          }, [])
 
         setTodayList(filtered)
       } catch (e) {
@@ -1670,8 +1685,11 @@ function TodayTimetable({
         backgroundColor: darkMode ? '#1e293b' : '#E1F5FE',
         borderRadius: '12px',
         padding: '12px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        display: isMobile ? 'flex' : 'grid',
+        gridTemplateColumns: isMobile
+          ? undefined
+          : 'repeat(auto-fit, minmax(180px, 1fr))',
+        overflowX: isMobile ? 'auto' : 'visible',
         gap: '8px',
       }}
     >
@@ -1681,11 +1699,13 @@ function TodayTimetable({
           <div
             key={i}
             style={{
+              minWidth: isMobile ? '140px' : 'auto', // 🔥 핵심
+              flexShrink: 0,
+
               background: bg,
               borderRadius: '8px',
               padding: '12px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              // 🆕 카드 안 텍스트는 항상 어두운 색
               color: '#111827',
             }}
           >
