@@ -143,19 +143,32 @@ export default function AdminChatReportDetail() {
             }}
           >
             신고된 채팅 내용
+            {/* 🔥 삭제된 메시지 표시 */}
+            {data.is_deleted && (
+              <span
+                style={{
+                  marginLeft: 10,
+                  color: '#DC2626',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                ⚠ 삭제된 메시지
+              </span>
+            )}
           </div>
 
           <div
             style={{
               padding: 16,
               borderRadius: 10,
-              background: '#F9FAFB',
+              background: data.is_deleted ? '#FEF2F2' : '#F9FAFB', // 🔥 여기만 변경
               border: '1px solid #E5E7EB',
               whiteSpace: 'pre-wrap',
               fontSize: 14,
             }}
           >
-            {data.content}
+            {data.content || '내용 없음'}
           </div>
         </div>
 
