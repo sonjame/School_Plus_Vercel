@@ -940,6 +940,8 @@ function ToastWatcher() {
   const prevNotifyIdRef = useRef<number | null>(null)
   const isFirstLoadRef = useRef(true)
 
+  const prevAdminNotifyIdRef = useRef<number | null>(null)
+
   useEffect(() => {
     const checkNotifications = async () => {
       const token = localStorage.getItem('accessToken')
@@ -1012,6 +1014,41 @@ function ToastWatcher() {
           }
 
           prevNotifyIdRef.current = latest.id
+        }
+      }
+
+      /* ===================== */
+      /* 🛡 관리자 알림 */
+      /* ===================== */
+
+      if (user.level === 'admin') {
+        const adminRes = await fetch('/api/admin/notifications', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (adminRes.ok) {
+          const list = await adminRes.json()
+
+          if (Array.isArray(list) && list.length > 0) {
+            const latest = list[0]
+
+            if (
+              !isFirstLoadRef.current &&
+              latest.id !== prevAdminNotifyIdRef.current
+            ) {
+              if (latest.type === 'chat_report') {
+                showToast('🚨 채팅 신고', latest.message, 'admin')
+              } else if (latest.type === 'report_post') {
+                showToast('🚨 게시글 신고', latest.message, 'admin')
+              } else if (latest.type === 'admin_inquiry') {
+                showToast('📩 관리자 문의', latest.message, 'admin')
+              } else {
+                showToast('🔔 관리자 알림', latest.message, 'admin')
+              }
+            }
+
+            prevAdminNotifyIdRef.current = latest.id
+          }
         }
       }
 
