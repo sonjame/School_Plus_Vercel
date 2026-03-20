@@ -80,6 +80,7 @@ export async function GET(
     p.attachments,
     p.thumbnail, 
     p.is_hidden,
+    p.is_reported,
     DATE_FORMAT(
       CONVERT_TZ(p.created_at, '+00:00', '+09:00'),
       '%Y-%m-%d %H:%i:%s'
@@ -484,7 +485,7 @@ export async function DELETE(
 
     /* 1️⃣ 게시글 + 이미지 조회 */
     const [[post]]: any = await db.query(
-      `SELECT user_id, images FROM posts WHERE id = ?`,
+      `SELECT user_id, images, is_reported FROM posts WHERE id = ?`,
       [postId],
     )
 
@@ -492,6 +493,13 @@ export async function DELETE(
 
     if (!post || (post.user_id !== userId && !isAdmin)) {
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
+    }
+
+    if (post.is_reported) {
+      return NextResponse.json(
+        { message: '신고된 게시글은 삭제할 수 없습니다.' },
+        { status: 403 },
+      )
     }
 
     /* 2️⃣ images JSON 파싱 */
