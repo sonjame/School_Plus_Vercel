@@ -410,7 +410,7 @@ export default function PostDetailPage() {
       }
 
       showAlert('게시글이 삭제되었습니다.', () => {
-        router.push('/board')
+        router.push(`/board/${post.category}`)
       })
     })
   }
