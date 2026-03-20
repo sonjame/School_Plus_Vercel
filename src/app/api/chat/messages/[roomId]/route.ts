@@ -124,14 +124,19 @@ export async function GET(
    AND b.blocked_id = m.sender_id
 
   WHERE m.room_id = ?
-    AND b.id IS NULL           -- 🔥 내가 차단한 사람의 메시지 제거
+    AND b.id IS NULL
+    AND (
+      m.deleted_by IS NULL
+      OR JSON_CONTAINS(m.deleted_by, JSON_ARRAY(?)) = 0
+    )
 
   ORDER BY m.id ASC
   `,
       [
         userId, // myVote
-        userId, // blocks.user_id (나)
+        userId, // blocks.user_id
         roomIdNum,
+        userId, 
       ],
     )
 
