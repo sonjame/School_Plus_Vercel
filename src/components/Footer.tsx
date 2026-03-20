@@ -207,8 +207,8 @@ export default function WeeklyMealPage() {
 
       /* 각 급식 카드 고정 너비 */
       .meal-card {
-        min-width: 330px !important;
-        max-width: 330px !important;
+        min-width: 305px !important;
+        max-width: 305px !important;
         flex-shrink: 0 !important;
         padding: 12px !important;
         border-radius: 12px !important;
