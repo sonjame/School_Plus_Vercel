@@ -7,7 +7,7 @@ type Toast = {
   id: number
   title: string
   message: string
-  type?: 'chat' | 'postComment' | 'commentReply' | 'success' | 'error'
+  type?: 'chat' | 'postComment' | 'commentReply' | 'success' | 'error' | 'admin'
 }
 
 const ToastContext = createContext<{
