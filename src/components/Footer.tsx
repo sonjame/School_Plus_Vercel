@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 // ---------------------------
 //  급식 API 불러오기 함수 (단일 날짜 조회)
@@ -48,6 +48,16 @@ export default function WeeklyMealPage() {
 
   const [eduCode, setEduCode] = useState<string | null>(null)
   const [schoolCode, setSchoolCode] = useState<string | null>(null)
+
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const todayKey = (() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    return `${y}${m}${d}`
+  })()
 
   const [ready, setReady] = useState(false)
 
@@ -128,6 +138,22 @@ export default function WeeklyMealPage() {
     return () => window.removeEventListener('theme-change', handleThemeChange)
   }, [])
 
+  useEffect(() => {
+    if (!weekMeals.length) return
+
+    const index = weekMeals.findIndex((d) => d.date === todayKey)
+    if (index === -1) return
+
+    const el = itemRefs.current[index]
+    if (!el) return
+
+    el.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center', // 🔥 핵심
+      block: 'nearest',
+    })
+  }, [weekMeals])
+
   return (
     <div
       style={{
@@ -181,22 +207,22 @@ export default function WeeklyMealPage() {
 
       /* 각 급식 카드 고정 너비 */
       .meal-card {
-        min-width: 160px !important;
-        max-width: 160px !important;
+        min-width: 330px !important;
+        max-width: 330px !important;
         flex-shrink: 0 !important;
         padding: 12px !important;
         border-radius: 12px !important;
       }
 
       .meal-date {
-        font-size: 13px !important;
+        font-size: 15px !important;
         margin-bottom: 4px !important;
       }
 
       .meal-ul {
-        font-size: 12px !important;
-        padding-left: 14px !important;
-        line-height: 1.45 !important;
+        font-size: 14px !important;  
+        adding-left: 14px !important;
+        line-height: 1.5 !important; 
       }
 
       h3 {
@@ -218,6 +244,9 @@ export default function WeeklyMealPage() {
         {weekMeals.map((d, idx) => (
           <div
             key={idx}
+            ref={(el) => {
+              itemRefs.current[idx] = el
+            }}
             className="meal-card"
             style={{
               background: darkMode ? '#1e293b' : 'white',
