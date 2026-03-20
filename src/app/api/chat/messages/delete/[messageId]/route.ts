@@ -62,7 +62,7 @@ export async function DELETE(
     /* 3️⃣ 메시지 조회 */
     const [[msg]]: any = await db.query(
       `
-      SELECT id, sender_id, created_at, type, file_url
+      SELECT id, sender_id, created_at, type, file_url, content
       FROM chat_messages
       WHERE id = ?
       `,
@@ -75,6 +75,46 @@ export async function DELETE(
 
     if (Number(msg.sender_id) !== Number(userId)) {
       return NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 })
+    }
+
+    /* 🔥 신고 여부 확인 */
+    const [[report]]: any = await db.query(
+      `
+  SELECT id FROM chat_reports
+  WHERE message_id = ?
+  LIMIT 1
+  `,
+      [messageIdNum],
+    )
+
+    /* 🔥 신고된 메시지면 snapshot 저장 */
+    if (report) {
+      const [[exists]]: any = await db.query(
+        `
+    SELECT id FROM chat_message_snapshots
+    WHERE message_id = ?
+    LIMIT 1
+    `,
+        [messageIdNum],
+      )
+
+      if (!exists) {
+        await db.query(
+          `
+      INSERT INTO chat_message_snapshots
+      (message_id, sender_id, content, file_url, type, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+          [
+            msg.id,
+            msg.sender_id,
+            msg.content || null,
+            msg.file_url || null,
+            msg.type,
+            msg.created_at,
+          ],
+        )
+      }
     }
 
     /* 4️⃣ 24시간 계산 */
