@@ -1295,15 +1295,7 @@ export default function ScoresPage() {
           <h2 className="section-title">과목별 성적 변화 그래프</h2>
 
           {/* 과목 선택 버튼들 */}
-          <div
-            style={{
-              marginTop: 12,
-              marginBottom: 16,
-              display: 'flex',
-              gap: 8,
-              flexWrap: 'wrap',
-            }}
-          >
+          <div className="subject-scroll-x">
             {subjectButtons.map((btn) => {
               const active =
                 selectedSubject?.key === btn.key &&
@@ -1316,6 +1308,7 @@ export default function ScoresPage() {
                   style={{
                     padding: '8px 14px',
                     borderRadius: 999,
+                    flex: '0 0 auto',
                     border: active
                       ? `2px solid ${subjectColors[btn.key]}`
                       : `1px solid ${darkMode ? '#4b5563' : '#ddd'}`,
@@ -1519,6 +1512,23 @@ export default function ScoresPage() {
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
+        @media (max-width: 768px) {
+          .page-wrap {
+            padding: 16px !important;
+            padding-top: 72px !important;
+            margin: 0 !important;
+            border-radius: 0;
+          }
+
+          .card {
+            padding: 16px;
+          }
+
+          .grid {
+            gap: 16px;
+          }
+        }
+
         .title {
           font-size: clamp(22px, 4vw, 32px);
           font-weight: 700;
@@ -1537,6 +1547,37 @@ export default function ScoresPage() {
           gap: 10px;
           margin-top: 20px;
           margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+          .month-tabs {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .month-tabs::-webkit-scrollbar {
+            display: none;
+          }
+        }
+
+        .subject-scroll-x {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+          .subject-scroll-x {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+          }
+
+          .subject-scroll-x::-webkit-scrollbar {
+            display: none;
+          }
         }
 
         .grade-btn,
