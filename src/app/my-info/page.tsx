@@ -558,7 +558,7 @@ export default function MyInfoPagePreview() {
         minHeight: '85vh',
         display: 'flex',
         justifyContent: 'center',
-        padding: '70px 40px 30px',
+        padding: isMobile ? '70px 12px 20px' : '70px 40px 30px',
         background: themeSetting.darkMode ? '#0f172a' : '#f8fafc',
         color: themeSetting.darkMode ? '#f1f5f9' : '#111827',
       }}
@@ -566,7 +566,7 @@ export default function MyInfoPagePreview() {
       <div
         style={{
           width: '100%',
-          maxWidth: 520,
+          maxWidth: isMobile ? '100%' : 520,
           background: themeSetting.darkMode ? '#1e293b' : 'white',
           borderRadius: 16,
           padding: 24,
