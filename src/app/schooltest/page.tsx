@@ -882,10 +882,11 @@ const styles = {
   },
 
   page: {
-    width: '97%',
+    width: '100%',
     maxWidth: 'none',
     margin: 0,
     padding: '24px',
+    paddingTop: '72px',
     background: '#fff',
     borderRadius: 0,
     boxShadow: 'none',
@@ -893,6 +894,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     minHeight: '100vh',
+    boxSizing: 'border-box', // 🔥 핵심
+    overflowX: 'hidden',
   },
 
   title: {
