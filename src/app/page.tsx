@@ -68,6 +68,15 @@ export default function HomePage() {
 
   const { showToast } = useToast()
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   // 🔔 관리자 알림
   const [unreadNotifyCount, setUnreadNotifyCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
@@ -844,9 +853,9 @@ export default function HomePage() {
 
         <div
           style={{
-            position: 'absolute',
-            top: '16px',
-            right: '32px',
+            position: isMobile ? 'fixed' : 'absolute',
+            top: isMobile ? '12px' : '16px',
+            right: isMobile ? '12px' : '32px',
             zIndex: 1000,
           }}
         >
@@ -892,7 +901,9 @@ export default function HomePage() {
                   position: 'absolute',
                   top: '36px',
                   right: 0,
-                  width: '320px',
+                  width: 'min(50vw, 320px)', // 🔥 핵심
+                  maxHeight: '60vh',
+                  overflowY: 'auto',
                   background: themeSetting.darkMode ? '#0f172a' : '#fff',
                   color: themeSetting.darkMode ? '#e5e7eb' : '#111827',
                   borderRadius: '12px',
