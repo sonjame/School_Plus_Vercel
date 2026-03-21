@@ -128,6 +128,7 @@ export default function WeeklyMealPage() {
       style={{
         marginBottom: '32px',
         padding: '20px',
+        marginTop: '20px',
         background: darkMode ? '#020617' : '#ffffff',
         borderRadius: '16px',
         boxShadow: darkMode
