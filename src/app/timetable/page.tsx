@@ -1021,7 +1021,7 @@ export default function TimetablePage() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 8,
-                    width: '85%',
+                    width: '100%',
                   }}
                 >
                   {addForm.slots.map((slot, idx) => (
@@ -1097,7 +1097,7 @@ export default function TimetablePage() {
               </Row>
 
               <Row label="과목" darkMode={darkMode}>
-                <div style={{ display: 'flex', gap: 6, width: '82%' }}>
+                <div style={{ display: 'flex', gap: 6, width: '100%' }}>
                   <select
                     value={
                       DEFAULT_SUBJECTS.includes(addForm.subject)
@@ -1177,7 +1177,7 @@ export default function TimetablePage() {
               darkMode={darkMode}
             >
               <Row label="과목" darkMode={darkMode}>
-                <div style={{ display: 'flex', gap: 6, width: '79%' }}>
+                <div style={{ display: 'flex', gap: 6, width: '100%' }}>
                   <select
                     value={
                       DEFAULT_SUBJECTS.includes(edit.subject)
@@ -1635,8 +1635,24 @@ function Row({
   darkMode?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <label style={getLabelCss(darkMode)}>{label}</label>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column', // 🔥 핵심
+        gap: 6,
+        width: '100%',
+      }}
+    >
+      <label
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: darkMode ? '#e5e7eb' : '#374151',
+        }}
+      >
+        {label}
+      </label>
+
       {children}
     </div>
   )
@@ -1697,15 +1713,22 @@ const overlay: React.CSSProperties = {
 }
 
 const modalBox: React.CSSProperties = {
-  background: 'white',
-  borderRadius: 12,
-  padding: 20,
-  width: '80%',
-  maxWidth: 420,
-  maxHeight: '80dvh',
+  width: 'min(92vw, 480px)', // 🔥 핵심
+  maxHeight: '85dvh',
   overflowY: 'auto',
-  boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+
+  background: 'white',
+  borderRadius: 16,
+  padding: '20px 16px',
+
+  boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
   position: 'relative',
+
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 16,
+
+  boxSizing: 'border-box',
 }
 
 const modalTitle: React.CSSProperties = {
@@ -1718,8 +1741,8 @@ const modalTitle: React.CSSProperties = {
 
 const modalButtons: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'center',
-  gap: 10,
+  flexDirection: 'column', // 🔥 핵심
+  gap: 8,
   marginTop: 8,
 }
 
