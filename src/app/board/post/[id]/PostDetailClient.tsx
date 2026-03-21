@@ -1839,24 +1839,27 @@ const getMenuBtn = (darkMode: boolean): React.CSSProperties => ({
 
 const menuBox: React.CSSProperties = {
   position: 'absolute',
-  top: '40px',
-  right: '10px',
+  top: '36px', // 🔥 살짝 줄임
+  right: '6px', // 🔥 더 붙이기
   background: 'white',
   border: '1px solid #ddd',
   borderRadius: '8px',
   boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-  padding: '6px 0',
+  padding: '4px 0', // 🔥 줄임
   zIndex: 9999,
+  minWidth: 130, // 🔥 핵심
+  maxWidth: 160,
 }
 
 const menuItem: React.CSSProperties = {
   width: '100%',
-  padding: '10px 14px',
+  padding: '7px 10px', // 🔥 핵심: 줄이기
   textAlign: 'left',
   background: 'white',
   border: 'none',
   cursor: 'pointer',
-  fontSize: '14px',
+  fontSize: '13px', // 🔥 핵심
+  lineHeight: 1.3,
 }
 
 const menuItemRed: React.CSSProperties = {
@@ -2015,27 +2018,27 @@ const voteBarFill: React.CSSProperties = {
 
 const commentMenuBox: React.CSSProperties = {
   position: 'absolute',
-  top: 34, // 댓글 기준 살짝 아래
-  right: 6,
+  top: 30, // 🔥 살짝 줄임
+  right: 4, // 🔥 더 붙이기
   background: 'white',
   border: '1px solid #e5e7eb',
-  borderRadius: 10,
+  borderRadius: 8, // 🔥 살짝 작게
   boxShadow: '0 4px 10px rgba(0,0,0,0.18)',
-  padding: '4px 0',
+  padding: '2px 0', // 🔥 핵심: 위아래 줄이기
   zIndex: 9999,
-  minWidth: 140, // 너무 넓어지지 않게
-  maxWidth: 180,
+  minWidth: 110, // 🔥 핵심: 작게
+  maxWidth: 140,
 }
 
 const commentMenuItem: React.CSSProperties = {
   width: '100%',
-  padding: '8px 10px', // 🔥 기존보다 줄임
+  padding: '6px 8px', // 🔥 핵심: 줄이기
   textAlign: 'left',
   background: 'white',
   border: 'none',
   cursor: 'pointer',
-  fontSize: 13, // 🔥 한 단계 작게
-  lineHeight: 1.3,
+  fontSize: 12, // 🔥 핵심: 작게
+  lineHeight: 1.2,
 }
 
 const commentMenuItemRed: React.CSSProperties = {
