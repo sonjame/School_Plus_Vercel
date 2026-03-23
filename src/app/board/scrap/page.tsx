@@ -131,7 +131,9 @@ export default function ScrapPage() {
                 <span style={likes}>💙 {p.likes}</span>
               </div>
               <h3 style={getTitleStyle(darkMode)}>{p.title}</h3>
-              <p style={getContentStyle(darkMode)}>{p.content}</p>
+              <p style={getContentStyle(darkMode)}>
+                {p.content?.replace(/<[^>]*>?/g, '').trim() || '내용 없음'}
+              </p>
 
               <div style={getFooterStyle(darkMode)}>
                 <span>{p.author}</span>
