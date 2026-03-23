@@ -39,6 +39,7 @@ export async function GET(req: Request) {
   WHERE user_id = ?
     AND type IN (
   'report_post',
+  'report_comment',
   'chat_report',
   'admin_question',
   'admin_post_commented',
