@@ -37,6 +37,7 @@ export async function GET(
     c.parent_id,
     c.user_id,
     c.created_at,
+    c.is_deleted,
     COUNT(cl.id) AS likes,
     MAX(cl.user_id = ?) AS likedByMe
   FROM post_comments c
@@ -66,6 +67,7 @@ export async function GET(
       rows.map((c: any) => ({
         id: c.id,
         content: c.content,
+        is_deleted: !!c.is_deleted, // 🔥 추가
         author: c.author,
         parent: c.parent_id,
         user_id: c.user_id,
