@@ -87,8 +87,16 @@ export async function DELETE(
     }
 
     /* 대댓글 먼저 삭제 */
-    await db.query(`DELETE FROM post_comments WHERE parent = ?`, [commentId])
-    await db.query(`DELETE FROM post_comments WHERE id = ?`, [commentId])
+    // 🔥 대댓글도 같이 "삭제 처리"
+    await db.query(
+      `UPDATE post_comments SET is_deleted = 1 WHERE parent_id = ?`,
+      [commentId],
+    )
+
+    // 🔥 본 댓글도 삭제 처리
+    await db.query(`UPDATE post_comments SET is_deleted = 1 WHERE id = ?`, [
+      commentId,
+    ])
 
     return NextResponse.json({ success: true })
   } catch (e) {
