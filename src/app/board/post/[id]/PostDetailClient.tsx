@@ -279,16 +279,26 @@ export default function PostDetailPage() {
     )
   }, [post])
 
+  const myLevel =
+    typeof window !== 'undefined' ? localStorage.getItem('level') : null
+
+  const isAdmin = myLevel === 'admin'
+
   /* ------------------------------------------
      댓글 트리 생성
   ------------------------------------------- */
   function buildTree(arr: any[], parent: string | null = null): any[] {
-    return arr
-      .filter((c) => c.parent === parent)
-      .map((c) => ({
-        ...c,
-        children: buildTree(arr, c.id),
-      }))
+    return arr.filter((c) => {
+      if (c.parent !== parent) return false
+
+      // 🔥 삭제된 댓글은 아예 제외
+      if (c.is_deleted) return false
+
+      // 🔥 관리자면 숨김은 보이지만 삭제는 제외
+      if (isAdmin) return true
+
+      return !c.is_hidden
+    })
   }
 
   const commentTree = buildTree(comments)
@@ -339,10 +349,12 @@ export default function PostDetailPage() {
 
     if (!replyValue.trim() || !replyTarget) return
 
+    const cleanedContent = replyValue.replace(/^@\S+\s*/, '')
+
     const res = await apiFetch(`/api/posts/${postId}/comments`, {
       method: 'POST',
       body: JSON.stringify({
-        content: replyValue,
+        content: cleanedContent, // ✅ 여기로 변경
         parent: replyTarget,
       }),
     })
@@ -387,13 +399,19 @@ export default function PostDetailPage() {
 
       if (!res.ok) return showAlert('댓글 삭제 실패')
 
-      setComments((prev) => prev.filter((c) => c.id !== id && c.parent !== id))
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, content: '삭제된 댓글입니다.', is_deleted: true }
+            : c,
+        ),
+      )
     })
   }
 
   /* 게시글 삭제 */
   const deletePost = async () => {
-    if (post?.is_reported) {
+    if (post?.is_reported && !isAdmin) {
       showAlert('🚫 신고된 게시글은 삭제할 수 없습니다.')
       return
     }
@@ -727,25 +745,29 @@ export default function PostDetailPage() {
 
             {openCommentMenu === c.id && (
               <div style={commentMenuBox}>
-                <button
-                  style={{
-                    ...commentMenuItem,
-                    color: reportedComments[c.id] ? '#9CA3AF' : undefined,
-                    cursor: reportedComments[c.id] ? 'not-allowed' : 'pointer',
-                  }}
-                  onClick={() => {
-                    if (reportedComments[c.id]) {
-                      showAlert('이미 신고한 댓글입니다.')
-                      return
-                    }
+                {!isWriter && (
+                  <button
+                    style={{
+                      ...commentMenuItem,
+                      color: reportedComments[c.id] ? '#9CA3AF' : undefined,
+                      cursor: reportedComments[c.id]
+                        ? 'not-allowed'
+                        : 'pointer',
+                    }}
+                    onClick={() => {
+                      if (reportedComments[c.id]) {
+                        showAlert('이미 신고한 댓글입니다.')
+                        return
+                      }
 
-                    setOpenCommentMenu(null)
-                    setReportTarget({ type: 'comment', id: c.id })
-                    setReportOpen(true)
-                  }}
-                >
-                  🚩 {reportedComments[c.id] ? '신고 완료됨' : '신고하기'}
-                </button>
+                      setOpenCommentMenu(null)
+                      setReportTarget({ type: 'comment', id: c.id })
+                      setReportOpen(true)
+                    }}
+                  >
+                    🚩 {reportedComments[c.id] ? '신고 완료됨' : '신고하기'}
+                  </button>
+                )}
 
                 {canManageComment && (
                   <>
@@ -798,7 +820,7 @@ export default function PostDetailPage() {
                     color: darkMode ? '#e2e8f0' : '#111827',
                   }}
                 >
-                  {c.content}
+                  {c.content.replace(/^@\S+\s*/, '')}
                 </div>
 
                 {/* 작성자 / 시간 */}
@@ -831,7 +853,7 @@ export default function PostDetailPage() {
                 </button>
 
                 {/* 🔥 답글 버튼은 부모 댓글 + 권한 있을 때만 */}
-                {canComment && (
+                {!c.is_deleted && !c.is_reported && canComment && (
                   <button
                     style={{
                       background: 'transparent',
@@ -894,11 +916,6 @@ export default function PostDetailPage() {
 
   if (!post)
     return <p style={{ padding: '20px' }}>게시글을 찾을 수 없습니다.</p>
-
-  const myLevel =
-    typeof window !== 'undefined' ? localStorage.getItem('level') : null
-
-  const isAdmin = myLevel === 'admin'
 
   // 🚫 숨김 게시글 처리 (관리자는 예외)
   if (post.is_hidden && myLevel !== 'admin') {
@@ -1525,6 +1542,7 @@ export default function PostDetailPage() {
                       body: JSON.stringify({
                         type: reportType,
                         content: reportType === '기타' ? reportText : null,
+                        commentId: target.type === 'comment' ? target.id : null,
                       }),
                     })
 
