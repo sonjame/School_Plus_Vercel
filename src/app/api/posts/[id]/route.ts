@@ -292,7 +292,12 @@ export async function PUT(
 
     /* 🔒 작성자 확인 */
 
-    const isAdmin = decoded.level === 'admin'
+   const [[userInfo]]: any = await db.query(
+     `SELECT level FROM users WHERE id = ?`,
+     [userId],
+   )
+
+   const isAdmin = userInfo?.level === 'admin'
 
     const [[post]]: any = await db.query(
       `SELECT user_id FROM posts WHERE id = ?`,
@@ -495,7 +500,8 @@ export async function DELETE(
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
     }
 
-    if (post.is_reported) {
+    // 🔥 관리자 아니고 + 신고된 경우만 막기
+    if (post.is_reported && !isAdmin) {
       return NextResponse.json(
         { message: '신고된 게시글은 삭제할 수 없습니다.' },
         { status: 403 },
