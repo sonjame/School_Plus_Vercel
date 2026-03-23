@@ -92,7 +92,86 @@ export async function POST(
       }
     }
 
-    const { type, content } = await req.json()
+    const { type, content, commentId } = await req.json()
+
+    /* =========================
+🔔 댓글 신고 처리 (⭐ 여기 추가)
+========================= */
+    if (commentId) {
+      // 🚫 본인 댓글 신고 방지
+      const [[comment]]: any = await db.query(
+        `
+    SELECT user_id, content
+    FROM post_comments
+    WHERE id = ?
+    `,
+        [commentId],
+      )
+
+      if (!comment) {
+        return NextResponse.json({ message: '댓글 없음' }, { status: 404 })
+      }
+
+      if (comment.user_id === userId) {
+        return NextResponse.json(
+          { message: '본인 댓글은 신고할 수 없습니다.' },
+          { status: 400 },
+        )
+      }
+
+      // 🔥 중복 신고 체크 (댓글용)
+      const [exists]: any = await db.query(
+        `
+    SELECT id
+    FROM comment_reports
+    WHERE comment_id = ? AND user_id = ?
+    LIMIT 1
+    `,
+        [commentId, userId],
+      )
+
+      if (exists.length > 0) {
+        return NextResponse.json(
+          { message: '이미 신고한 댓글입니다.' },
+          { status: 409 },
+        )
+      }
+
+      // 🔥 댓글 신고 저장
+      await db.query(
+        `
+    INSERT INTO comment_reports (comment_id, user_id, type, content)
+    VALUES (?, ?, ?, ?)
+    `,
+        [commentId, userId, type, content || null],
+      )
+
+      // 🔔 관리자 알림
+      const [admins]: any = await db.query(`
+    SELECT id FROM users WHERE level = 'admin'
+  `)
+
+      if (admins.length > 0) {
+        const values = admins.map((a: any) => [
+          a.id,
+          'report_comment',
+          '🚨 댓글 신고 접수',
+          `댓글이 신고되었습니다. (사유: ${type})`,
+          `/board/post/${postId}`,
+        ])
+
+        await db.query(
+          `
+      INSERT INTO notifications
+        (user_id, type, title, message, link)
+      VALUES ?
+      `,
+          [values],
+        )
+      }
+
+      return NextResponse.json({ success: true })
+    }
 
     if (!type) {
       return NextResponse.json(
