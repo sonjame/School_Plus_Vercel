@@ -127,6 +127,13 @@ export default function ScoresPage() {
     label: string
   } | null>(null)
 
+  // 🎓 대학 검색
+  const [univKeyword, setUnivKeyword] = useState('')
+  const [results, setResults] = useState<any[]>([])
+
+  const [regionFilter, setRegionFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+
   // 그래프 보기: 꺽은선 형식, 막대 형식 버튼 선택
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
 
@@ -538,6 +545,53 @@ export default function ScoresPage() {
 
     setShowModal(true)
     setTimeout(() => setShowModal(false), 1500)
+  }
+
+  const handleSearchUniv = async () => {
+    if (!univKeyword) return
+
+    const res = await fetch(
+      `/api/univ-search?q=${encodeURIComponent(univKeyword)}`,
+    )
+    const text = await res.text()
+
+    const parser = new DOMParser()
+    const xml = parser.parseFromString(text, 'text/xml')
+
+    // 🔥 career.go 구조
+    const items = Array.from(xml.getElementsByTagName('content'))
+
+    let parsed = items.map((item) => ({
+      school: item.getElementsByTagName('schoolName')[0]?.textContent,
+      region: item.getElementsByTagName('region')[0]?.textContent,
+      address: item.getElementsByTagName('adres')[0]?.textContent,
+      type: item.getElementsByTagName('schoolGubun')[0]?.textContent,
+      link: item.getElementsByTagName('link')[0]?.textContent,
+      estType: item.getElementsByTagName('estType')[0]?.textContent,
+    }))
+
+    // 🔥 지역 필터
+    if (regionFilter) {
+      parsed = parsed.filter((v) => v.region?.includes(regionFilter))
+    }
+
+    // 🔥 4년제 필터
+    if (typeFilter) {
+      parsed = parsed.filter((v) => v.type?.includes(typeFilter))
+    }
+
+    // 🔥 중복 제거 (캠퍼스 여러개 문제 해결)
+    const unique = new Map()
+    parsed.forEach((item) => {
+      if (!unique.has(item.school)) {
+        unique.set(item.school, item)
+      }
+    })
+
+    setResults(Array.from(unique.values()))
+
+    console.log(parsed)
+    setResults(parsed)
   }
 
   // ---------------------------------------------
@@ -1282,6 +1336,78 @@ export default function ScoresPage() {
               <p style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
                 ※ 실제 합격 여부는 대학별 반영 비율에 따라 달라질 수 있습니다.
               </p>
+
+              {/* 🎓 대학 / 학과 검색 */}
+              <div style={{ marginTop: 30 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+                  🎓 대학교 검색
+                </h3>
+
+                <p style={{ fontSize: 13, marginBottom: 12, color: '#6B7280' }}>
+                  가고싶은 대학을 검색해보세요
+                </p>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    placeholder="대학교 (예: 연세대학교)"
+                    value={univKeyword}
+                    onChange={(e) => setUnivKeyword(e.target.value)}
+                    style={{
+                      padding: 8,
+                      borderRadius: 6,
+                      border: '1px solid #ccc',
+                      fontSize: 13,
+                    }}
+                  />
+
+                  <button
+                    onClick={handleSearchUniv}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: 6,
+                      background: '#4d8dff',
+                      color: '#fff',
+                      fontSize: 13,
+                    }}
+                  >
+                    검색
+                  </button>
+                </div>
+
+                {/* 결과 */}
+                <div style={{ marginTop: 15 }}>
+                  {results.map((r, i) => (
+                    <div
+                      key={i}
+                      onClick={() => r.link && window.open(r.link, '_blank')}
+                      style={{
+                        fontSize: 13,
+                        marginBottom: 10,
+                        padding: 10,
+                        border: '1px solid #ddd',
+                        borderRadius: 8,
+                        cursor: 'pointer', // ⭐ 중요
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>🎓 {r.school}</div>
+
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        📍 {r.region}
+                      </div>
+
+                      <div style={{ fontSize: 12 }}>🏫 {r.type}</div>
+
+                      <div style={{ fontSize: 12 }}>📌 {r.address}</div>
+
+                      <div
+                        style={{ fontSize: 12, color: '#2563EB', marginTop: 4 }}
+                      >
+                        🔗 홈페이지 바로가기
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
