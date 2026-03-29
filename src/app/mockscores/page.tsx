@@ -131,6 +131,10 @@ export default function ScoresPage() {
   const [univKeyword, setUnivKeyword] = useState('')
   const [results, setResults] = useState<any[]>([])
 
+  // 🔥 검색 기록 & 연관 검색
+  const [recentSearches, setRecentSearches] = useState<any[]>([])
+  const [suggestions, setSuggestions] = useState<any[]>([])
+
   const [regionFilter, setRegionFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
 
@@ -583,16 +587,137 @@ export default function ScoresPage() {
     // 🔥 중복 제거 (캠퍼스 여러개 문제 해결)
     const unique = new Map()
     parsed.forEach((item) => {
-      if (!unique.has(item.school)) {
-        unique.set(item.school, item)
+      const key = item.school + item.address // ⭐ 핵심 수정
+      if (!unique.has(key)) {
+        unique.set(key, item)
       }
     })
 
     setResults(Array.from(unique.values()))
 
     console.log(parsed)
-    setResults(parsed)
+
+    // ⭐ 먼저 UI에 바로 추가
+    setRecentSearches((prev) => {
+      const exists = prev.find((v) => v.keyword === univKeyword)
+      if (exists) return prev
+
+      return [
+        { id: Date.now(), keyword: univKeyword }, // 임시 id
+        ...prev,
+      ].slice(0, 10)
+    })
+
+    // ⭐ 서버 저장
+    await saveSearchHistory(univKeyword)
+
+    // ⭐ 서버 데이터 동기화
+    fetchRecentSearches()
   }
+
+  // 🔥 검색 기록 저장
+  const saveSearchHistory = async (keyword: string) => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
+    const token = JSON.parse(stored).token
+
+    await fetch('/api/univ-search-history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ keyword }),
+    })
+  }
+
+  // 🔥 최근 검색 가져오기
+  const fetchRecentSearches = async () => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
+    let token = null
+    try {
+      token = JSON.parse(stored).token
+    } catch {}
+
+    if (!token) return // 🔥 이거 중요
+
+    const res = await fetch('/api/univ-search-history', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!res.ok) {
+      console.log('검색 기록 불러오기 실패', res.status)
+      return
+    }
+
+    const data = await res.json()
+    setRecentSearches(data)
+  }
+
+  // 🔥 자동완성
+  const fetchSuggestions = async (q: string) => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
+    const token = JSON.parse(stored).token
+
+    const res = await fetch(
+      `/api/univ-search-history?q=${encodeURIComponent(q)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    )
+
+    const data = await res.json()
+    setSuggestions(data)
+  }
+
+  // 🔥 단일 삭제
+  const deleteSearch = async (id: number) => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
+    const token = JSON.parse(stored).token
+
+    await fetch('/api/univ-search-history', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id }),
+    })
+
+    fetchRecentSearches()
+  }
+
+  // 🔥 전체 삭제
+  const deleteAllSearch = async () => {
+    const stored = localStorage.getItem('loggedInUser')
+    if (!stored) return
+
+    const token = JSON.parse(stored).token
+
+    await fetch('/api/univ-search-history', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    setRecentSearches([])
+  }
+
+  useEffect(() => {
+    fetchRecentSearches()
+  }, [])
 
   // ---------------------------------------------
   // ⭐ 과목별 색상
@@ -1344,14 +1469,24 @@ export default function ScoresPage() {
                 </h3>
 
                 <p style={{ fontSize: 13, marginBottom: 12, color: '#6B7280' }}>
-                  가고싶은 대학을 검색해보세요
+                  입시분석을 통해 가고싶은 대학을 검색해보세요
                 </p>
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input
                     placeholder="대학교 (예: 연세대학교)"
                     value={univKeyword}
-                    onChange={(e) => setUnivKeyword(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setUnivKeyword(value)
+
+                      if (!value) {
+                        setSuggestions([]) // ⭐ 추가
+                        return
+                      }
+
+                      fetchSuggestions(value)
+                    }}
                     style={{
                       padding: 8,
                       borderRadius: 6,
@@ -1359,6 +1494,54 @@ export default function ScoresPage() {
                       fontSize: 13,
                     }}
                   />
+
+                  {suggestions.length > 0 && univKeyword && (
+                    <div style={{ marginTop: 8 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: '#666',
+                          marginBottom: 5,
+                        }}
+                      >
+                        추천 검색
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          overflowX: 'auto',
+                          gap: 8,
+                          flexWrap: 'nowrap',
+                          WebkitOverflowScrolling: 'touch',
+                          paddingBottom: 4,
+                        }}
+                      >
+                        {suggestions.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setUnivKeyword(item.keyword)
+                              setSuggestions([]) // ⭐ 선택하면 닫힘
+                              handleSearchUniv()
+                            }}
+                            style={{
+                              flex: '0 0 auto',
+                              whiteSpace: 'nowrap',
+                              border: '1px solid #ddd',
+                              borderRadius: 999,
+                              padding: '6px 10px',
+                              fontSize: 12,
+                              background: '#eef4ff',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {item.keyword}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleSearchUniv}
@@ -1374,8 +1557,109 @@ export default function ScoresPage() {
                   </button>
                 </div>
 
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {recentSearches.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: '#666',
+                          marginBottom: 5,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>검색 기록</span>
+
+                        {/* 🔥 전체 삭제 */}
+                        <button
+                          onClick={deleteAllSearch}
+                          style={{
+                            fontSize: 11,
+                            color: '#ef4444',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          전체삭제
+                        </button>
+                      </div>
+
+                      <div
+                        className="horizontal-scroll"
+                        style={{
+                          display: 'flex',
+                          overflowX: 'auto',
+                          gap: 8,
+                          flexWrap: 'nowrap',
+                          WebkitOverflowScrolling: 'touch',
+                          paddingBottom: 4,
+                        }}
+                      >
+                        {recentSearches.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setUnivKeyword(item.keyword)
+                              handleSearchUniv()
+                            }}
+                            style={{
+                              display: 'flex',
+                              flex: '0 0 auto',
+                              whiteSpace: 'nowrap',
+                              alignItems: 'center',
+                              border: '1px solid #ddd',
+                              borderRadius: 999,
+                              padding: '6px 10px',
+                              fontSize: 12,
+                              background: '#f9fafb',
+                              cursor: 'pointer', // ⭐ 추가
+                            }}
+                          >
+                            {/* 검색 클릭 */}
+                            <span
+                              onClick={() => {
+                                setUnivKeyword(item.keyword)
+                                handleSearchUniv() // ⭐ 추가
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {item.keyword}
+                            </span>
+
+                            {/* 🔥 삭제 버튼 */}
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation() // ⭐ 핵심
+                                deleteSearch(item.id)
+                              }}
+                              style={{
+                                marginLeft: 6,
+                                color: '#999',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✕
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* 결과 */}
-                <div style={{ marginTop: 15 }}>
+                <div
+                  style={{
+                    marginTop: 15,
+                    maxHeight: '260px', // ⭐ 핵심
+                    overflowY: 'auto', // ⭐ 핵심
+                    border: '1px solid #eee',
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
                   {results.map((r, i) => (
                     <div
                       key={i}
@@ -1653,6 +1937,10 @@ export default function ScoresPage() {
           .grid {
             gap: 16px;
           }
+
+          .horizontal-scroll::-webkit-scrollbar {
+            display: none;
+          }
         }
 
         .title {
@@ -1703,6 +1991,10 @@ export default function ScoresPage() {
 
           .subject-scroll-x::-webkit-scrollbar {
             display: none;
+          }
+
+          .result-list {
+            max-height: 200px;
           }
         }
 
@@ -1879,6 +2171,16 @@ export default function ScoresPage() {
           to {
             opacity: 1;
             transform: scale(1);
+          }
+        }
+
+        .horizontal-scroll {
+          max-width: 430px; /* 💻 PC: 5개 정도 */
+        }
+
+        @media (max-width: 768px) {
+          .horizontal-scroll {
+            max-width: 260px; /* 📱 모바일: 3개 */
           }
         }
 
