@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { apiFetch } from '@/src/lib/apiFetch'
+import LZString from 'lz-string'
 
 interface ClassItem {
   day: string
@@ -268,9 +269,20 @@ export default function TimetablePage() {
 
   /* ----------------- URL 생성 함수 ----------------- */
   const getShareURL = () => {
-    const json = JSON.stringify(classes)
-    const encoded = btoa(encodeURIComponent(json))
-    return `${window.location.origin}/timetable?data=${encoded}`
+    // 🔥 여기 추가
+    const compact = classes.map((c) => [
+      c.day,
+      c.period,
+      c.subject,
+      c.teacher,
+      c.room,
+    ])
+
+    const json = JSON.stringify(compact)
+
+    const compressed = LZString.compressToEncodedURIComponent(json)
+
+    return `${window.location.origin}/timetable?data=${compressed}`
   }
 
   const openShareToChat = async () => {
@@ -529,6 +541,50 @@ export default function TimetablePage() {
       setSubjectReviews,
     )
   }, [term, mySchool])
+
+  useEffect(() => {
+    if (!myUserId) return
+
+    const params = new URLSearchParams(window.location.search)
+    const data = params.get('data')
+
+    // 🔥 공유 URL이면 → 복원
+    if (data) {
+      try {
+        const decompressed = LZString.decompressFromEncodedURIComponent(data)
+
+        if (!decompressed) return
+
+        const parsed = JSON.parse(decompressed)
+
+        if (Array.isArray(parsed)) {
+          const restored = parsed.map(
+            ([day, period, subject, teacher, room]: any) => ({
+              day,
+              period,
+              subject,
+              teacher,
+              room,
+            }),
+          )
+
+          setClasses(restored)
+        }
+      } catch (err) {
+        console.error('URL 복원 실패', err)
+      }
+
+      return // 🔥 여기 핵심 (API 호출 막기)
+    }
+
+    // 🔥 일반 접근 → 서버 데이터
+    apiFetch(`/api/timetable?year=${term.year}&semester=${term.semester}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setClasses(Array.isArray(data) ? data : [])
+      })
+      .catch(() => setClasses([]))
+  }, [term, myUserId])
 
   const registeredSubjectTeachers = Array.from(
     new Set(
