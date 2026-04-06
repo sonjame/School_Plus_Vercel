@@ -153,6 +153,18 @@ export default function ScoresPage() {
 
   const [year, setYear] = useState<number>(defaultYear)
 
+  const [cutoffs, setCutoffs] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!grade || !selectedMonth) return
+
+    fetch(
+      `/api/exam-cutoffs?year=${year}&grade=${grade}&month=${selectedMonth}`,
+    )
+      .then((res) => res.json())
+      .then((data) => setCutoffs(data))
+  }, [year, grade, selectedMonth])
+
   // ---------------------------------------------
   // ⭐ 탐구 과목 리스트 (학년별)
   // ---------------------------------------------
@@ -217,11 +229,22 @@ export default function ScoresPage() {
   // ---------------------------------------------
   let subjects: string[] = []
 
+  function getMonthNumber(month: string) {
+    return Number(month.replace('월', ''))
+  }
+
+  const isSecondLangAvailable =
+    grade === 3 && getMonthNumber(selectedMonth) >= 6
+
   if (grade === 1) {
     subjects = firstGradeSubjects // 고1
   } else if (grade === 2) {
-    subjects =
-      explorationArea === '사회탐구' ? secondGradeSocial : secondGradeScience // 고2
+    if (selectedMonth === '3월') {
+      subjects = firstGradeSubjects // 통합사회, 통합과학
+    } else {
+      subjects =
+        explorationArea === '사회탐구' ? secondGradeSocial : secondGradeScience
+    }
   } else if (grade === 3) {
     subjects =
       explorationArea === '사회탐구'
@@ -244,70 +267,35 @@ export default function ScoresPage() {
   // ---------------------------------------------
   // ⭐ 등급 계산 함수들
   // ---------------------------------------------
-  const getRawGrade = (score: string) => {
+
+  function normalizeSubject(subject: string) {
+    return subject.replace(/\s/g, '') // 공백 제거
+  }
+
+  function getGrade(subject: string, score: string) {
     if (!score || isNaN(Number(score))) return '-'
+
     const s = Number(score)
-    if (s >= 90) return '1등급'
-    if (s >= 80) return '2등급'
-    if (s >= 70) return '3등급'
-    if (s >= 60) return '4등급'
-    if (s >= 50) return '5등급'
-    if (s >= 40) return '6등급'
-    if (s >= 30) return '7등급'
-    if (s >= 20) return '8등급'
+
+    // 선택과목 분리
+    let baseSubject = subject.includes('_') ? subject.split('_')[1] : subject
+
+    // 공백 제거
+    baseSubject = baseSubject.replace(/\s/g, '')
+
+    const subjectCutoffs = cutoffs
+      .filter((c) => c.subject.replace(/\s/g, '') === baseSubject)
+      .sort((a, b) => a.grade_level - b.grade_level)
+
+    if (subjectCutoffs.length === 0) return '-'
+
+    for (const c of subjectCutoffs) {
+      if (s >= c.min_score) {
+        return `${c.grade_level}등급`
+      }
+    }
+
     return '9등급'
-  }
-
-  const getExploreGrade = (score: string) => {
-    if (!score || isNaN(Number(score))) return '-'
-    const s = Number(score)
-    if (s >= 45) return '1등급'
-    if (s >= 40) return '2등급'
-    if (s >= 35) return '3등급'
-    if (s >= 30) return '4등급'
-    if (s >= 25) return '5등급'
-    if (s >= 20) return '6등급'
-    if (s >= 15) return '7등급'
-    if (s >= 10) return '8등급'
-    return '9등급'
-  }
-
-  const getEnglishGrade = (score?: string) => {
-    if (!score || isNaN(Number(score))) return '-'
-    const s = Number(score)
-    if (s >= 90) return '1등급'
-    if (s >= 80) return '2등급'
-    if (s >= 70) return '3등급'
-    if (s >= 60) return '4등급'
-    if (s >= 50) return '5등급'
-    if (s >= 40) return '6등급'
-    if (s >= 30) return '7등급'
-    if (s >= 20) return '8등급'
-    if (s >= 10) return '9등급'
-    return '-'
-  }
-
-  const getHistoryGrade = (score?: string) => {
-    if (!score || isNaN(Number(score))) return '-'
-    const s = Number(score)
-    if (s >= 40) return '1등급'
-    if (s >= 35) return '2등급'
-    if (s >= 30) return '3등급'
-    if (s >= 25) return '4등급'
-    if (s >= 20) return '5등급'
-    if (s >= 10) return '6등급'
-    return '-' // ⭐ 추가
-  }
-
-  const getSecondLangGrade = (score: string) => {
-    if (!score || isNaN(Number(score))) return '-'
-    const s = Number(score)
-    if (s >= 45) return '1등급'
-    if (s >= 40) return '2등급'
-    if (s >= 35) return '3등급'
-    if (s >= 30) return '4등급'
-    if (s >= 25) return '5등급'
-    return '6등급 이하'
   }
 
   function gradeToNumber(grade: string) {
@@ -319,11 +307,16 @@ export default function ScoresPage() {
   function calculateAverageGrade() {
     const grades: number[] = []
 
+    const koreanSubject =
+      grade === 3 && koreanType ? `국어_${koreanType}` : '국어'
+
+    const mathSubject = grade === 3 && mathType ? `수학_${mathType}` : '수학'
+
     // 필수 과목
-    const korean = gradeToNumber(getRawGrade(scores.korean))
-    const math = gradeToNumber(getRawGrade(scores.math))
-    const english = gradeToNumber(getEnglishGrade(scores.english))
-    const history = gradeToNumber(getHistoryGrade(scores.history))
+    const korean = gradeToNumber(getGrade(koreanSubject, scores.korean))
+    const math = gradeToNumber(getGrade(mathSubject, scores.math))
+    const english = gradeToNumber(getGrade('영어', scores.english))
+    const history = gradeToNumber(getGrade('한국사', scores.history))
 
     if (korean) grades.push(korean)
     if (math) grades.push(math)
@@ -331,28 +324,33 @@ export default function ScoresPage() {
     if (history) grades.push(history)
 
     // 탐구
-    if (grade === 1) {
-      const e1 = gradeToNumber(getExploreGrade(exploreScores.sub1))
-      const e2 = gradeToNumber(getExploreGrade(exploreScores.sub2))
+    if (grade === 1 || (grade === 2 && selectedMonth === '3월')) {
+      const e1 = gradeToNumber(getGrade('통합사회', exploreScores.sub1))
+      const e2 = gradeToNumber(getGrade('통합과학', exploreScores.sub2))
+
       if (e1) grades.push(e1)
       if (e2) grades.push(e2)
     } else {
       if (explorationSubjects[0]) {
-        const e1 = gradeToNumber(getExploreGrade(exploreScores.sub1))
+        const e1 = gradeToNumber(
+          getGrade(explorationSubjects[0], exploreScores.sub1),
+        )
         if (e1) grades.push(e1)
       }
+
       if (explorationSubjects[1]) {
-        const e2 = gradeToNumber(getExploreGrade(exploreScores.sub2))
+        const e2 = gradeToNumber(
+          getGrade(explorationSubjects[1], exploreScores.sub2),
+        )
         if (e2) grades.push(e2)
       }
     }
 
     // 제2외국어
-    if (grade === 3 && secondLang) {
-      const lang = gradeToNumber(getSecondLangGrade(secondLangScore))
+    if (isSecondLangAvailable && secondLang) {
+      const lang = gradeToNumber(getGrade(secondLang, secondLangScore))
       if (lang) grades.push(lang)
     }
-
     if (grades.length === 0) return '-'
 
     const avg = grades.reduce((sum, g) => sum + g, 0) / grades.length
@@ -509,12 +507,12 @@ export default function ScoresPage() {
     if (scores.english) payload['영어'] = Number(scores.english)
     if (scores.history) payload['한국사'] = Number(scores.history)
 
-    if (grade === 1) {
+    if (grade === 1 || (grade === 2 && selectedMonth === '3월')) {
       if (exploreScores.sub1) payload['통합사회'] = Number(exploreScores.sub1)
       if (exploreScores.sub2) payload['통합과학'] = Number(exploreScores.sub2)
     }
 
-    if (grade !== 1) {
+    if (!(grade === 1 || (grade === 2 && selectedMonth === '3월'))) {
       if (explorationSubjects[0] && exploreScores.sub1) {
         payload[explorationSubjects[0]] = Number(exploreScores.sub1)
       }
@@ -523,7 +521,7 @@ export default function ScoresPage() {
       }
     }
 
-    if (grade === 3 && secondLang && secondLangScore) {
+    if (isSecondLangAvailable && secondLang && secondLangScore) {
       payload[secondLang] = Number(secondLangScore)
     }
 
@@ -762,7 +760,7 @@ export default function ScoresPage() {
   )
 
   // 탐구 버튼
-  if (grade === 1) {
+  if (grade === 1 || (grade === 2 && selectedMonth === '3월')) {
     subjectButtons.push(
       { key: 'explore1', label: '통합사회' },
       { key: 'explore2', label: '통합과학' },
@@ -778,7 +776,7 @@ export default function ScoresPage() {
 
   // 제2외국어 버튼 (고3만, 데이터가 있거나 현재 선택되어 있으면 표시)
   const hasSecondLangData =
-    grade === 3 &&
+    isSecondLangAvailable &&
     (secondLang || Object.values(savedData).some((v) => v.secondLang != null))
 
   if (grade === 3 && hasSecondLangData) {
@@ -1073,7 +1071,7 @@ export default function ScoresPage() {
             {/* ---------------------------------- */}
             {/* 탐구 영역 - 학년별 다르게 표시 */}
             {/* ---------------------------------- */}
-            {grade === 1 && (
+            {(grade === 1 || (grade === 2 && selectedMonth === '3월')) && (
               <>
                 <h2 className="section-title" style={{ marginTop: 30 }}>
                   탐구 영역 (필수)
@@ -1109,7 +1107,7 @@ export default function ScoresPage() {
               </>
             )}
 
-            {grade === 2 && (
+            {grade === 2 && selectedMonth !== '3월' && (
               <>
                 <h2 className="section-title" style={{ marginTop: 30 }}>
                   탐구 영역
@@ -1300,40 +1298,53 @@ export default function ScoresPage() {
                   <tr>
                     <td>국어</td>
                     <td>{scores.korean || '-'}</td>
-                    <td>{getRawGrade(scores.korean)}</td>
+                    <td>
+                      {getGrade(
+                        grade === 3 && koreanType
+                          ? `국어_${koreanType}`
+                          : '국어',
+                        scores.korean,
+                      )}
+                    </td>
                   </tr>
 
                   <tr>
                     <td>수학</td>
                     <td>{scores.math || '-'}</td>
-                    <td>{getRawGrade(scores.math)}</td>
+                    <td>
+                      {getGrade(
+                        grade === 3 && mathType ? `수학_${mathType}` : '수학',
+                        scores.math,
+                      )}
+                    </td>
                   </tr>
 
                   <tr>
                     <td>영어</td>
                     <td>{scores.english || '-'}</td>
-                    <td>{getEnglishGrade(scores.english)}</td>
+                    <td>{getGrade('영어', scores.english)}</td>
                   </tr>
 
                   <tr>
                     <td>한국사</td>
                     <td>{scores.history || '-'}</td>
-                    <td>{getHistoryGrade(scores.history)}</td>
+                    <td>{getGrade('한국사', scores.history)}</td>
                   </tr>
 
                   {/* 1학년 탐구 */}
-                  {grade === 1 && (
+                  {(grade === 1 ||
+                    (grade === 2 && selectedMonth === '3월')) && (
                     <>
                       <tr>
                         <td>통합사회</td>
                         <td>{exploreScores.sub1 || '-'}</td>
-                        <td>{getExploreGrade(exploreScores.sub1)}</td>
+                        <td>{getGrade('통합사회', exploreScores.sub1)}</td>
                       </tr>
 
                       <tr>
                         <td>통합과학</td>
                         <td>{exploreScores.sub2 || '-'}</td>
-                        <td>{getExploreGrade(exploreScores.sub2)}</td>
+                        <td>{getGrade('통합과학', exploreScores.sub2)}</td>
                       </tr>
                     </>
                   )}
@@ -1343,7 +1354,9 @@ export default function ScoresPage() {
                     <tr>
                       <td>{explorationSubjects[0]}</td>
                       <td>{exploreScores.sub1 || '-'}</td>
-                      <td>{getExploreGrade(exploreScores.sub1)}</td>
+                      <td>
+                        {getGrade(explorationSubjects[0], exploreScores.sub1)}
+                      </td>
                     </tr>
                   )}
 
@@ -1351,16 +1364,18 @@ export default function ScoresPage() {
                     <tr>
                       <td>{explorationSubjects[1]}</td>
                       <td>{exploreScores.sub2 || '-'}</td>
-                      <td>{getExploreGrade(exploreScores.sub2)}</td>
+                      <td>
+                        {getGrade(explorationSubjects[1], exploreScores.sub2)}
+                      </td>
                     </tr>
                   )}
 
                   {/* 제2외국어 */}
-                  {grade === 3 && secondLang && (
+                  {isSecondLangAvailable && secondLang && (
                     <tr>
                       <td>{secondLang}</td>
                       <td>{secondLangScore || '-'}</td>
-                      <td>{getSecondLangGrade(secondLangScore)}</td>
+                      <td>{getGrade(secondLang, secondLangScore)}</td>
                     </tr>
                   )}
 
