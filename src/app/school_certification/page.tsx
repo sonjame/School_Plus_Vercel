@@ -4,6 +4,45 @@
 
 import React, { useRef, useState, useEffect } from 'react'
 
+async function resizeImage(file: File): Promise<Blob> {
+  const img = new Image()
+  const url = URL.createObjectURL(file)
+
+  return new Promise((resolve) => {
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+
+      const MAX_WIDTH = 1600
+      const scale = MAX_WIDTH / img.width
+
+      canvas.width = MAX_WIDTH
+      canvas.height = img.height * scale
+
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob)
+        },
+        'image/jpeg',
+        0.85,
+      )
+    }
+    img.src = url
+  })
+}
+
+function normalizeDate(s: string | null | undefined) {
+  if (!s) return ''
+
+  const digits = s.replace(/[^0-9]/g, '')
+
+  if (digits.length !== 8) return ''
+
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+}
+
 const styles: Record<string, React.CSSProperties> = {
   page: {
     background: '#f5f7fb',
@@ -130,6 +169,8 @@ const styles: Record<string, React.CSSProperties> = {
 const SchoolAuthPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  const [ocrRawText, setOcrRawText] = useState('')
+
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [nameInput, setNameInput] = useState('')
@@ -197,8 +238,11 @@ const SchoolAuthPage: React.FC = () => {
     try {
       setError(null)
 
+      // ✅ 이미지 전처리 (핵심)
+      const resized = await resizeImage(file)
+
       const formData = new FormData()
-      formData.append('image', file)
+      formData.append('image', resized, 'image.jpg')
 
       const res = await fetch('/api/vision/ocr', {
         method: 'POST',
@@ -209,20 +253,86 @@ const SchoolAuthPage: React.FC = () => {
 
       const { text } = await res.json()
 
-      const parsed = parseStudentCard(text)
-      setNameInput(parsed.name ?? '')
-      setSchoolInput(parsed.school ?? '')
-      setBirthDate(parsed.birthDate ?? '')
-      setValidFrom(parsed.validFrom ?? '')
-      setValidTo(parsed.validTo ?? '')
+      setOcrRawText(text || '')
+
+      const parsed1 = parseStudentCard(text)
+      const parsed2 = parseFieldsFromRawText(text)
+
+      const merged = {
+        ...parsed1,
+        ...parsed2,
+      }
+
+      console.log('birth:', merged.birth, merged.birthDate)
+
+      setNameInput(merged.name ?? '')
+      setSchoolInput(merged.school ?? '')
+      setBirthDate(normalizeDate(merged.birth || merged.birthDate))
+
+      setValidFrom(normalizeDate(merged.expiryStart || merged.validFrom))
+
+      setValidTo(normalizeDate(merged.expiry || merged.validTo))
     } catch {
       setError('학생증을 다시 촬영해 주세요.')
     }
   }
 
+  function extractAllDates(rawText: string): string[] {
+    const re =
+      /(19\d{2}|20\d{2})[.\-/ ]?(0?\d|1[0-2])[.\-/ ]?(0?\d|[12]\d|3[01])/g
+
+    const found: string[] = []
+    let m: RegExpExecArray | null
+
+    while ((m = re.exec(rawText)) !== null) {
+      const digits = m[0].replace(/[^0-9]/g, '')
+      if (digits.length === 8) {
+        found.push(
+          `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`,
+        )
+      }
+    }
+
+    return Array.from(new Set(found))
+  }
+
+  function parseFieldsFromRawText(rawText: string) {
+    const text = rawText.replace(/\u00A0/g, ' ')
+
+    const lines = text
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+
+    const school = lines.find((l) => /고등학교|중학교|초등학교/.test(l)) ?? ''
+
+    let name = ''
+    const nameLine = lines.find((l) => /이름/.test(l))
+
+    if (nameLine) {
+      const m = nameLine.match(/이름\s*[:\-]?\s*([가-힣]{2,4})/)
+      if (m?.[1]) name = m[1]
+    }
+
+    if (!name) {
+      const candidate = lines.find((l) => /^[가-힣]{2,4}$/.test(l))
+      if (candidate) name = candidate
+    }
+
+    const dates = extractAllDates(text)
+
+    return {
+      name,
+      school,
+      birth: dates[0] ?? '',
+      expiryStart: dates[1] ?? '',
+      expiry: dates[2] ?? '',
+    }
+  }
+
   function parseStudentCard(text: string) {
     const normalized = text
-      .replace(/[^\uAC00-\uD7A3\s]/g, ' ')
+      .replace(/[^\uAC00-\uD7A3a-zA-Z0-9.\-\/\s]/g, ' ')
       .replace(/\n+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
@@ -263,7 +373,7 @@ const SchoolAuthPage: React.FC = () => {
 
     /* ✅ 생년월일 (키워드 기반) */
     const birthMatch = normalized.match(
-      /생년월일\s*(19|20\d{2})\s*(\d{1,2})\s*(\d{1,2})/,
+      /생년월일\s*(19|20\d{2})[.\-/\s]*(\d{1,2})[.\-/\s]*(\d{1,2})/,
     )
 
     if (birthMatch) {
@@ -289,6 +399,30 @@ const SchoolAuthPage: React.FC = () => {
 
       validFrom = `${startYear}-${startMonth}-${startDay}`
       validTo = `${endYear}-${endMonth}-${endDay}`
+    }
+
+    // ✅ fallback 이름 (추가)
+    if (!name) {
+      const candidate = normalized
+        .split(' ')
+        .find((l) => /^[가-힣]{2,4}$/.test(l))
+
+      if (candidate) name = candidate
+    }
+
+    // ✅ fallback 날짜 (추가)
+    const dates = extractAllDates(text)
+
+    if (!birthDate && dates.length > 0) {
+      birthDate = dates[0]
+    }
+
+    if (!validFrom && dates.length >= 2) {
+      validFrom = dates[1]
+    }
+
+    if (!validTo && dates.length >= 3) {
+      validTo = dates[2]
     }
 
     return {
@@ -436,6 +570,40 @@ const SchoolAuthPage: React.FC = () => {
           >
             다음 단계
           </button>
+
+          {ocrRawText && (
+            <div
+              style={{
+                marginTop: 20,
+                padding: 14,
+                borderRadius: 12,
+                background: darkMode ? '#111827' : '#f3f4f6',
+                border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  marginBottom: 8,
+                  fontSize: 13,
+                  color: darkMode ? '#e5e7eb' : '#111827',
+                }}
+              >
+                📄 OCR 원본 텍스트 (디버그)
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.5,
+                  color: darkMode ? '#9ca3af' : '#374151',
+                }}
+              >
+                {ocrRawText}
+              </div>
+            </div>
+          )}
 
           {(nameInput || schoolInput) && (
             <div
