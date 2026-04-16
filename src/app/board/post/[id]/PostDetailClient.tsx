@@ -1139,11 +1139,10 @@ export default function PostDetailPage() {
           >
             <button
               onClick={() => {
-                if (post?.category) {
-                  router.push(getBoardListPath(post.category))
-                } else {
-                  router.push('/board')
-                }
+                const target = post?.category
+                  ? getBoardListPath(post.category)
+                  : '/board'
+                window.location.href = target
               }}
               style={{
                 display: 'flex',
