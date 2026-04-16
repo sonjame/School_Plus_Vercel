@@ -288,17 +288,22 @@ export default function PostDetailPage() {
      댓글 트리 생성
   ------------------------------------------- */
   function buildTree(arr: any[], parent: string | null = null): any[] {
-    return arr.filter((c) => {
-      if (c.parent !== parent) return false
+    return arr
+      .filter((c) => {
+        if (c.parent !== parent) return false
 
-      // 🔥 삭제된 댓글은 아예 제외
-      if (c.is_deleted) return false
+        // 🔥 삭제된 댓글은 아예 제외
+        if (c.is_deleted) return false
 
-      // 🔥 관리자면 숨김은 보이지만 삭제는 제외
-      if (isAdmin) return true
+        // 🔥 관리자면 숨김은 보이지만 삭제는 제외
+        if (isAdmin) return true
 
-      return !c.is_hidden
-    })
+        return !c.is_hidden
+      })
+      .map((c) => ({
+        ...c,
+        children: buildTree(arr, c.id),
+      }))
   }
 
   const commentTree = buildTree(comments)
