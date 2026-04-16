@@ -86,17 +86,38 @@ export async function DELETE(
       return NextResponse.json({ message: 'forbidden' }, { status: 403 })
     }
 
+    /* 🔥 post_id 가져오기 (추가) */
+    const [[fullComment]]: any = await db.query(
+      `SELECT post_id FROM post_comments WHERE id = ?`,
+      [commentId],
+    )
+
+    const postId = fullComment.post_id
+
     /* 대댓글 먼저 삭제 */
-    // 🔥 대댓글도 같이 "삭제 처리"
     await db.query(
       `UPDATE post_comments SET is_deleted = 1 WHERE parent_id = ?`,
       [commentId],
     )
 
-    // 🔥 본 댓글도 삭제 처리
+    /* 본 댓글 삭제 */
     await db.query(`UPDATE post_comments SET is_deleted = 1 WHERE id = ?`, [
       commentId,
     ])
+
+    /* 🔥 댓글 개수 다시 계산 (핵심 추가) */
+    await db.query(
+      `
+  UPDATE posts
+  SET commentCount = (
+    SELECT COUNT(*) 
+    FROM post_comments 
+    WHERE post_id = ? AND is_deleted = 0
+  )
+  WHERE id = ?
+  `,
+      [postId, postId],
+    )
 
     return NextResponse.json({ success: true })
   } catch (e) {
