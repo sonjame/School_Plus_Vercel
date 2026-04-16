@@ -60,6 +60,7 @@ DATE_FORMAT(
 FROM posts p
 JOIN users u ON p.user_id = u.id
 LEFT JOIN post_comments c ON p.id = c.post_id
+ AND c.is_deleted = 0 
   WHERE 1=1
 `
 
