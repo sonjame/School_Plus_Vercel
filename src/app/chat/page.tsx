@@ -71,13 +71,18 @@ function getRoomDisplayName(
   currentUserId?: number,
   participants?: UserSummary[],
 ) {
+  // ✅ 변경된 방 이름 우선 표시
+  if (room.name && room.name !== '새 그룹 채팅' && room.name !== '1:1 채팅') {
+    return room.name
+  }
+
   if (!participants || participants.length === 0) {
     return room.name
   }
 
   if (!room.isGroup) {
     const other = participants.find((p) => p.id !== currentUserId)
-    return other?.name ?? '1:1 채팅'
+    return other?.name ?? room.name
   }
 
   const owner = participants.find((p) => p.isOwner)
@@ -399,6 +404,16 @@ export default function ChatPage() {
     onConfirm?: () => void
   }>({ open: false, message: '' })
 
+  const [renameModal, setRenameModal] = useState<{
+    open: boolean
+    roomId: number | null
+    name: string
+  }>({
+    open: false,
+    roomId: null,
+    name: '',
+  })
+
   // 🔥 최신 공지 1개 추출
   const latestNotice = messages
     .filter((m) => m.roomId === currentRoomId && m.type === 'notice')
@@ -621,31 +636,66 @@ export default function ChatPage() {
     })
   }
 
-  const handleRenameRoom = async () => {
-    if (!currentRoomId || !currentUser?.token) return
+  const handleRenameRoom = (roomId?: number) => {
+    const targetRoomId = roomId ?? currentRoomId
+    if (!targetRoomId) return
 
-    const newName = prompt('새 채팅방 이름을 입력하세요')
-    if (!newName?.trim()) return
+    const targetRoom = rooms.find((r) => r.id === targetRoomId)
 
-    const res = await apiFetch(`/api/chat/messages/${currentRoomId}/name`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName }),
+    setRenameModal({
+      open: true,
+      roomId: targetRoomId,
+      name:
+        targetRoom?.name &&
+        targetRoom.name !== '새 그룹 채팅' &&
+        targetRoom.name !== '1:1 채팅'
+          ? targetRoom.name
+          : '',
     })
+  }
 
-    const data = await res.json()
+  const submitRenameRoom = async () => {
+    if (!renameModal.roomId || !currentUser?.token) return
+
+    const trimmedName = renameModal.name.trim()
+
+    if (!trimmedName) {
+      setAlert({
+        open: true,
+        title: '입력 필요',
+        message: '채팅방 이름을 입력하세요.',
+      })
+      return
+    }
+
+    const res = await apiFetch(
+      `/api/chat/messages/${renameModal.roomId}/name`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      },
+    )
+
+    const data = await res.json().catch(() => ({}))
 
     if (!res.ok) {
       setBlockMessage(data.message || '이름 변경 실패')
       return
     }
 
-    // 🔄 방 목록 갱신
-    const listRes = await apiFetch('/api/chat/rooms')
-    const roomsData = await safeJson<ChatRoom[]>(listRes)
-    setRooms(Array.isArray(roomsData) ? roomsData : [])
-  }
+    setRooms((prev) =>
+      prev.map((room) =>
+        room.id === renameModal.roomId ? { ...room, name: trimmedName } : room,
+      ),
+    )
 
+    setRenameModal({
+      open: false,
+      roomId: null,
+      name: '',
+    })
+  }
   const handleSendImage = async (file: File) => {
     if (!currentRoomId || !currentUser?.token) return
 
@@ -1655,8 +1705,8 @@ export default function ChatPage() {
                             <MenuItem
                               label="✏️ 이름 변경"
                               onClick={() => {
-                                setShowRoomMenu(false)
-                                handleRenameRoom()
+                                setOpenRoomMenuId(null)
+                                handleRenameRoom(room.id)
                               }}
                             />
                           </div>
@@ -2009,7 +2059,13 @@ export default function ChatPage() {
 
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>
-                    {currentRoom ? currentRoom.name : '채팅방을 선택하세요'}
+                    {currentRoom
+                      ? getRoomDisplayName(
+                          currentRoom,
+                          currentUser?.id,
+                          currentRoom.participants,
+                        )
+                      : '채팅방을 선택하세요'}
                   </div>
                   {currentRoom && (
                     <div style={{ fontSize: 12, color: COLORS.subText }}>
@@ -3415,6 +3471,162 @@ export default function ChatPage() {
             >
               닫기
             </button>
+          </div>
+        </div>
+      )}
+
+      {renameModal.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100000,
+            padding: 16,
+          }}
+          onClick={() =>
+            setRenameModal({
+              open: false,
+              roomId: null,
+              name: '',
+            })
+          }
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              background: darkMode ? '#1e293b' : 'white',
+              color: COLORS.text,
+              borderRadius: 18,
+              padding: 20,
+              boxShadow: '0 20px 45px rgba(0,0,0,0.25)',
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: 8 }}>✏️</div>
+
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                marginBottom: 6,
+              }}
+            >
+              채팅방 이름 변경
+            </h3>
+
+            <p
+              style={{
+                fontSize: 13,
+                color: COLORS.subText,
+                marginBottom: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              새 채팅방 이름을 입력하세요.
+            </p>
+
+            <input
+              autoFocus
+              value={renameModal.name}
+              onChange={(e) =>
+                setRenameModal((prev) => ({
+                  ...prev,
+                  name: e.target.value,
+                }))
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  submitRenameRoom()
+                }
+
+                if (e.key === 'Escape') {
+                  setRenameModal({
+                    open: false,
+                    roomId: null,
+                    name: '',
+                  })
+                }
+              }}
+              placeholder="예: 2학년 3반 모임"
+              maxLength={30}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: `1px solid ${COLORS.border}`,
+                background: darkMode ? '#0f172a' : '#f9fafb',
+                color: COLORS.text,
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+
+            <div
+              style={{
+                textAlign: 'right',
+                fontSize: 11,
+                color: COLORS.subText,
+                marginTop: 6,
+              }}
+            >
+              {renameModal.name.length}/30
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 18,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setRenameModal({
+                    open: false,
+                    roomId: null,
+                    name: '',
+                  })
+                }
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: 999,
+                  border: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#0f172a' : 'white',
+                  color: COLORS.text,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                취소
+              </button>
+
+              <button
+                type="button"
+                onClick={submitRenameRoom}
+                disabled={!renameModal.name.trim()}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: renameModal.name.trim() ? '#4FC3F7' : '#e5e7eb',
+                  color: renameModal.name.trim() ? 'white' : '#9ca3af',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: renameModal.name.trim() ? 'pointer' : 'default',
+                }}
+              >
+                변경하기
+              </button>
+            </div>
           </div>
         </div>
       )}
