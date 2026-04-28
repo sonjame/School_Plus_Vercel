@@ -75,14 +75,22 @@ END AS name,
 
   r.is_group AS isGroup,
   r.is_self AS isSelf,
-
-  (
-    SELECT m.content
-    FROM chat_messages m
-    WHERE m.room_id = r.id
-    ORDER BY m.id DESC
-    LIMIT 1
-  ) AS lastMessage,
+(
+  SELECT
+    CASE
+      WHEN m.type = 'image' THEN '사진을 보냈습니다.'
+      WHEN m.type = 'file' THEN '파일을 보냈습니다.'
+      WHEN m.type = 'poll' THEN '투표를 보냈습니다.'
+      WHEN m.type = 'video' THEN '동영상을 보냈습니다.'
+      WHEN m.type = 'url' THEN m.content
+      WHEN m.type = 'notice' THEN CONCAT('공지: ', m.content)
+      ELSE m.content
+    END
+  FROM chat_messages m
+  WHERE m.room_id = r.id
+  ORDER BY m.id DESC
+  LIMIT 1
+) AS lastMessage,
 
   (
     SELECT COUNT(*)
