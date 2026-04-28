@@ -466,6 +466,12 @@ export default function ChatPage() {
     }
   }
 
+  const refreshRooms = async () => {
+    const res = await apiFetch('/api/chat/rooms')
+    const data = await safeJson<ChatRoom[]>(res)
+    setRooms(Array.isArray(data) ? data : [])
+  }
+
   const [showRoomUsers, setShowRoomUsers] = useState(false)
 
   const fetchRoomUsers = async () => {
@@ -732,6 +738,7 @@ export default function ChatPage() {
 
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
+    await refreshRooms()
   }
 
   useEffect(() => {
@@ -1076,6 +1083,7 @@ export default function ChatPage() {
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
+    await refreshRooms()
   }
 
   /* -------------------------
@@ -1161,9 +1169,7 @@ export default function ChatPage() {
     }
 
     /* ✅ 성공한 경우만 메시지 다시 불러오기 */
-    const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
-    const data = await safeJson<ChatMessage[]>(res)
-    setMessages(Array.isArray(data) ? data : [])
+    await refreshRooms()
   }
 
   useEffect(() => {
@@ -1312,6 +1318,7 @@ export default function ChatPage() {
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
+    await refreshRooms()
   }
 
   const handleSendVideo = async (file: File) => {
@@ -1365,6 +1372,7 @@ export default function ChatPage() {
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
+    await refreshRooms()
   }
 
   const handleDeleteNotice = async (noticeId: number) => {
@@ -1565,6 +1573,8 @@ export default function ChatPage() {
                       const data = await safeJson<ChatMessage[]>(res)
 
                       setMessages(Array.isArray(data) ? data : [])
+
+                      await refreshRooms()
 
                       // 🔥 메시지 로딩 후 한번 더 (핵심)
                       setTimeout(() => {
@@ -2290,6 +2300,7 @@ export default function ChatPage() {
                                 )
                                 const data = await safeJson<ChatMessage[]>(res)
                                 setMessages(Array.isArray(data) ? data : [])
+                                await refreshRooms()
                               }}
                             />
                           </div>
@@ -2963,6 +2974,7 @@ export default function ChatPage() {
             const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
             const data = await safeJson<ChatMessage[]>(res)
             setMessages(Array.isArray(data) ? data : [])
+            await refreshRooms()
           }}
           onBlocked={(msg) => {
             setShowPollModal(false)
