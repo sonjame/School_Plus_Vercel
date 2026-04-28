@@ -35,39 +35,43 @@ SELECT
   r.id,
 
   /* 🔥 채팅방 이름 자동 계산 */
-  CASE
-    WHEN r.is_group = 0 AND r.is_self = 0 THEN (
-      SELECT u.name
-      FROM chat_room_members rm2
-      JOIN users u ON u.id = rm2.user_id
-      WHERE rm2.room_id = r.id
-        AND rm2.user_id != ?
-      LIMIT 1
-    )
+CASE
+  WHEN r.name IS NOT NULL
+       AND TRIM(r.name) != ''
+       AND r.name NOT IN ('새 그룹 채팅', '1:1 채팅')
+    THEN r.name
 
-WHEN r.is_group = 1 THEN (
-  SELECT CONCAT(
-    /* 방장 이름 */
-    (
-      SELECT u2.name
-      FROM chat_room_members rm3
-      JOIN users u2 ON u2.id = rm3.user_id
-      WHERE rm3.room_id = r.id
-      ORDER BY rm3.joined_at ASC
-      LIMIT 1
-    ),
-    ' 외에 ',
-    (
-      SELECT COUNT(*)
-      FROM chat_room_members rm4
-      WHERE rm4.room_id = r.id
-    ) - 1,
-    '명'
+  WHEN r.is_group = 0 AND r.is_self = 0 THEN (
+    SELECT u.name
+    FROM chat_room_members rm2
+    JOIN users u ON u.id = rm2.user_id
+    WHERE rm2.room_id = r.id
+      AND rm2.user_id != ?
+    LIMIT 1
   )
-)
 
-    ELSE r.name
-  END AS name,
+  WHEN r.is_group = 1 THEN (
+    SELECT CONCAT(
+      (
+        SELECT u2.name
+        FROM chat_room_members rm3
+        JOIN users u2 ON u2.id = rm3.user_id
+        WHERE rm3.room_id = r.id
+        ORDER BY rm3.joined_at ASC
+        LIMIT 1
+      ),
+      ' 외에 ',
+      (
+        SELECT COUNT(*)
+        FROM chat_room_members rm4
+        WHERE rm4.room_id = r.id
+      ) - 1,
+      '명'
+    )
+  )
+
+  ELSE r.name
+END AS name,
 
   r.is_group AS isGroup,
   r.is_self AS isSelf,
