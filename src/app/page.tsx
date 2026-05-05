@@ -222,6 +222,36 @@ export default function HomePage() {
     setUnreadNotifyCount((prev) => Math.max(0, prev - 1))
   }
 
+  const deleteAllChatNotifications = async () => {
+    const res = await apiFetch('/api/chat/read-all', {
+      method: 'POST',
+    })
+
+    if (!res.ok) {
+      alert('채팅 알림 삭제에 실패했습니다.')
+      return
+    }
+
+    setUnreadMessages([])
+    setUnreadChatCount(0)
+    prevChatCountRef.current = 0
+  }
+
+  const deleteAllNotifications = async () => {
+    const res = await apiFetch('/api/notifications/delete-all', {
+      method: 'POST',
+    })
+
+    if (!res.ok) {
+      alert('알림 삭제에 실패했습니다.')
+      return
+    }
+
+    setNotifications([])
+    setUnreadNotifyCount(0)
+    prevNotifyCountRef.current = 0
+  }
+
   useEffect(() => {
     if (isLoggingOut) return
 
@@ -913,8 +943,34 @@ export default function HomePage() {
                 }}
               >
                 {/* ================= 💬 채팅 알림 ================= */}
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                  💬 채팅 알림
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>💬 채팅 알림</div>
+
+                  {unreadMessages.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteAllChatNotifications()
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      모두 지우기
+                    </button>
+                  )}
                 </div>
 
                 {unreadMessages.length === 0 ? (
@@ -940,24 +996,73 @@ export default function HomePage() {
                         <div
                           key={`${msg.roomId}-${msg.messageId}`}
                           style={{
-                            padding: '8px',
+                            padding: '8px 28px 8px 8px',
                             borderBottom: themeSetting.darkMode
                               ? '1px solid #334155'
                               : '1px solid #eee',
                             cursor: 'pointer',
+                            position: 'relative',
                           }}
                           onClick={() => {
                             setIsChatNoticeOpen(false)
                             window.location.href = `/chat?roomId=${msg.roomId}`
                           }}
                         >
+                          {/* ❌ 채팅 알림 개별 삭제 */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation()
+
+                              const res = await apiFetch('/api/chat/read-one', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                  roomId: msg.roomId,
+                                  messageId: msg.messageId,
+                                }),
+                              })
+
+                              if (!res.ok) {
+                                alert('채팅 알림 삭제에 실패했습니다.')
+                                return
+                              }
+
+                              setUnreadMessages((prev) =>
+                                prev.filter(
+                                  (m) => m.messageId !== msg.messageId,
+                                ),
+                              )
+
+                              setUnreadChatCount((prev) =>
+                                Math.max(0, prev - 1),
+                              )
+                              prevChatCountRef.current = Math.max(
+                                0,
+                                prevChatCountRef.current - 1,
+                              )
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              right: 6,
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#9CA3AF',
+                              fontSize: 14,
+                              cursor: 'pointer',
+                            }}
+                            title="채팅 알림 삭제"
+                          >
+                            ✕
+                          </button>
+
                           <div style={{ fontSize: 13, fontWeight: 600 }}>
                             👤 {msg.senderName}
                           </div>
+
                           <div
                             style={{
                               fontSize: 12,
-                              color: '#555',
+                              color: themeSetting.darkMode ? '#cbd5e1' : '#555',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -992,7 +1097,35 @@ export default function HomePage() {
                 )}
 
                 {/* ================= 📢 알림 ================= */}
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>📢 알림</div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>📢 알림</div>
+
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteAllNotifications()
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      모두 지우기
+                    </button>
+                  )}
+                </div>
 
                 {notifications.length === 0 ? (
                   <p
