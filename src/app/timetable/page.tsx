@@ -126,11 +126,30 @@ export default function TimetablePage() {
   const [myUserId, setMyUserId] = useState<number | null>(null)
   const [mySchool, setMySchool] = useState<string | null>(null)
 
+  const ocrFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [ocrLoading, setOcrLoading] = useState(false)
+
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [edit, setEdit] = useState<ClassItem | null>(null)
 
+  const [editSameSubjectAll, setEditSameSubjectAll] = useState(false)
+
   const [addOpen, setAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const [notice, setNotice] = useState<{
+    open: boolean
+    title: string
+    message: string
+    type?: 'info' | 'success' | 'error' | 'confirm'
+    onConfirm?: () => void
+  }>({
+    open: false,
+    title: '',
+    message: '',
+  })
 
   const CURRENT_YEAR = new Date().getFullYear()
 
@@ -457,10 +476,16 @@ export default function TimetablePage() {
   const openEdit = (day: string, period: number) => {
     const existing = classes.find((c) => c.day === day && c.period === period)
     setEdit(existing ?? { day, period, subject: '', teacher: '', room: '' })
+    setEditSameSubjectAll(false)
   }
 
   const saveEdit = () => {
     if (!edit) return
+
+    const original = classes.find(
+      (c) => c.day === edit.day && c.period === edit.period,
+    )
+
     if (!edit.subject.trim()) {
       const filtered = classes.filter(
         (c) => !(c.day === edit.day && c.period === edit.period),
@@ -470,13 +495,33 @@ export default function TimetablePage() {
       return
     }
 
+    // ✅ 같은 과목 전체 수정
+    if (editSameSubjectAll && original?.subject) {
+      const next = classes.map((c) => {
+        if (c.subject !== original.subject) return c
+
+        return {
+          ...c,
+          subject: edit.subject,
+          teacher: edit.teacher,
+          room: edit.room,
+        }
+      })
+
+      save(next)
+      setEdit(null)
+      setEditSameSubjectAll(false)
+      return
+    }
+
+    // ✅ 기존처럼 한 칸만 수정
     const filtered = classes.filter(
       (c) => !(c.day === edit.day && c.period === edit.period),
     )
+
     save([...filtered, edit])
     setEdit(null)
   }
-
   const deleteEdit = () => {
     if (!edit) return
     const filtered = classes.filter(
@@ -487,6 +532,33 @@ export default function TimetablePage() {
   }
 
   /* ----------------- 수업 추가 ----------------- */
+
+  const showNotice = (
+    title: string,
+    message: string,
+    type: 'info' | 'success' | 'error' = 'info',
+  ) => {
+    setNotice({
+      open: true,
+      title,
+      message,
+      type,
+    })
+  }
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+  ) => {
+    setNotice({
+      open: true,
+      title,
+      message,
+      type: 'confirm',
+      onConfirm,
+    })
+  }
 
   const saveAdd = () => {
     const { slots, subject, teacher, room } = addForm
@@ -520,6 +592,290 @@ export default function TimetablePage() {
     })
 
     setAddOpen(false)
+  }
+
+  const deleteAllClassesForCurrentTerm = async () => {
+    showConfirm(
+      '전체 삭제',
+      `${term.year}년 ${term.semester} 시간표의 모든 과목을 삭제할까요?`,
+      async () => {
+        await save([])
+        showNotice(
+          '삭제 완료',
+          `${term.year}년 ${term.semester} 과목이 전체 삭제되었습니다.`,
+          'success',
+        )
+      },
+    )
+  }
+
+  async function resizeImage(file: File): Promise<Blob> {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+
+    return new Promise((resolve, reject) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+
+        const MAX_WIDTH = 1800
+        const scale = Math.min(1, MAX_WIDTH / img.width)
+
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('canvas error'))
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url)
+            if (blob) resolve(blob)
+            else reject(new Error('resize failed'))
+          },
+          'image/jpeg',
+          0.9,
+        )
+      }
+
+      img.onerror = reject
+      img.src = url
+    })
+  }
+
+  function parseTimetableOCR(rawText: string): OCRCandidate[] {
+    const normalizeSubject = (s: string) => {
+      const clean = s.replace(/\s+/g, '')
+
+      const map: Record<string, string> = {
+        창의적체험활동: '창의적 체험활동',
+        창체: '창의적 체험활동',
+        일어: '일본어',
+
+        통사: '통합사회',
+        통과: '통합과학',
+        과실: '과학탐구실험',
+
+        생활과과학: '생활과 과학',
+        생활과: '생활과 과학',
+
+        정치와법: '정치와 법',
+        정치와: '정치와 법',
+
+        스포츠생활: '스포츠 생활',
+        스포츠: '스포츠 생활',
+
+        가정과학: '가정과학',
+        지구과학: '지구과학',
+      }
+
+      return map[clean] ?? clean
+    }
+
+    const ignoreWords = new Set([
+      '월',
+      '화',
+      '수',
+      '목',
+      '금',
+      '월요일',
+      '화요일',
+      '수요일',
+      '목요일',
+      '금요일',
+      '교시',
+      '시간표',
+      '학기',
+      '학년',
+      '반',
+      '중학교',
+      '고등학교',
+      '예시',
+      '고등학생',
+      '대학생',
+      '아니고',
+      '라고',
+      '선택',
+      '내보내기',
+      '옵션',
+      '고교시',
+      '고등',
+      '학생',
+      '시간표라고',
+    ])
+
+    const isSubjectToken = (word: string) => {
+      const clean = word.replace(/[^가-힣A-Za-z0-9]/g, '')
+
+      if (!clean) return false
+      if (ignoreWords.has(clean)) return false
+
+      // 여기 추가
+      if (clean.includes('교시')) return false
+      if (clean.includes('학생')) return false
+      if (clean.includes('대학')) return false
+      if (clean.includes('고등')) return false
+
+      if (/^\d+$/.test(clean)) return false
+      if (/^\d교시$/.test(clean)) return false
+      if (/^1학기$/.test(clean)) return false
+      if (clean.length < 2) return false
+
+      return /^[가-힣A-Za-z0-9]+$/.test(clean)
+    }
+
+    const lines = rawText
+      .replace(/\u00A0/g, ' ')
+      .split('\n')
+      .map((l) => l.replace(/[|]/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+
+    const result: OCRCandidate[] = []
+
+    // ✅ 1순위: "1교시 수학 사회 도덕 영어 수학" 형태
+    for (const line of lines) {
+      const rowMatch = line.match(/^([1-9]|10)\s*교시?\s+(.+)$/)
+      if (!rowMatch) continue
+
+      const period = Number(rowMatch[1])
+      const rest = rowMatch[2]
+
+      const tokens = rest
+        .split(/\s+/)
+        .map((w) => normalizeSubject(w.replace(/[^가-힣A-Za-z0-9]/g, '')))
+        .filter(isSubjectToken)
+
+      if (tokens.length >= 1) {
+        tokens.slice(0, 5).forEach((subject, idx) => {
+          result.push({
+            day: DAYS[idx],
+            period,
+            subject,
+            teacher: '',
+            room: '',
+          })
+        })
+      }
+    }
+
+    if (result.length > 0) return result
+
+    // ✅ 2순위: 전체 텍스트에서 과목 후보를 순서대로 추출
+    // ✅ 2순위: 전체 텍스트에서 과목 후보를 순서대로 추출
+    let safeText = rawText
+
+    const cutIndex = safeText.search(
+      /대학생|아니고|고등학생|라고|시간표라고|내보내기|옵션/,
+    )
+
+    if (cutIndex !== -1) {
+      safeText = safeText.slice(0, cutIndex)
+    }
+
+    const fullText = safeText
+      .replace(/\u00A0/g, ' ')
+      .replace(/월요일|화요일|수요일|목요일|금요일/g, ' ')
+      .replace(/생활과\s+과학/g, '생활과과학')
+      .replace(/정치와\s+법/g, '정치와법')
+      .replace(/스포츠\s+생활/g, '스포츠생활')
+      .replace(/\b[월화수목금]\b/g, ' ')
+      .replace(/([1-9]|10)\s*교시/g, ' ')
+      .replace(
+        /1학기|2학기|시간표|중학교|고등학교|고등학생|대학생|학년|반|예시|아니고|라고|선택|내보내기|옵션/g,
+        ' ',
+      )
+      .replace(/[^\uAC00-\uD7A3A-Za-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const tokens = fullText
+      .split(/\s+/)
+      .map((w) => normalizeSubject(w.replace(/[^가-힣A-Za-z0-9]/g, '')))
+      .filter(isSubjectToken)
+
+    tokens.forEach((subject, index) => {
+      const period = Math.floor(index / 5) + 1
+      const dayIndex = index % 5
+
+      if (period > 10) return
+
+      result.push({
+        day: DAYS[dayIndex],
+        period,
+        subject,
+        teacher: '',
+        room: '',
+      })
+    })
+
+    return result
+  }
+
+  const handleTimetableOCR = async (file: File) => {
+    try {
+      setOcrLoading(true)
+
+      const resized = await resizeImage(file)
+
+      const formData = new FormData()
+      formData.append('image', resized, 'timetable.jpg')
+
+      const res = await fetch('/api/vision/ocr', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) throw new Error('OCR 실패')
+
+      const { text } = await res.json()
+
+      const parsed = parseTimetableOCR(text || '')
+
+      if (parsed.length === 0) {
+        showNotice(
+          '인식 실패',
+          '시간표에서 과목을 인식하지 못했습니다.',
+          'error',
+        )
+        return
+      }
+
+      const next = [...classes]
+
+      for (const item of parsed) {
+        if (!item.day) continue
+
+        const newItem: ClassItem = {
+          day: item.day,
+          period: item.period,
+          subject: item.subject,
+          teacher: item.teacher,
+          room: item.room,
+        }
+
+        const idx = next.findIndex(
+          (c) => c.day === newItem.day && c.period === newItem.period,
+        )
+
+        if (idx >= 0) next[idx] = newItem
+        else next.push(newItem)
+      }
+
+      await save(next)
+
+      showNotice('추가 완료', '시간표가 자동으로 추가되었습니다.', 'success')
+    } catch (err) {
+      console.error(err)
+
+      showNotice('인식 오류', '시간표 사진 인식에 실패했습니다.', 'error')
+    } finally {
+      setOcrLoading(false)
+
+      if (ocrFileInputRef.current) {
+        ocrFileInputRef.current.value = ''
+      }
+    }
   }
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
@@ -683,11 +1039,62 @@ export default function TimetablePage() {
         </div>
 
         <div style={toolbar}>
-          <button style={btn('#4FC3F7')} onClick={() => setAddOpen(true)}>
-            ➕ 수업 추가하기
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              style={hamburgerBtn(darkMode)}
+              onClick={() => setMenuOpen((prev) => !prev)}
+            >
+              ☰
+            </button>
 
-          {/* 내보내기 옵션 버튼 */}
+            {menuOpen && (
+              <div style={dropdownMenu(darkMode)}>
+                <button
+                  style={menuItemBtn('#4FC3F7')}
+                  onClick={() => {
+                    setAddOpen(true)
+                    setMenuOpen(false)
+                  }}
+                >
+                  ➕ 수업 추가하기
+                </button>
+
+                <button
+                  style={menuItemBtn('#7E57C2')}
+                  onClick={() => {
+                    ocrFileInputRef.current?.click()
+                    setMenuOpen(false)
+                  }}
+                  disabled={ocrLoading}
+                >
+                  📷 시간표 사진 인식
+                </button>
+
+                <button
+                  style={menuItemBtn('#E57373')}
+                  onClick={() => {
+                    deleteAllClassesForCurrentTerm()
+                    setMenuOpen(false)
+                  }}
+                >
+                  🗑 전체 삭제
+                </button>
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={ocrFileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              handleTimetableOCR(file)
+            }}
+          />
+
           <button style={btn('#FF9800')} onClick={() => setExportOpen(true)}>
             📤 내보내기 옵션
           </button>
@@ -918,6 +1325,52 @@ export default function TimetablePage() {
           </div>
 
           {/* ----------------- 내보내기 옵션 모달 ----------------- */}
+
+          {notice.open && (
+            <NoticeModal
+              title={notice.title}
+              message={notice.message}
+              type={notice.type}
+              darkMode={darkMode}
+              onClose={() =>
+                setNotice({
+                  open: false,
+                  title: '',
+                  message: '',
+                })
+              }
+              onConfirm={async () => {
+                const confirmFn = notice.onConfirm
+
+                setNotice({
+                  open: false,
+                  title: '',
+                  message: '',
+                })
+
+                await confirmFn?.()
+              }}
+            />
+          )}
+
+          {ocrLoading && (
+            <Modal
+              title="📷 시간표 인식 중"
+              onClose={() => {}}
+              darkMode={darkMode}
+            >
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  padding: '12px 0',
+                }}
+              >
+                잠시만 기다려주세요.
+              </div>
+            </Modal>
+          )}
           {exportOpen && (
             <Modal
               title="내보내기 옵션"
@@ -1293,6 +1746,27 @@ export default function TimetablePage() {
                 />
               </Row>
 
+              {edit.subject.trim() && (
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: darkMode ? '#e5e7eb' : '#374151',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={editSameSubjectAll}
+                    onChange={(e) => setEditSameSubjectAll(e.target.checked)}
+                  />
+                  같은 과목 전체 수정
+                </label>
+              )}
+
               <div style={modalButtons}>
                 <button style={btn('#4FC3F7')} onClick={saveEdit}>
                   저장
@@ -1619,6 +2093,131 @@ export default function TimetablePage() {
 
 /* ----------------- 공통 컴포넌트 ----------------- */
 
+function NoticeModal({
+  title,
+  message,
+  type = 'info',
+  darkMode = false,
+  onClose,
+  onConfirm,
+}: {
+  title: string
+  message: string
+  type?: 'info' | 'success' | 'error' | 'confirm'
+  darkMode?: boolean
+  onClose: () => void
+  onConfirm?: () => void
+}) {
+  const color =
+    type === 'success'
+      ? '#22C55E'
+      : type === 'error'
+        ? '#EF4444'
+        : type === 'confirm'
+          ? '#F97316'
+          : '#4FC3F7'
+
+  const icon =
+    type === 'success'
+      ? '✅'
+      : type === 'error'
+        ? '⚠️'
+        : type === 'confirm'
+          ? '🗑'
+          : 'ℹ️'
+
+  return (
+    <div style={overlay}>
+      <div
+        style={{
+          width: 'min(90vw, 360px)',
+          background: darkMode ? '#020617' : '#ffffff',
+          color: darkMode ? '#e5e7eb' : '#111827',
+          borderRadius: 18,
+          padding: 22,
+          boxShadow: '0 20px 45px rgba(0,0,0,0.25)',
+          textAlign: 'center',
+          border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
+        }}
+      >
+        <div
+          style={{
+            width: 54,
+            height: 54,
+            margin: '0 auto 12px',
+            borderRadius: '50%',
+            background: `${color}22`,
+            color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 28,
+          }}
+        >
+          {icon}
+        </div>
+
+        <h3
+          style={{
+            fontSize: 20,
+            fontWeight: 800,
+            marginBottom: 8,
+            color,
+          }}
+        >
+          {title}
+        </h3>
+
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            marginBottom: 18,
+            whiteSpace: 'pre-line',
+          }}
+        >
+          {message}
+        </p>
+
+        {type === 'confirm' ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              style={{
+                ...btn('#CBD5E1'),
+                color: '#111827',
+                flex: 1,
+              }}
+              onClick={onClose}
+            >
+              취소
+            </button>
+
+            <button
+              style={{
+                ...btn(color),
+                flex: 1,
+              }}
+              onClick={onConfirm}
+            >
+              삭제
+            </button>
+          </div>
+        ) : (
+          <button
+            style={{
+              ...btn(color),
+              width: '100%',
+            }}
+            onClick={onClose}
+          >
+            확인
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Modal({
   title,
   children,
@@ -1648,21 +2247,23 @@ function Modal({
         }}
       >
         {/* 🔥 X 버튼 */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            right: 10,
-            top: 10,
-            background: 'transparent',
-            border: 'none',
-            fontSize: 20,
-            cursor: 'pointer',
-            color: darkMode ? '#e5e7eb' : '#555',
-          }}
-        >
-          ✖
-        </button>
+        {title !== '📷 시간표 인식 중' && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              right: 10,
+              top: 10,
+              background: 'transparent',
+              border: 'none',
+              fontSize: 20,
+              cursor: 'pointer',
+              color: darkMode ? '#e5e7eb' : '#555',
+            }}
+          >
+            ✖
+          </button>
+        )}
 
         <h3
           style={{
@@ -1960,3 +2561,37 @@ const shareCloseBtn: React.CSSProperties = {
   cursor: 'pointer',
   fontWeight: 600,
 }
+
+const hamburgerBtn = (darkMode: boolean): React.CSSProperties => ({
+  width: 42,
+  height: 38,
+  borderRadius: 8,
+  border: darkMode ? '1px solid #334155' : '1px solid #ddd',
+  background: darkMode ? '#020617' : '#ffffff',
+  color: darkMode ? '#e5e7eb' : '#111827',
+  fontSize: 22,
+  fontWeight: 700,
+  cursor: 'pointer',
+})
+
+const dropdownMenu = (darkMode: boolean): React.CSSProperties => ({
+  position: 'absolute',
+  top: 44,
+  left: 0,
+  zIndex: 50,
+  width: 210,
+  padding: 10,
+  borderRadius: 12,
+  background: darkMode ? '#0f172a' : '#ffffff',
+  border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
+  boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+})
+
+const menuItemBtn = (color: string): React.CSSProperties => ({
+  ...btn(color),
+  width: '100%',
+  textAlign: 'left',
+})
