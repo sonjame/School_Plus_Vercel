@@ -1,20 +1,27 @@
 import { NextResponse } from 'next/server'
 import vision from '@google-cloud/vision'
+import path from 'path'
 
 export async function POST(req: Request) {
   try {
-    // 🔥 환경변수에서 서비스 계정 JSON 읽기
-    const credentials = JSON.parse(process.env.GOOGLE_VISION_KEY!)
+    const keyFilePath = path.join(
+      process.cwd(),
+      'credentials',
+      'vision-key.json',
+    )
 
     const client = new vision.ImageAnnotatorClient({
-      credentials,
+      keyFilename: keyFilePath,
     })
 
     const formData = await req.formData()
-    const file = formData.get('image') as File
+    const file = formData.get('image')
 
-    if (!file) {
-      return NextResponse.json({ error: '이미지 없음' }, { status: 400 })
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json(
+        { error: '이미지 파일이 없습니다' },
+        { status: 400 },
+      )
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -25,9 +32,41 @@ export async function POST(req: Request) {
 
     const text = result.fullTextAnnotation?.text ?? ''
 
-    return NextResponse.json({ text })
+    const words =
+      result.textAnnotations?.slice(1).map((item) => {
+        const vertices = item.boundingPoly?.vertices ?? []
+
+        const xs = vertices
+          .map((v) => v.x ?? 0)
+          .filter((v) => typeof v === 'number')
+
+        const ys = vertices
+          .map((v) => v.y ?? 0)
+          .filter((v) => typeof v === 'number')
+
+        const x = Math.min(...xs)
+        const y = Math.min(...ys)
+        const maxX = Math.max(...xs)
+        const maxY = Math.max(...ys)
+
+        return {
+          text: item.description ?? '',
+          x,
+          y,
+          width: maxX - x,
+          height: maxY - y,
+        }
+      }) ?? []
+
+    return NextResponse.json({
+      text,
+      words,
+    })
   } catch (err) {
     console.error('Vision OCR Error:', err)
-    return NextResponse.json({ error: 'OCR 실패' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'OCR 처리 중 오류 발생' },
+      { status: 500 },
+    )
   }
 }
