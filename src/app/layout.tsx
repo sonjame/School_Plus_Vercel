@@ -935,6 +935,7 @@ function AdminMenuItem({
 
 function ToastWatcher() {
   const { showToast } = useToast()
+  const pathname = usePathname()
 
   const prevChatCountRef = useRef(0)
   const prevNotifyIdRef = useRef<number | null>(null)
@@ -965,7 +966,7 @@ function ToastWatcher() {
       /* 💬 채팅 */
       /* ===================== */
 
-      if (settings.chat) {
+      if (settings.chat && pathname !== '/chat') {
         const chatRes = await fetch('/api/chat/unread-summary', {
           headers: { Authorization: `Bearer ${token}` },
         })
