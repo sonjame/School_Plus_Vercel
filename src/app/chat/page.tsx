@@ -1166,6 +1166,12 @@ export default function ChatPage() {
     const handleReceiveMessage = async (message: ChatMessage) => {
       if (message.roomId !== currentRoomId) return
 
+      await apiFetch(`/api/chat/messages/${currentRoomId}/read`, {
+        method: 'POST',
+      })
+
+      socket.emit('readRoom', currentRoomId)
+
       const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
       const data = await safeJson<ChatMessage[]>(res)
 
@@ -1175,8 +1181,21 @@ export default function ChatPage() {
     }
     socket.on('receiveMessage', handleReceiveMessage)
 
+    const handleRoomRead = async (data: { roomId: number; userId: number }) => {
+      if (data.roomId !== currentRoomId) return
+
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const list = await safeJson<ChatMessage[]>(res)
+      setMessages(Array.isArray(list) ? list : [])
+
+      await refreshRooms()
+    }
+
+    socket.on('roomRead', handleRoomRead)
+
     return () => {
       socket.emit('leaveRoom', currentRoomId)
+      socket.off('roomRead', handleRoomRead)
       socket.off('receiveMessage', handleReceiveMessage)
     }
   }, [currentRoomId, currentUser?.token])
