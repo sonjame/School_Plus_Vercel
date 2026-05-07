@@ -7,12 +7,16 @@ type PollMessageProps = {
   msg: any
   currentUser: any
   onRefresh?: () => void
+  onDelete?: () => void
+  onClose?: () => void
 }
 
 export default function PollMessage({
   msg,
   currentUser,
   onRefresh,
+  onDelete,
+  onClose,
 }: PollMessageProps) {
   const poll = msg.pollData
   const results = msg.pollResult ?? []
@@ -69,31 +73,15 @@ export default function PollMessage({
   /* ======================
      투표 마감
   ====================== */
-  const handleClosePoll = async () => {
-    if (!confirm('투표를 마감하시겠습니까?')) return
-
-    await apiFetch('/api/chat/poll/close', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messageId: msg.id,
-      }),
-    })
-
-    onRefresh?.()
+  const handleClosePoll = () => {
+    onClose?.()
   }
 
   /* ======================
      투표 삭제
   ====================== */
-  const handleDeletePoll = async () => {
-    if (!confirm('이 투표를 삭제하시겠습니까?')) return
-
-    await apiFetch(`/api/chat/messages/delete/${msg.id}`, {
-      method: 'DELETE',
-    })
-
-    onRefresh?.()
+  const handleDeletePoll = () => {
+    onDelete?.()
   }
 
   /* ======================
@@ -152,7 +140,7 @@ export default function PollMessage({
   return (
     <div
       style={{
-        background: darkMode? '#1e293b' : 'white',
+        background: darkMode ? '#1e293b' : 'white',
         borderRadius: 14,
         padding: '16px 14px',
         border: darkMode ? '1px solid #334155' : '1px solid #e5e7eb',
@@ -211,9 +199,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: '12px 14px',
                   borderRadius: 10,
-                  background: darkMode? '#334155' : '#f9fafb',
+                  background: darkMode ? '#334155' : '#f9fafb',
                   border: darkMode ? '1px solid #475569' : '1px solid #d1d5db',
-                  color: darkMode? '#e2e8f0' : '#111827',
+                  color: darkMode ? '#e2e8f0' : '#111827',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: 14,
@@ -232,9 +220,9 @@ export default function PollMessage({
                   width: '100%',
                   padding: isMobile ? '4px 12px' : '8px 12px',
                   borderRadius: 10,
-                  background:darkMode  ? '#3f1d1d' : '#fee2e2',
+                  background: darkMode ? '#3f1d1d' : '#fee2e2',
                   color: darkMode ? '#fca5a5' : '#b91c1c',
-                  border: darkMode? '1px solid #7f1d1d' : '1px solid #ef4444',
+                  border: darkMode ? '1px solid #7f1d1d' : '1px solid #ef4444',
                   cursor: 'pointer',
                   fontWeight: 600,
                   marginTop: 4,
@@ -280,7 +268,7 @@ export default function PollMessage({
                   <div
                     style={{
                       fontSize: 11,
-                      color: darkMode? '#94a3b8' : '#6b7280',
+                      color: darkMode ? '#94a3b8' : '#6b7280',
                       marginTop: 2,
                     }}
                   >
@@ -314,7 +302,10 @@ export default function PollMessage({
           {/* 👀 읽은 사람 수 */}
           {typeof msg.readCount === 'number' && (
             <span
-              style={{ color: darkMode? '#60a5fa' : '#2563eb', fontWeight: 600 }}
+              style={{
+                color: darkMode ? '#60a5fa' : '#2563eb',
+                fontWeight: 600,
+              }}
             >
               👀 {msg.readCount}
             </span>
