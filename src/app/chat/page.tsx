@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
+import { socket } from '@/src/lib/socket'
 import PollMessage from '@/src/components/chat/PollMessage'
 import AlertModal from '@/src/components/common/AlertModal'
 import ConfirmModal from '@/src/components/common/ConfirmModal'
@@ -66,6 +67,7 @@ type Friend = {
   profileImageUrl?: string | null
   gradeLabel?: string
 }
+
 function getRoomDisplayName(
   room: ChatRoom,
   currentUserId?: number,
@@ -737,6 +739,7 @@ export default function ChatPage() {
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
 
     const data = await safeJson<ChatMessage[]>(res)
+    shouldScrollToBottomRef.current = true
     setMessages(Array.isArray(data) ? data : [])
     await refreshRooms()
   }
@@ -913,19 +916,45 @@ export default function ChatPage() {
 
   const messageContainerRef = useRef<HTMLDivElement | null>(null)
 
+  const shouldScrollToBottomRef = useRef(false)
+
+  const scrollToBottom = () => {
+    const container = messageContainerRef.current
+    if (!container) return
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight
+    })
+
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight
+    }, 100)
+
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight
+    }, 300)
+  }
+
   useEffect(() => {
     const container = messageContainerRef.current
     if (!container) return
 
-    const threshold = 80
+    if (shouldScrollToBottomRef.current) {
+      scrollToBottom()
+      shouldScrollToBottomRef.current = false
+      return
+    }
+
+    const threshold = 120
 
     const isNearBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight <
       threshold
 
-    // 🔥 처음 로드 or 아래 근처일 때
     if (isNearBottom) {
-      container.scrollTop = container.scrollHeight
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight
+      })
     }
   }, [messages])
 
@@ -1078,6 +1107,7 @@ export default function ChatPage() {
 
     // 3️⃣ 성공한 경우만 UI 정리
     setPendingImages([])
+    shouldScrollToBottomRef.current = true
 
     // 4️⃣ 메시지 새로 불러오기
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
@@ -1093,87 +1123,26 @@ export default function ChatPage() {
     if (isChatBanned) return
     if (!currentRoomId) return
 
-    /* ======================
-     🖼 이미지 먼저 전송
-  ====================== */
     if (pendingImages.length > 0) {
       await handleSendImagesBulk()
       return
     }
 
-    /* ======================
-     ✏️ 텍스트 메시지
-  ====================== */
     if (!inputText.trim()) return
 
     const trimmed = inputText.trim()
-
-    const newMessage: ChatMessage = {
-      id: Date.now(),
-      roomId: currentRoomId,
-      senderId: currentUser?.id || 0,
-      senderName: currentUser?.name || '나',
-      content: trimmed,
-      createdAt: new Date().toISOString(),
-      type: isUrl(trimmed) ? 'url' : 'text',
-    }
-
-    // 🔹 optimistic UI
-    setMessages((prev) => [...prev, newMessage])
     setInputText('')
 
-    setTimeout(() => {
-      const container = messageContainerRef.current
-      if (!container) return
-      container.scrollTop = container.scrollHeight
-    }, 0)
+    shouldScrollToBottomRef.current = true
 
-    const sendRes = await apiFetch('/api/chat/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        roomId: currentRoomId,
-        type: newMessage.type,
-        content: newMessage.content,
-      }),
+    socket.emit('sendMessage', {
+      roomId: currentRoomId,
+      type: isUrl(trimmed) ? 'url' : 'text',
+      content: trimmed,
     })
-
-    /* 🔥 전학 등으로 차단된 경우 */
-    if (!sendRes.ok) {
-      const err = await sendRes.json().catch(() => ({}))
-
-      if (sendRes.status === 403) {
-        if (err?.message === 'CHAT_BANNED') {
-          const until = err.banEnd
-            ? `\n정지 해제 시간: ${formatKST(err.banEnd)}`
-            : ''
-
-          setBlockMessage(`채팅 이용이 제한되었습니다.${until}`)
-        } else {
-          setBlockMessage(
-            err.message ??
-              '학교가 달라져 더 이상 이 채팅방에서 메시지를 보낼 수 없습니다.',
-          )
-        }
-
-        // optimistic 메시지 제거
-        setMessages((prev) => prev.filter((m) => m.id !== newMessage.id))
-        return
-      }
-
-      setBlockMessage(err.message || '메시지 전송에 실패했습니다.')
-
-      // 실패 시 optimistic 메시지 제거
-      setMessages((prev) => prev.filter((m) => m.id !== newMessage.id))
-      return
-    }
-
-    /* ✅ 성공한 경우만 메시지 다시 불러오기 */
-    await refreshRooms()
   }
-
   useEffect(() => {
-    if (!currentRoomId) return
+    if (!currentRoomId || !currentUser?.token) return
 
     const fetchMessages = async () => {
       const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
@@ -1181,15 +1150,35 @@ export default function ChatPage() {
       setMessages(Array.isArray(data) ? data : [])
     }
 
-    // 처음 1회 실행
     fetchMessages()
 
-    // 3초마다 반복
-    const interval = setInterval(fetchMessages, 3000)
+    if (!socket.connected) {
+      socket.auth = {
+        token: currentUser.token,
+      }
 
-    // 방 바뀌거나 컴포넌트 언마운트 시 정리
-    return () => clearInterval(interval)
-  }, [currentRoomId])
+      socket.connect()
+    }
+
+    socket.emit('joinRoom', currentRoomId)
+
+    const handleReceiveMessage = async (message: ChatMessage) => {
+      if (message.roomId !== currentRoomId) return
+
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const data = await safeJson<ChatMessage[]>(res)
+
+      setMessages(Array.isArray(data) ? data : [])
+
+      await refreshRooms()
+    }
+    socket.on('receiveMessage', handleReceiveMessage)
+
+    return () => {
+      socket.emit('leaveRoom', currentRoomId)
+      socket.off('receiveMessage', handleReceiveMessage)
+    }
+  }, [currentRoomId, currentUser?.token])
 
   /* -------------------------
      파일 선택 핸들러 (UI만)
@@ -1315,6 +1304,7 @@ export default function ChatPage() {
     /* =====================
      3️⃣ 성공 시 메시지 갱신
   ===================== */
+    shouldScrollToBottomRef.current = true
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
@@ -1369,6 +1359,7 @@ export default function ChatPage() {
     }
 
     // 3️⃣ 메시지 갱신
+    shouldScrollToBottomRef.current = true
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
@@ -2271,6 +2262,19 @@ export default function ChatPage() {
                           }}
                         >
                           <div
+                            ref={(el) => {
+                              if (!el) return
+
+                              if (msg.senderId === currentUser?.id) {
+                                setTimeout(() => {
+                                  scrollToBottom()
+                                }, 0)
+
+                                setTimeout(() => {
+                                  scrollToBottom()
+                                }, 200)
+                              }
+                            }}
                             style={{
                               width: '100%',
                               maxWidth: 560, // 🔥 핵심: 투표 최대 폭
@@ -2294,6 +2298,33 @@ export default function ChatPage() {
                             <PollMessage
                               msg={msg}
                               currentUser={currentUser}
+                              onDelete={() => handleDeleteMessage(msg.id)}
+                              onClose={() => {
+                                setConfirm({
+                                  open: true,
+                                  title: '투표 마감',
+                                  message: '투표를 마감하시겠습니까?',
+                                  onConfirm: async () => {
+                                    await apiFetch('/api/chat/poll/close', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        messageId: msg.id,
+                                      }),
+                                    })
+
+                                    const res = await apiFetch(
+                                      `/api/chat/messages/${currentRoomId}`,
+                                    )
+                                    const data =
+                                      await safeJson<ChatMessage[]>(res)
+                                    setMessages(Array.isArray(data) ? data : [])
+                                    await refreshRooms()
+                                  },
+                                })
+                              }}
                               onRefresh={async () => {
                                 const res = await apiFetch(
                                   `/api/chat/messages/${currentRoomId}`,
@@ -2402,6 +2433,11 @@ export default function ChatPage() {
                               <img
                                 src={msg.fileUrl}
                                 alt="uploaded"
+                                onLoad={() => {
+                                  if (msg.senderId === currentUser?.id) {
+                                    scrollToBottom()
+                                  }
+                                }}
                                 style={{
                                   maxWidth: 280, // 🔥 200 → 280 (체감 큼)
                                   maxHeight: 360, // 🔥 세로 제한
@@ -2980,6 +3016,7 @@ export default function ChatPage() {
             setShowPollModal(false)
             setBlockMessage(msg)
           }}
+          setAlert={setAlert}
         />
       )}
 
@@ -4571,12 +4608,21 @@ function PollCreateModal({
   roomId,
   onClose,
   onCreated,
-  onBlocked, // ✅ 추가
+  onBlocked,
+  setAlert,
 }: {
   roomId: number
   onClose: () => void
   onCreated: () => Promise<void>
-  onBlocked: (message: string) => void // ✅ 추가
+  onBlocked: (msg: string) => void
+
+  setAlert: React.Dispatch<
+    React.SetStateAction<{
+      open: boolean
+      title?: string
+      message: string
+    }>
+  >
 }) {
   const [darkMode, setDarkMode] = useState(false)
 
@@ -4647,22 +4693,43 @@ function PollCreateModal({
     setOptions((o) => o.filter((_, idx) => idx !== i))
 
   const handleSubmit = async () => {
-    if (!title.trim()) return alert('투표 제목을 입력하세요')
-    if (options.filter((o) => o.trim()).length < 2)
-      return alert('선택지는 최소 2개입니다')
+    if (!title.trim()) {
+      setAlert({
+        open: true,
+        title: '입력 필요',
+        message: '투표 제목을 입력하세요',
+      })
+      return
+    }
+
+    if (options.filter((o) => o.trim()).length < 2) {
+      setAlert({
+        open: true,
+        title: '선택지 부족',
+        message: '선택지는 최소 2개입니다',
+      })
+      return
+    }
+
+    if (!deadlineDate) {
+      setAlert({
+        open: true,
+        title: '마감 시간 필요',
+        message: '투표 마감 날짜와 시간을 설정하세요',
+      })
+      return
+    }
 
     let finalClosedAt: string | null = null
 
-    if (deadlineDate) {
-      let h = parseInt(hour, 10)
+    let h = parseInt(hour, 10)
 
-      if (ampm === 'PM' && h !== 12) h += 12
-      if (ampm === 'AM' && h === 12) h = 0
+    if (ampm === 'PM' && h !== 12) h += 12
+    if (ampm === 'AM' && h === 12) h = 0
 
-      finalClosedAt = new Date(
-        `${deadlineDate}T${String(h).padStart(2, '0')}:${minute}:00`,
-      ).toISOString()
-    }
+    finalClosedAt = new Date(
+      `${deadlineDate}T${String(h).padStart(2, '0')}:${minute}:00`,
+    ).toISOString()
 
     const res = await apiFetch('/api/chat/poll/create', {
       method: 'POST',
