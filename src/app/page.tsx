@@ -45,6 +45,7 @@ type UnreadMessage = {
   senderName: string
   content: string
   createdAt: string
+  type: string
 }
 
 export default function HomePage() {
@@ -344,7 +345,19 @@ export default function HomePage() {
       data.messages?.length > 0
     ) {
       const latest = data.messages[0]
-      showToast(`💬 ${latest.senderName}`, latest.content, 'chat')
+      const previewText =
+        latest.content ||
+        (latest.type === 'image'
+          ? '사진을 보냈습니다.'
+          : latest.type === 'file'
+            ? '파일을 보냈습니다.'
+            : latest.type === 'video'
+              ? '동영상을 보냈습니다.'
+              : latest.type === 'poll'
+                ? '투표를 보냈습니다.'
+                : '메시지를 보냈습니다.')
+
+      showToast(`💬 ${latest.senderName}`, previewText, 'chat')
     }
 
     prevChatCountRef.current = data.unreadCount
