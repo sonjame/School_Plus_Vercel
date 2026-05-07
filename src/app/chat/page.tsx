@@ -2801,7 +2801,7 @@ export default function ChatPage() {
                         }
 
                         setShowAttachMenu(false)
-                        fileInputRef.current?.click()
+                        imageInputRef.current?.click()
                       }}
                     />
 
@@ -2884,19 +2884,21 @@ export default function ChatPage() {
                 }}
               />
 
+              {/* 사진/동영상: 모바일에서는 갤러리 */}
               <input
                 ref={imageInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 multiple
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
               />
 
+              {/* 일반 파일: 모바일에서는 파일 앱 */}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
+                multiple
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
               />
