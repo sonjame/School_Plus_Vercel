@@ -1561,6 +1561,17 @@ export default function ChatPage() {
                         method: 'POST',
                       })
 
+                      setRooms((prev) =>
+                        prev.map((r) =>
+                          r.id === room.id
+                            ? {
+                                ...r,
+                                unreadCount: 0,
+                              }
+                            : r,
+                        ),
+                      )
+
                       const res = await apiFetch(
                         `/api/chat/messages/${room.id}`,
                       )
