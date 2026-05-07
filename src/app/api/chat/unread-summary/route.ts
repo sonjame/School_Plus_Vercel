@@ -21,8 +21,16 @@ export async function GET(req: Request) {
     cm.room_id AS roomId,
     cm.sender_id AS senderId,
     u.name AS senderName,
-    cm.content,
-    cm.created_at AS createdAt
+   cm.type,
+CASE
+  WHEN cm.type = 'image' THEN '사진을 보냈습니다.'
+  WHEN cm.type = 'file' THEN '파일을 보냈습니다.'
+  WHEN cm.type = 'video' THEN '동영상을 보냈습니다.'
+  WHEN cm.type = 'poll' THEN '투표를 보냈습니다.'
+  WHEN cm.type = 'notice' THEN CONCAT('공지: ', cm.content)
+  ELSE cm.content
+END AS content,
+cm.created_at AS createdAt
   FROM chat_room_members crm
   JOIN chat_messages cm
     ON cm.room_id = crm.room_id
