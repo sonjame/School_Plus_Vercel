@@ -1114,6 +1114,7 @@ export default function ChatPage() {
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
     await refreshRooms()
+    socket.emit('refreshRoom', currentRoomId)
   }
 
   /* -------------------------
@@ -1309,6 +1310,7 @@ export default function ChatPage() {
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
     await refreshRooms()
+    socket.emit('refreshRoom', currentRoomId)
   }
 
   const handleSendVideo = async (file: File) => {
@@ -1364,6 +1366,7 @@ export default function ChatPage() {
     const data = await safeJson<ChatMessage[]>(res)
     setMessages(Array.isArray(data) ? data : [])
     await refreshRooms()
+    socket.emit('refreshRoom', currentRoomId)
   }
 
   const handleDeleteNotice = async (noticeId: number) => {
@@ -3011,6 +3014,8 @@ export default function ChatPage() {
             const data = await safeJson<ChatMessage[]>(res)
             setMessages(Array.isArray(data) ? data : [])
             await refreshRooms()
+
+            socket.emit('refreshRoom', currentRoomId)
           }}
           onBlocked={(msg) => {
             setShowPollModal(false)
