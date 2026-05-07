@@ -742,6 +742,7 @@ export default function ChatPage() {
     shouldScrollToBottomRef.current = true
     setMessages(Array.isArray(data) ? data : [])
     await refreshRooms()
+    socket.emit('refreshRoom', currentRoomId)
   }
 
   useEffect(() => {
@@ -1163,14 +1164,18 @@ export default function ChatPage() {
 
     socket.emit('joinRoom', currentRoomId)
 
-    const handleReceiveMessage = async (message: ChatMessage) => {
-      if (message.roomId !== currentRoomId) return
+    const handleReceiveMessage = async (message: any) => {
+      if (Number(message.roomId) !== Number(currentRoomId)) return
 
       await apiFetch(`/api/chat/messages/${currentRoomId}/read`, {
         method: 'POST',
       })
 
       socket.emit('readRoom', currentRoomId)
+
+      setTimeout(() => {
+        socket.emit('readRoom', currentRoomId)
+      }, 300)
 
       const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
       const data = await safeJson<ChatMessage[]>(res)
