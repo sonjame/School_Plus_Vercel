@@ -943,7 +943,12 @@ function ToastWatcher() {
 
   const prevAdminNotifyIdRef = useRef<number | null>(null)
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 800
+
   useEffect(() => {
+    // ✅ 모바일 웹에서는 토스트 알림 비활성화
+    if (isMobile) return
+
     const checkNotifications = async () => {
       const token = localStorage.getItem('accessToken')
       const savedUser = localStorage.getItem('loggedInUser')
@@ -966,7 +971,9 @@ function ToastWatcher() {
       /* 💬 채팅 */
       /* ===================== */
 
-      if (settings.chat && pathname !== '/chat') {
+      const isChatPage = pathname.startsWith('/chat')
+
+      if (settings.chat && !isChatPage) {
         const chatRes = await fetch('/api/chat/unread-summary', {
           headers: { Authorization: `Bearer ${token}` },
         })
@@ -1059,7 +1066,8 @@ function ToastWatcher() {
     checkNotifications()
     const interval = setInterval(checkNotifications, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [pathname, isMobile])
+  
 
   return null
 }
