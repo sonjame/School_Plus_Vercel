@@ -305,6 +305,8 @@ export default function ChatPage() {
   //다크 모드
   const [darkMode, setDarkMode] = useState(false)
 
+  const [isSending, setIsSending] = useState(false)
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -1122,26 +1124,43 @@ export default function ChatPage() {
      메시지 전송 핸들러
   ------------------------- */
   const handleSendMessage = async () => {
+    if (isSending) return
+
     if (isChatBanned) return
     if (!currentRoomId) return
 
     if (pendingImages.length > 0) {
-      await handleSendImagesBulk()
+      try {
+        setIsSending(true)
+        await handleSendImagesBulk()
+      } finally {
+        setIsSending(false)
+      }
       return
     }
 
     if (!inputText.trim()) return
 
     const trimmed = inputText.trim()
-    setInputText('')
 
-    shouldScrollToBottomRef.current = true
+    try {
+      setIsSending(true)
 
-    socket.emit('sendMessage', {
-      roomId: currentRoomId,
-      type: isUrl(trimmed) ? 'url' : 'text',
-      content: trimmed,
-    })
+      setInputText('')
+
+      shouldScrollToBottomRef.current = true
+
+      socket.emit('sendMessage', {
+        roomId: currentRoomId,
+        type: isUrl(trimmed) ? 'url' : 'text',
+        content: trimmed,
+      })
+
+      // 약간의 연타 방지 딜레이
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    } finally {
+      setIsSending(false)
+    }
   }
   useEffect(() => {
     if (!currentRoomId || !currentUser?.token) return
@@ -2989,6 +3008,7 @@ export default function ChatPage() {
                 type="button"
                 onClick={handleSendMessage}
                 disabled={
+                  isSending ||
                   !currentRoom ||
                   (!inputText.trim() && pendingImages.length === 0)
                 }
@@ -3000,19 +3020,24 @@ export default function ChatPage() {
                   fontSize: 14,
                   fontWeight: 600,
 
+                  opacity: isSending ? 0.6 : 1,
+
                   cursor:
+                    !isSending &&
                     currentRoom &&
                     (inputText.trim() || pendingImages.length > 0)
                       ? 'pointer'
                       : 'default',
 
                   background:
+                    !isSending &&
                     currentRoom &&
                     (inputText.trim() || pendingImages.length > 0)
                       ? '#4FC3F7'
                       : '#e5e7eb',
 
                   color:
+                    !isSending &&
                     currentRoom &&
                     (inputText.trim() || pendingImages.length > 0)
                       ? 'white'
