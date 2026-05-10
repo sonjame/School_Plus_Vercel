@@ -28,13 +28,13 @@ export async function GET(req: Request) {
     searchParams.get('mode')
 
   const clientId =
-    process.env.GOOGLE_CLIENT_ID
+    process.env.EXPO_GOOGLE_CLIENT_ID
 
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET
+    process.env.EXPO_GOOGLE_CLIENT_SECRET
 
   const serverRedirectUri =
-    process.env.GOOGLE_SERVER_REDIRECT_URI
+    process.env.EXPO_GOOGLE_REDIRECT_URI
 
   if (!clientId || !serverRedirectUri) {
     return NextResponse.json(
