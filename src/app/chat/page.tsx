@@ -68,6 +68,13 @@ type Friend = {
   gradeLabel?: string
 }
 
+type UploadingFile = {
+  id: string
+  name: string
+  type: 'image' | 'video' | 'file'
+  progress: number
+}
+
 function getRoomDisplayName(
   room: ChatRoom,
   currentUserId?: number,
@@ -343,7 +350,7 @@ export default function ChatPage() {
   const [currentRoomId, setCurrentRoomId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
-  const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteMode, setInviteMode] = useState<'oneToOne' | 'group'>('oneToOne')
 
@@ -706,6 +713,66 @@ export default function ChatPage() {
       name: '',
     })
   }
+
+  const uploadWithProgress = (file: File, type: 'image' | 'video' | 'file') => {
+    return new Promise<{ url: string; name: string }>((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const xhr = new XMLHttpRequest()
+
+      const uploadId = crypto.randomUUID()
+
+      setUploadingFiles((prev) => [
+        ...prev,
+        {
+          id: uploadId,
+          name: file.name,
+          type,
+          progress: 0,
+        },
+      ])
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return
+
+        const percent = Math.round((event.loaded / event.total) * 100)
+
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadId
+              ? {
+                  ...f,
+                  progress: percent,
+                }
+              : f,
+          ),
+        )
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const data = JSON.parse(xhr.responseText)
+
+          setUploadingFiles((prev) => prev.filter((f) => f.id !== uploadId))
+
+          resolve(data)
+        } else {
+          reject()
+        }
+      }
+
+      xhr.onerror = () => {
+        setUploadingFiles((prev) => prev.filter((f) => f.id !== uploadId))
+
+        reject()
+      }
+
+      xhr.open('POST', '/api/upload/chat')
+      xhr.send(formData)
+    })
+  }
+
   const handleSendImage = async (file: File) => {
     if (!currentRoomId || !currentUser?.token) return
 
@@ -713,18 +780,7 @@ export default function ChatPage() {
     formData.append('file', file)
 
     // 1. S3 업로드
-    const uploadRes = await fetch('/api/upload/chat', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!uploadRes.ok) {
-      setBlockMessage('이미지 업로드 실패')
-      return
-    }
-
-    const { url, name } = await uploadRes.json()
-
+    const { url, name } = await uploadWithProgress(file, 'image')
     // 2. 메시지 저장
     await apiFetch('/api/chat/messages', {
       method: 'POST',
@@ -1058,18 +1114,13 @@ export default function ChatPage() {
 
     // 1️⃣ 이미지 업로드
     for (const file of pendingImages) {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadRes = await fetch('/api/upload/chat', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadRes.ok) continue
-
-      const { url, name } = await uploadRes.json()
-      uploaded.push({ fileUrl: url, fileName: name })
+      try {
+        const { url, name } = await uploadWithProgress(file, 'image')
+        uploaded.push({ fileUrl: url, fileName: name })
+      } catch {
+        setBlockMessage('이미지 업로드 실패')
+        continue
+      }
     }
 
     if (uploaded.length === 0) return
@@ -1304,17 +1355,7 @@ export default function ChatPage() {
     /* =====================
      1️⃣ S3 업로드
   ===================== */
-    const uploadRes = await fetch('/api/upload/chat', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!uploadRes.ok) {
-      setBlockMessage('파일 업로드 실패')
-      return
-    }
-
-    const { url, name } = await uploadRes.json()
+    const { url, name } = await uploadWithProgress(file, 'file')
 
     /* =====================
      2️⃣ 메시지 저장 (🔥 핵심)
@@ -1364,27 +1405,7 @@ export default function ChatPage() {
     formData.append('file', file)
 
     // 1️⃣ S3 업로드
-    const uploadRes = await fetch('/api/upload/chat', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!uploadRes.ok) {
-      const err = await uploadRes.json().catch(() => ({}))
-
-      if (err?.error === 'FILE_TOO_LARGE') {
-        setAlert({
-          open: true,
-          title: '업로드 제한',
-          message: '100MB 이상 영상은 업로드할 수 없습니다.',
-        })
-        return
-      }
-
-      setBlockMessage('동영상 업로드 실패')
-      return
-    }
-    const { url, name } = await uploadRes.json()
+    const { url, name } = await uploadWithProgress(file, 'video')
 
     // 2️⃣ 메시지 저장
     const sendRes = await apiFetch('/api/chat/messages', {
@@ -2135,6 +2156,68 @@ export default function ChatPage() {
             </div>
 
             {/* 메시지 영역 */}
+            {uploadingFiles.length > 0 && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderTop: `1px solid ${COLORS.border}`,
+                  background: darkMode ? '#1e293b' : '#fff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                {uploadingFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    style={{
+                      background: COLORS.softBg,
+                      borderRadius: 12,
+                      padding: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span>
+                        {file.type === 'image'
+                          ? '🖼 이미지 업로드 중'
+                          : file.type === 'video'
+                            ? '🎥 동영상 업로드 중'
+                            : '📄 파일 업로드 중'}
+                      </span>
+
+                      <span>{file.progress}%</span>
+                    </div>
+
+                    <div
+                      style={{
+                        width: '100%',
+                        height: 6,
+                        background: darkMode ? '#334155' : '#e5e7eb',
+                        borderRadius: 999,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${file.progress}%`,
+                          height: '100%',
+                          background: '#4FC3F7',
+                          transition: 'width 0.2s linear',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               ref={messageContainerRef} // 🔥 여기로 이동
               style={{
