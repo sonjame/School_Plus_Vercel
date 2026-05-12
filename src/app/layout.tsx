@@ -22,6 +22,47 @@ export default function RootLayout({
   const effectiveDark = user?.level === 'admin' ? false : darkMode
 
   useEffect(() => {
+    const restoreLogin = async () => {
+      const savedUser = localStorage.getItem('loggedInUser')
+      const token = localStorage.getItem('accessToken')
+
+      // 이미 둘 다 있으면 그대로 사용
+      if (savedUser && token) return
+
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (!res.ok) {
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('loggedInUser')
+          localStorage.removeItem('userId')
+          setUser(null)
+          return
+        }
+
+        const data = await res.json()
+
+        localStorage.setItem('accessToken', data.accessToken)
+
+        if (data.user) {
+          localStorage.setItem('loggedInUser', JSON.stringify(data.user))
+          localStorage.setItem('userId', data.user.id.toString())
+          setUser(data.user)
+        } else if (savedUser) {
+          setUser(JSON.parse(savedUser))
+        }
+      } catch (err) {
+        console.error('자동 로그인 복구 실패:', err)
+      }
+    }
+
+    restoreLogin()
+  }, [])
+
+  useEffect(() => {
     const loadTheme = () => {
       const saved = localStorage.getItem('loggedInUser')
       if (!saved) return
@@ -374,7 +415,8 @@ export default function RootLayout({
               top: 0,
               left: sidebarOpen ? 0 : isPC ? '-220px' : '-260px',
               width: isPC ? '220px' : '240px',
-              height: '100vh',
+              height: '100dvh',
+              maxHeight: '100dvh',
               background:
                 user?.level === 'admin'
                   ? 'linear-gradient(180deg, #0F172A, #020617)'
@@ -382,9 +424,8 @@ export default function RootLayout({
                     ? '#1e293b'
                     : '#4DB8FF',
 
-              /* ✅ padding 분해 */
               paddingTop: '20px',
-              paddingBottom: '20px',
+              paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
               paddingLeft: '14px',
               paddingRight: '14px',
 
@@ -396,6 +437,7 @@ export default function RootLayout({
               zIndex: 998,
               overflowY: 'auto',
               overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {/* 학교 이름 표시 */}
