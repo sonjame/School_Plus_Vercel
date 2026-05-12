@@ -119,12 +119,15 @@ export async function POST(req: Request) {
 
     res.cookies.set('refreshToken', refreshToken, {
       httpOnly: true,
+
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+
       path: '/',
+
       maxAge: 60 * 60 * 24 * 30,
     })
-
     return res
   } catch (e) {
     console.error('❌ login error:', e)
