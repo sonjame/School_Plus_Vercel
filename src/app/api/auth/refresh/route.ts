@@ -77,10 +77,18 @@ export async function POST(req: Request) {
        6️⃣ 새 accessToken 발급
     ========================= */
     const [userRows]: any = await db.query(
-      `SELECT school_code, level FROM users WHERE id = ?`,
+      `
+  SELECT id, username, name, email, school, grade, level,
+         edu_code, school_code, class_num, profile_image_url
+  FROM users
+  WHERE id = ?
+  `,
       [userId],
     )
 
+    if (userRows.length === 0) {
+      return NextResponse.json({ code: 'USER_NOT_FOUND' }, { status: 401 })
+    }
     const newAccessToken = jwt.sign(
       {
         id: userId,
@@ -94,14 +102,29 @@ export async function POST(req: Request) {
     /* =========================
        7️⃣ 응답 + 쿠키 갱신
     ========================= */
+    const user = userRows[0]
+
     const res = NextResponse.json({
       accessToken: newAccessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        school: user.school,
+        grade: user.grade,
+        level: user.level,
+        eduCode: user.edu_code,
+        schoolCode: user.school_code,
+        classNum: user.class_num,
+        profileImageUrl: user.profile_image_url,
+      },
     })
 
     res.cookies.set('refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     })
