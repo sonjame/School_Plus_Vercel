@@ -63,6 +63,24 @@ export async function apiFetch(
 
     localStorage.setItem('accessToken', newAccessToken)
 
+    const savedUser = localStorage.getItem('loggedInUser')
+
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser)
+
+        localStorage.setItem(
+          'loggedInUser',
+          JSON.stringify({
+            ...parsedUser,
+            token: newAccessToken,
+          }),
+        )
+      } catch {
+        localStorage.removeItem('loggedInUser')
+      }
+    }
+
     // 🔔 대기 중이던 요청들 재개
     waitQueue.forEach((cb) => cb(newAccessToken))
     waitQueue = []
