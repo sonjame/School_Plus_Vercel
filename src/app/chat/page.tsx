@@ -2244,10 +2244,14 @@ export default function ChatPage() {
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
+
+                paddingTop: 12,
+                paddingRight: 16,
+                paddingLeft: 16,
                 paddingBottom: isMobile ? 120 : 16,
+
                 scrollPaddingBottom: isMobile ? 120 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
-                padding: '12px 16px',
                 display: 'flex',
                 flexDirection: 'column',
               }}
