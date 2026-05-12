@@ -1478,7 +1478,8 @@ export default function ChatPage() {
     <main
       ref={containerRef}
       style={{
-        height: 'calc(var(--vh, 1vh) * 100)',
+        height: '100dvh',
+
         paddingTop: isMobile ? 60 : 0,
         paddingBottom: 0,
         background: darkMode ? '#0f172a' : '#ffffff',
@@ -1495,9 +1496,7 @@ export default function ChatPage() {
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
-          height: isMobile
-            ? 'calc(var(--vh, 1vh) * 100 - 60px)'
-            : 'calc(var(--vh, 1vh) * 100)',
+          height: isMobile ? 'calc(100dvh - 60px)' : '100dvh',
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
@@ -2179,7 +2178,9 @@ export default function ChatPage() {
                   position: 'sticky',
                   bottom: 0,
                   zIndex: 20,
-                  paddingBottom: 'env(safe-area-inset-bottom)',
+                  paddingBottom: isMobile
+                    ? 'max(8px, env(safe-area-inset-bottom))'
+                    : 8,
                   background: darkMode ? '#1e293b' : '#fff',
                   display: 'flex',
                   flexDirection: 'column',
@@ -2248,9 +2249,8 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: isMobile ? 120 : 16,
-
-                scrollPaddingBottom: isMobile ? 120 : 16,
+                paddingBottom: isMobile ? 72 : 16,
+                scrollPaddingBottom: isMobile ? 72 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
