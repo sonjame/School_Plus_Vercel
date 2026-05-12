@@ -1023,16 +1023,23 @@ export default function ChatPage() {
           'ontouchstart' in window,
       )
     }
-
     const updateViewport = () => {
-      const height = window.visualViewport?.height || window.innerHeight
-      setViewportHeight(height)
+      const viewport = window.visualViewport
+
+      if (!viewport) {
+        setViewportHeight(window.innerHeight)
+        return
+      }
+
+      // ✅ 아이패드 Safari 보정 핵심
+      const height = viewport.height + viewport.offsetTop
+
+      setViewportHeight(Math.round(height))
 
       setTimeout(() => {
         scrollToBottom()
-      }, 50)
+      }, 80)
     }
-
     checkTouch()
     updateViewport()
 
@@ -1531,7 +1538,10 @@ export default function ChatPage() {
     <main
       ref={containerRef}
       style={{
-        height: isTouchDevice && viewportHeight > 0 ? viewportHeight : '100dvh',
+        height:
+          isTouchDevice && viewportHeight > 0
+            ? `${viewportHeight}px`
+            : '100dvh',
         overflowY: 'hidden',
 
         paddingTop: isMobile ? 60 : 0,
@@ -1552,8 +1562,8 @@ export default function ChatPage() {
           height:
             isTouchDevice && viewportHeight > 0
               ? isMobile
-                ? viewportHeight - 60
-                : viewportHeight
+                ? `${viewportHeight - 60}px`
+                : `${viewportHeight}px`
               : isMobile
                 ? 'calc(100dvh - 60px)'
                 : '100dvh',
