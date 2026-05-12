@@ -1028,13 +1028,15 @@ export default function ChatPage() {
 
       if (!viewport) {
         setViewportHeight(window.innerHeight)
+        setKeyboardHeight(0)
         return
       }
 
-      // ✅ 아이패드 Safari 보정 핵심
-      const height = viewport.height + viewport.offsetTop
+      const visibleHeight = viewport.height + viewport.offsetTop
+      const keyboard = Math.max(0, window.innerHeight - visibleHeight)
 
-      setViewportHeight(Math.round(height))
+      setViewportHeight(Math.round(visibleHeight))
+      setKeyboardHeight(keyboard > 80 ? Math.round(keyboard) : 0)
 
       setTimeout(() => {
         scrollToBottom()
@@ -2243,16 +2245,14 @@ export default function ChatPage() {
             {uploadingFiles.length > 0 && (
               <div
                 style={{
-                  padding: '10px 12px',
+                  position: isTouchDevice ? 'fixed' : 'relative',
+                  left: 0,
+                  right: 0,
+                  bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+                  zIndex: 999,
+
                   borderTop: `1px solid ${COLORS.border}`,
-                  zIndex: 20,
-                  paddingBottom: isMobile
-                    ? 'max(8px, env(safe-area-inset-bottom))'
-                    : 8,
                   background: darkMode ? '#1e293b' : '#fff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
                 }}
               >
                 {uploadingFiles.map((file) => (
@@ -2317,7 +2317,7 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: isMobile ? 8 : 16,
+                paddingBottom: isTouchDevice ? 80 : 16,
                 scrollPaddingBottom: isMobile ? 8 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
