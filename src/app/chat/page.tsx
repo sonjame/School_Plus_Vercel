@@ -2317,7 +2317,7 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: isTouchDevice ? 80 : 16,
+                paddingBottom: isTouchDevice ? 110 + keyboardHeight : 16,
                 scrollPaddingBottom: isMobile ? 8 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
@@ -2930,8 +2930,19 @@ export default function ChatPage() {
                 alignItems: 'center',
                 gap: 8,
                 background: darkMode ? '#1e293b' : 'white',
-                position: 'sticky',
-                bottom: 0,
+
+                position: isTouchDevice ? 'fixed' : 'sticky',
+                left: isTouchDevice
+                  ? isMobile
+                    ? 0
+                    : sidebarWidth + 8
+                  : undefined,
+                right: isTouchDevice ? 0 : undefined,
+                bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+                zIndex: 9999,
+
+                padding: '10px 12px',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ position: 'relative' }}>
