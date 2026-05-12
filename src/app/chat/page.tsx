@@ -2941,7 +2941,6 @@ export default function ChatPage() {
                 bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
                 zIndex: 9999,
 
-                padding: '10px 12px',
                 boxSizing: 'border-box',
               }}
             >
