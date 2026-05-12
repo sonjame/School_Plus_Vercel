@@ -1137,7 +1137,13 @@ export default function ChatPage() {
 
   // 모바일 웹
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth <= 768)
+    const check = () => {
+      const isTouch =
+        window.matchMedia('(pointer: coarse)').matches ||
+        'ontouchstart' in window
+
+      setIsMobile(window.innerWidth <= 1024 && isTouch)
+    }
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -2245,14 +2251,23 @@ export default function ChatPage() {
             {uploadingFiles.length > 0 && (
               <div
                 style={{
-                  position: isTouchDevice ? 'fixed' : 'relative',
-                  left: 0,
-                  right: 0,
+                  position: isTouchDevice ? 'fixed' : 'sticky',
+                  left: isTouchDevice ? 0 : undefined,
+                  right: isTouchDevice ? 0 : undefined,
                   bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
-                  zIndex: 999,
+                  zIndex: 9999,
 
-                  borderTop: `1px solid ${COLORS.border}`,
-                  background: darkMode ? '#1e293b' : '#fff',
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: darkMode ? '#1e293b' : 'white',
+
+                  paddingTop: 10,
+                  paddingBottom: 10,
+                  paddingLeft: 12,
+                  paddingRight: 12,
+                  boxSizing: 'border-box',
                 }}
               >
                 {uploadingFiles.map((file) => (
@@ -2317,8 +2332,8 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: isMobile ? 8 : 16,
-                scrollPaddingBottom: isMobile ? 8 : 16,
+                paddingBottom: isTouchDevice ? 110 + keyboardHeight : 16,
+                scrollPaddingBottom: isTouchDevice ? 110 + keyboardHeight : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
