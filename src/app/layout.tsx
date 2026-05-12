@@ -136,22 +136,23 @@ export default function RootLayout({
     }
 
     loadUser()
-
-    // 🔥 학교 변경 후 새로 저장된 값 반영
     window.addEventListener('storage', loadUser)
 
-    const check = () => {
-      const wide = window.innerWidth >= 800
-      setIsPC(wide)
-      setSidebarOpen(wide)
+    const mediaQuery = window.matchMedia('(min-width: 800px)')
+
+    const applyLayout = (e: MediaQueryList | MediaQueryListEvent) => {
+      const pc = e.matches
+      setIsPC(pc)
+      setSidebarOpen(pc)
     }
 
-    check()
-    window.addEventListener('resize', check)
+    applyLayout(mediaQuery)
+
+    mediaQuery.addEventListener('change', applyLayout)
 
     return () => {
       window.removeEventListener('storage', loadUser)
-      window.removeEventListener('resize', check)
+      mediaQuery.removeEventListener('change', applyLayout)
     }
   }, [])
 
@@ -1067,7 +1068,6 @@ function ToastWatcher() {
     const interval = setInterval(checkNotifications, 5000)
     return () => clearInterval(interval)
   }, [pathname, isMobile])
-  
 
   return null
 }
