@@ -995,6 +995,20 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    const handleFocus = () => {
+      setTimeout(() => {
+        scrollToBottom()
+      }, 300)
+    }
+
+    window.addEventListener('focusin', handleFocus)
+
+    return () => {
+      window.removeEventListener('focusin', handleFocus)
+    }
+  }, [])
+
+  useEffect(() => {
     const container = messageContainerRef.current
     if (!container) return
 
@@ -1465,14 +1479,15 @@ export default function ChatPage() {
       ref={containerRef}
       style={{
         height: 'calc(var(--vh, 1vh) * 100)',
-        paddingTop: isMobile ? 60 : 0, // 가독성도 좋아짐
-        paddingBottom: 0, // ✅ 아래 여백 완전 제거
+        paddingTop: isMobile ? 60 : 0,
+        paddingBottom: 0,
         background: darkMode ? '#0f172a' : '#ffffff',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'stretch',
-        overflow: 'hidden',
+        // ✅ 변경
         overflowX: 'hidden',
+        overflowY: isMobile ? 'auto' : 'hidden',
       }}
     >
       <div
@@ -2161,6 +2176,10 @@ export default function ChatPage() {
                 style={{
                   padding: '10px 12px',
                   borderTop: `1px solid ${COLORS.border}`,
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 20,
+                  paddingBottom: 'env(safe-area-inset-bottom)',
                   background: darkMode ? '#1e293b' : '#fff',
                   display: 'flex',
                   flexDirection: 'column',
@@ -2219,12 +2238,14 @@ export default function ChatPage() {
               </div>
             )}
             <div
-              ref={messageContainerRef} // 🔥 여기로 이동
+              ref={messageContainerRef}
               style={{
                 flex: 1,
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
+                paddingBottom: isMobile ? 120 : 16,
+                scrollPaddingBottom: isMobile ? 120 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 padding: '12px 16px',
                 display: 'flex',
