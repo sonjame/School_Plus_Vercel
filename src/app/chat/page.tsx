@@ -358,6 +358,9 @@ export default function ChatPage() {
 
   const [keyboardHeight, setKeyboardHeight] = useState(0)
 
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+
   const showRoomList = !isMobile || currentRoomId === null
   const showChatRoom = !isMobile || currentRoomId !== null
 
@@ -1014,34 +1017,35 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
-    if (!isMobile) return
-    if (!window.visualViewport) return
+    const checkTouch = () => {
+      setIsTouchDevice(
+        window.matchMedia('(pointer: coarse)').matches ||
+          'ontouchstart' in window,
+      )
+    }
 
-    const updateKeyboard = () => {
-      const viewport = window.visualViewport
-      if (!viewport) return
-
-      const heightDiff =
-        window.innerHeight - viewport.height - viewport.offsetTop
-      const keyboard = heightDiff > 80 ? heightDiff : 0
-
-      setKeyboardHeight(keyboard)
+    const updateViewport = () => {
+      const height = window.visualViewport?.height || window.innerHeight
+      setViewportHeight(height)
 
       setTimeout(() => {
         scrollToBottom()
       }, 50)
     }
 
-    updateKeyboard()
+    checkTouch()
+    updateViewport()
 
-    window.visualViewport.addEventListener('resize', updateKeyboard)
-    window.visualViewport.addEventListener('scroll', updateKeyboard)
+    window.visualViewport?.addEventListener('resize', updateViewport)
+    window.visualViewport?.addEventListener('scroll', updateViewport)
+    window.addEventListener('resize', updateViewport)
 
     return () => {
-      window.visualViewport?.removeEventListener('resize', updateKeyboard)
-      window.visualViewport?.removeEventListener('scroll', updateKeyboard)
+      window.visualViewport?.removeEventListener('resize', updateViewport)
+      window.visualViewport?.removeEventListener('scroll', updateViewport)
+      window.removeEventListener('resize', updateViewport)
     }
-  }, [isMobile])
+  }, [])
 
   useEffect(() => {
     const handleFocus = () => {
@@ -1527,7 +1531,7 @@ export default function ChatPage() {
     <main
       ref={containerRef}
       style={{
-        height: isMobile ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
+        height: isTouchDevice && viewportHeight > 0 ? viewportHeight : '100dvh',
         overflowY: 'hidden',
 
         paddingTop: isMobile ? 60 : 0,
@@ -1545,9 +1549,14 @@ export default function ChatPage() {
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
-          height: isMobile
-            ? `calc(100dvh - 60px - ${keyboardHeight}px)`
-            : '100dvh',
+          height:
+            isTouchDevice && viewportHeight > 0
+              ? isMobile
+                ? viewportHeight - 60
+                : viewportHeight
+              : isMobile
+                ? 'calc(100dvh - 60px)'
+                : '100dvh',
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
