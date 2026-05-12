@@ -11,6 +11,39 @@ export default function LoginPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
 
+  useEffect(() => {
+    const restoreLogin = async () => {
+      let token = localStorage.getItem('accessToken')
+
+      // accessToken 있으면 홈으로
+      if (token) {
+        window.location.href = '/'
+        return
+      }
+
+      // refresh 시도
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (!res.ok) return
+
+        const data = await res.json()
+
+        localStorage.setItem('accessToken', data.accessToken)
+
+        // 자동 로그인 성공
+        window.location.href = '/'
+      } catch (err) {
+        console.error('자동 로그인 실패:', err)
+      }
+    }
+
+    restoreLogin()
+  }, [])
+
   // ⭐ Enter 키로 로그인 실행
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,12 +89,12 @@ export default function LoginPage() {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ⭐ 추가
       body: JSON.stringify({
         username,
         password,
       }),
     })
-
     let data: any = {}
     try {
       data = await res.json()
