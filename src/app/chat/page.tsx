@@ -1032,10 +1032,12 @@ export default function ChatPage() {
         return
       }
 
-      const visibleHeight = viewport.height + viewport.offsetTop
-      const keyboard = Math.max(0, window.innerHeight - visibleHeight)
+      const keyboard = Math.max(
+        0,
+        window.innerHeight - viewport.height - viewport.offsetTop,
+      )
 
-      setViewportHeight(Math.round(visibleHeight))
+      setViewportHeight(Math.round(viewport.height))
       setKeyboardHeight(keyboard > 80 ? Math.round(keyboard) : 0)
 
       setTimeout(() => {
@@ -2251,23 +2253,26 @@ export default function ChatPage() {
             {uploadingFiles.length > 0 && (
               <div
                 style={{
+                  padding: '10px 12px',
+                  borderTop: '1px solid #e5e7eb',
+
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+
+                  background: darkMode ? '#1e293b' : 'white',
+
                   position: isTouchDevice ? 'fixed' : 'sticky',
                   left: isTouchDevice ? 0 : undefined,
                   right: isTouchDevice ? 0 : undefined,
                   bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+
                   zIndex: 9999,
 
-                  borderTop: '1px solid #e5e7eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: darkMode ? '#1e293b' : 'white',
-
-                  paddingTop: 10,
-                  paddingBottom: 10,
-                  paddingLeft: 12,
-                  paddingRight: 12,
+                  width: '100%',
                   boxSizing: 'border-box',
+
+                  flexWrap: 'nowrap',
                 }}
               >
                 {uploadingFiles.map((file) => (
@@ -2332,8 +2337,8 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: isTouchDevice ? 110 + keyboardHeight : 16,
-                scrollPaddingBottom: isTouchDevice ? 110 + keyboardHeight : 16,
+                paddingBottom: isTouchDevice ? 72 : 16,
+                scrollPaddingBottom: isTouchDevice ? 72 : 16,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
@@ -3069,10 +3074,10 @@ export default function ChatPage() {
                 }}
                 disabled={!currentRoom || isChatBanned}
                 style={{
-                  flex: 1,
+                  flex: '1 1 auto',
                   padding: '10px 14px',
                   borderRadius: 999,
-
+                  minWidth: 0,
                   fontSize: 14,
                   outline: 'none',
                   backgroundColor: blockMessage
@@ -3118,8 +3123,9 @@ export default function ChatPage() {
                   type="button"
                   onClick={() => setShowEmojiPicker((v) => !v)}
                   style={{
-                    width: 32,
-                    height: 32,
+                    flexShrink: 0,
+                    width: 36,
+                    height: 36,
                     borderRadius: 999,
                     border: `1px solid ${COLORS.border}`,
                     background: darkMode ? '#0f172a' : '#f9fafb',
