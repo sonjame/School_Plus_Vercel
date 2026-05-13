@@ -1548,10 +1548,7 @@ export default function ChatPage() {
     <main
       ref={containerRef}
       style={{
-        height:
-          isTouchDevice && viewportHeight > 0
-            ? `${viewportHeight}px`
-            : '100dvh',
+        height: '100dvh',
         overflowY: 'hidden',
 
         paddingTop: isMobile ? 60 : 0,
@@ -1569,14 +1566,7 @@ export default function ChatPage() {
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
-          height:
-            isTouchDevice && viewportHeight > 0
-              ? isMobile
-                ? `${viewportHeight - 60}px`
-                : `${viewportHeight}px`
-              : isMobile
-                ? 'calc(100dvh - 60px)'
-                : '100dvh',
+          height: isMobile ? 'calc(100dvh - 60px)' : '100dvh',
           borderRadius: 0, // ✅ 둥근 모서리 제거
           display: 'flex',
           overflow: 'hidden',
@@ -1589,8 +1579,8 @@ export default function ChatPage() {
           <aside
             style={{
               width: isMobile ? '100%' : sidebarWidth,
-              minWidth: 240,
-              maxWidth: 520,
+              minWidth: isMobile ? '100%' : 240,
+              maxWidth: isMobile ? 'none' : 520,
               borderRight: isMobile ? 'none' : `1px solid ${COLORS.border}`,
               background: darkMode ? '#1e293b' : 'white',
               color: COLORS.text,
@@ -3153,7 +3143,7 @@ export default function ChatPage() {
                   <span
                     style={{
                       display: 'inline-block',
-                      transform: 'translateX(-3px) translateY(-1px)', // ⭐ 위로 1px
+                      transform: 'translateX(-1px) translateY(-1px)', // ⭐ 위로 1px
                     }}
                   >
                     😊
