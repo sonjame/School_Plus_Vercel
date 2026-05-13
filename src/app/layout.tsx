@@ -179,7 +179,9 @@ export default function RootLayout({
     loadUser()
     window.addEventListener('storage', loadUser)
 
-    const mediaQuery = window.matchMedia('(min-width: 800px)')
+    const mediaQuery = window.matchMedia(
+      '(min-width: 1025px) and (pointer: fine)',
+    )
 
     const applyLayout = (e: MediaQueryList | MediaQueryListEvent) => {
       const pc = e.matches
@@ -990,7 +992,9 @@ function ToastWatcher() {
 
   const prevAdminNotifyIdRef = useRef<number | null>(null)
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 800
+  const isMobile =
+    typeof window !== 'undefined' &&
+    (window.innerWidth < 1025 || window.matchMedia('(pointer: coarse)').matches)
 
   useEffect(() => {
     // ✅ 모바일 웹에서는 토스트 알림 비활성화
