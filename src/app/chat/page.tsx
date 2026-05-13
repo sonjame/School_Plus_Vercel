@@ -2950,8 +2950,24 @@ export default function ChatPage() {
                 alignItems: 'center',
                 gap: 8,
                 background: darkMode ? '#1e293b' : 'white',
-                position: 'sticky',
-                bottom: 0,
+
+                position: isTouchDevice ? 'fixed' : 'sticky',
+
+                left:
+                  isTouchDevice && !isMobile && showRoomList
+                    ? `${sidebarWidth + 8}px`
+                    : 0,
+
+                right: 0,
+
+                bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+
+                zIndex: 9999,
+
+                boxSizing: 'border-box',
+                flexWrap: 'nowrap',
+
+                paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
               }}
             >
               <div style={{ position: 'relative' }}>
