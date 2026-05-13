@@ -2335,10 +2335,9 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 90 : 90,
-
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 120 : 72,
                 scrollPaddingBottom:
-                  keyboardHeight > 0 ? keyboardHeight + 90 : 90,
+                  keyboardHeight > 0 ? keyboardHeight + 120 : 72,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
