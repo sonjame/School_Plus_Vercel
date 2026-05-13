@@ -271,11 +271,19 @@ export default function RootLayout({
   }
 
   /* 메뉴 섹션 UI */
-  function dropdownItem(href: string, label: string, dark: boolean) {
+  function dropdownItem(
+    href: string,
+    label: string,
+    dark: boolean,
+    onClick?: () => void,
+  ) {
     return (
       <Link
         href={href}
-        onClick={() => setDropOpen(false)}
+        onClick={() => {
+          setDropOpen(false)
+          onClick?.()
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -460,6 +468,11 @@ export default function RootLayout({
               {user?.level !== 'admin' && (
                 <Link
                   href="/"
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                   style={{
                     fontSize: '20px',
                     fontWeight: 700,
@@ -585,6 +598,11 @@ export default function RootLayout({
                   label="내정보"
                   href="/my-info"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
 
                 {/* 게시판 드롭다운 */}
@@ -639,16 +657,37 @@ export default function RootLayout({
                         zIndex: 9999,
                       }}
                     >
-                      {dropdownItem('/board', '📚 전체 게시판', effectiveDark)}
+                      {dropdownItem(
+                        '/board',
+                        '📚 전체 게시판',
+                        effectiveDark,
+                        () => {
+                          if (!isPC) {
+                            setSidebarOpen(false)
+                          }
+                        },
+                      )}
+
                       {dropdownItem(
                         '/board/myposts',
                         '✏ 내가 쓴 글',
                         effectiveDark,
+                        () => {
+                          if (!isPC) {
+                            setSidebarOpen(false)
+                          }
+                        },
                       )}
+
                       {dropdownItem(
                         '/board/scrap',
                         '⭐ 스크랩한 글',
                         effectiveDark,
+                        () => {
+                          if (!isPC) {
+                            setSidebarOpen(false)
+                          }
+                        },
                       )}
                     </div>
                   )}
@@ -659,48 +698,88 @@ export default function RootLayout({
                   label="채팅"
                   href="/chat"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="📅"
                   label="일정"
                   href="/calendar"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="⏰"
                   label="시간표"
                   href="/timetable"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="📊"
                   label="모의고사"
                   href="/mockscores"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="📊"
                   label="내신점수"
                   href="/schooltest"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="🍚"
                   label="급식표"
                   href="/meal"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="📚"
                   label="도서관"
                   href="/Library"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
                 <MenuItem
                   icon="🏫"
                   label="학교인증"
                   href="/school_certification"
                   darkMode={effectiveDark}
+                  onClick={() => {
+                    if (!isPC) {
+                      setSidebarOpen(false)
+                    }
+                  }}
                 />
               </>
             )}
@@ -914,15 +993,18 @@ function MenuItem({
   label,
   href,
   darkMode,
+  onClick,
 }: {
   icon: string
   label: string
   href: string
   darkMode: boolean
+  onClick?: () => void
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       style={{
         display: 'flex',
         alignItems: 'center',
