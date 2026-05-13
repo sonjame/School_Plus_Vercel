@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const [user, setUser] = useState<any>(null)
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true)
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [isPC, setIsPC] = useState<boolean>(true)
   const [banRemainMs, setBanRemainMs] = useState<number | null>(null)
 
@@ -184,9 +184,13 @@ export default function RootLayout({
     const applyLayout = (e: MediaQueryList | MediaQueryListEvent) => {
       const pc = e.matches
       setIsPC(pc)
-      setSidebarOpen(pc)
-    }
 
+      if (pc) {
+        setSidebarOpen(true)
+      } else {
+        setSidebarOpen(false)
+      }
+    }
     applyLayout(mediaQuery)
 
     mediaQuery.addEventListener('change', applyLayout)
