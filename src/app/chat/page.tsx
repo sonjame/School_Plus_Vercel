@@ -2952,7 +2952,7 @@ export default function ChatPage() {
 
                 right: 0,
 
-                bottom: isTouchDevice ? `${keyboardHeight + 38}px` : 0,
+                bottom: isTouchDevice ? `${keyboardHeight + 44}px` : 0,
 
                 zIndex: 9999,
 
