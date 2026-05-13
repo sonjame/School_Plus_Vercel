@@ -2252,17 +2252,18 @@ export default function ChatPage() {
 
                   background: darkMode ? '#1e293b' : 'white',
 
-                  position: 'fixed',
-                  left: 0,
-                  right: 0,
+                  position: keyboardHeight > 0 ? 'fixed' : 'sticky',
+                  left: keyboardHeight > 0 ? 0 : undefined,
+                  right: keyboardHeight > 0 ? 0 : undefined,
                   bottom: 0,
 
                   transform:
                     keyboardHeight > 0
-                      ? `translateY(-${keyboardHeight}px)`
-                      : 'translateY(0)',
+                      ? `translateY(-${keyboardHeight + 24}px)`
+                      : 'none',
 
-                  transition: 'transform 0.25s ease',
+                  transition:
+                    keyboardHeight > 0 ? 'transform 0.25s ease' : 'none',
 
                   zIndex: 9999,
 
@@ -2959,7 +2960,7 @@ export default function ChatPage() {
 
                 right: 0,
 
-                bottom: isTouchDevice ? `${keyboardHeight + 52}px` : 0,
+                bottom: isTouchDevice ? `${keyboardHeight + 56}px` : 0,
 
                 zIndex: 9999,
 
