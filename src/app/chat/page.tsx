@@ -2255,13 +2255,15 @@ export default function ChatPage() {
                   position: isTouchDevice ? 'fixed' : 'sticky',
                   left: isTouchDevice ? 0 : undefined,
                   right: isTouchDevice ? 0 : undefined,
-                  bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+                  bottom: isTouchDevice
+                    ? `${keyboardHeight + (isMobile ? 18 : 12)}px`
+                    : 0,
 
                   zIndex: 9999,
 
                   width: '100%',
                   boxSizing: 'border-box',
-
+                  paddingBottom: '8px',
                   flexWrap: 'nowrap',
                 }}
               >
@@ -2950,14 +2952,14 @@ export default function ChatPage() {
 
                 right: 0,
 
-                bottom: isTouchDevice ? `${keyboardHeight}px` : 0,
+                bottom: isTouchDevice ? `${keyboardHeight + 34}px` : 0,
 
                 zIndex: 9999,
 
                 boxSizing: 'border-box',
                 flexWrap: 'nowrap',
 
-                paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
+                paddingBottom: '8px',
               }}
             >
               <div style={{ position: 'relative' }}>
