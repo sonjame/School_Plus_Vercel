@@ -1053,9 +1053,11 @@ export default function PostDetailPage() {
               ? '📣 홍보게시판'
               : post.category === 'club'
                 ? '🎭 동아리게시판'
-                : post.category === 'admin'
-                  ? '🛠 관리자 게시판'
-                  : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
+                : post.category === 'freshman'
+                  ? '🌱 신입생게시판'
+                  : post.category === 'admin'
+                    ? '🛠 관리자 게시판'
+                    : `🎓 ${post.category.replace('grade', '')}학년 게시판`}
         </h3>
 
         {/* 게시글 카드 */}
