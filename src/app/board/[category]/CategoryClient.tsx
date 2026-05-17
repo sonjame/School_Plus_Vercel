@@ -17,6 +17,7 @@ export default function CategoryPage() {
     grade3: '3학년게시판',
     graduate: '졸업생게시판',
     admin: '관리자 게시판',
+    freshman: '신입생게시판',
   }
 
   const [darkMode, setDarkMode] = useState(false)
