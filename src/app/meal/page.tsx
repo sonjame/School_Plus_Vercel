@@ -32,7 +32,12 @@ function getWeekDates() {
     const m = String(d.getMonth() + 1).padStart(2, '0')
     const dd = String(d.getDate()).padStart(2, '0')
 
-    dates.push({ key: `${y}${m}${dd}`, label: `${m}/${dd}` })
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+
+    dates.push({
+      key: `${y}${m}${dd}`,
+      label: `${Number(m)}/${Number(dd)}(${dayNames[d.getDay()]})`,
+    })
   }
 
   return dates
