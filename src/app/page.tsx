@@ -403,6 +403,7 @@ export default function HomePage() {
     { key: 'free', label: '자유게시판' },
     { key: 'promo', label: '홍보게시판' },
     { key: 'club', label: '동아리게시판' },
+    { key: 'freshman', label: '신입생게시판' },
     { key: 'grade1', label: '1학년게시판' },
     { key: 'grade2', label: '2학년게시판' },
     { key: 'grade3', label: '3학년게시판' },
@@ -422,7 +423,15 @@ export default function HomePage() {
       const token = localStorage.getItem('accessToken')
       if (!token) return
 
-      const categories = ['free', 'promo', 'club', 'grade1', 'grade2', 'grade3']
+      const categories = [
+        'free',
+        'promo',
+        'club',
+        'freshman',
+        'grade1',
+        'grade2',
+        'grade3',
+      ]
       let merged: Post[] = []
 
       for (const cat of categories) {
@@ -1614,6 +1623,7 @@ export default function HomePage() {
                   free: '자유',
                   promo: '홍보',
                   club: '동아리',
+                  freshman: '신입생',
                   grade1: '1학년',
                   grade2: '2학년',
                   grade3: '3학년',
