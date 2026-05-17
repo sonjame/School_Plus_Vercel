@@ -50,6 +50,18 @@ export default function CalendarPage() {
   const today = new Date()
   const todayKey = formatLocalDate(today)
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+
+    check()
+
+    window.addEventListener('resize', check)
+
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   /* ===============================
      Dark Mode
   ================================ */
@@ -460,17 +472,28 @@ export default function CalendarPage() {
                 >
                   <div className="cell-date">{cell.day}</div>
                   {isToday && <div className="today-badge">오늘</div>}
-                  {userEvents[cell.key || '']?.slice(0, 2).map((ev) => (
-                    <div
-                      key={ev.id}
-                      className="cell-user-event"
-                      style={{
-                        backgroundColor: ev.color || '#4f46e5',
-                      }}
-                    >
-                      {ev.title}
-                    </div>
-                  ))}
+                  {isMobile
+                    ? userEvents[cell.key || '']?.length > 0 && (
+                        <div
+                          className="dot"
+                          style={{
+                            background:
+                              userEvents[cell.key || '']?.[0]?.color ||
+                              '#0ea5e9',
+                          }}
+                        />
+                      )
+                    : userEvents[cell.key || '']?.slice(0, 2).map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="cell-user-event"
+                          style={{
+                            backgroundColor: ev.color || '#4f46e5',
+                          }}
+                        >
+                          {ev.title}
+                        </div>
+                      ))}
                   {academicList.map((ev, i) => (
                     <div key={i} className="cell-academic">
                       {ev.title}
