@@ -182,7 +182,7 @@ export default function HomePage() {
     const latest = data[0]
 
     // 🔔 일반 알림은 id 변경 시에만 토스트
-    if (latest.id !== prevLatestNotificationIdRef.current) {
+    if (!latest.is_read && latest.id !== prevLatestNotificationIdRef.current) {
       if (latest.type === 'post_commented') {
         showToast('💬 내 게시글에 댓글', latest.message, 'postComment')
       }
@@ -1181,6 +1181,18 @@ export default function HomePage() {
                             method: 'PATCH',
                             body: JSON.stringify({ notificationId: n.id }),
                           })
+
+                          setNotifications((prev) =>
+                            prev.map((item) =>
+                              item.id === n.id
+                                ? { ...item, is_read: true }
+                                : item,
+                            ),
+                          )
+
+                          setUnreadNotifyCount((prev) => Math.max(0, prev - 1))
+                          prevLatestNotificationIdRef.current = n.id
+
                           setIsChatNoticeOpen(false)
                           window.location.href = n.link
                         }}
