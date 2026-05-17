@@ -175,7 +175,9 @@ export default function HomePage() {
     if (!res.ok) return
 
     const data = await res.json()
-    setNotifications(data || [])
+    const unreadOnly = Array.isArray(data) ? data.filter((n) => !n.is_read) : []
+
+    setNotifications(unreadOnly)
 
     if (!Array.isArray(data) || data.length === 0) return
 
@@ -1183,11 +1185,7 @@ export default function HomePage() {
                           })
 
                           setNotifications((prev) =>
-                            prev.map((item) =>
-                              item.id === n.id
-                                ? { ...item, is_read: true }
-                                : item,
-                            ),
+                            prev.filter((item) => item.id !== n.id),
                           )
 
                           setUnreadNotifyCount((prev) => Math.max(0, prev - 1))
