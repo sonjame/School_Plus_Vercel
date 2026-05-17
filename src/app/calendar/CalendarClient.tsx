@@ -410,16 +410,31 @@ export default function CalendarPage() {
   ================================ */
 
   const COLOR_PALETTE = [
-    '#4f46e5', // indigo
+    // 🔵 Blue / Indigo
+    '#3b82f6', // blue
     '#0ea5e9', // sky
+    '#4f46e5', // indigo
+
+    // 🟢 Green / Teal
     '#10b981', // emerald
     '#22c55e', // green
+    '#84cc16', // lime
+
+    // 🟡 Yellow / Orange
+    '#facc15', // amber
     '#eab308', // yellow
     '#f97316', // orange
+
+    // 🔴 Red / Pink
     '#ef4444', // red
+
     '#ec4899', // pink
+    '#f9a8d4', // pastel pink
+
+    // 🟣 Purple
     '#8b5cf6', // violet
-    '#64748b', // slate
+    '#a855f7', // purple
+    '#c4b5fd', // pastel purple
   ]
 
   /* ===============================
