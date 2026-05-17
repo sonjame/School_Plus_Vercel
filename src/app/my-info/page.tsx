@@ -896,7 +896,7 @@ export default function MyInfoPagePreview() {
 
         <Field
           label="학년"
-          value={getCurrentGrade(user.entryYear)}
+          value={user.grade}
           darkMode={themeSetting.darkMode}
         />
 
@@ -1118,7 +1118,7 @@ export default function MyInfoPagePreview() {
 
         <Field
           label="학년"
-          value={getCurrentGrade(user.entryYear)}
+          value={user.grade}
           darkMode={themeSetting.darkMode}
         />
 
