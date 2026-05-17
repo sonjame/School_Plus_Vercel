@@ -460,7 +460,17 @@ export default function CalendarPage() {
                 >
                   <div className="cell-date">{cell.day}</div>
                   {isToday && <div className="today-badge">오늘</div>}
-                  {hasUserEvent && <div className="dot" />}
+                  {userEvents[cell.key || '']?.slice(0, 2).map((ev) => (
+                    <div
+                      key={ev.id}
+                      className="cell-user-event"
+                      style={{
+                        backgroundColor: ev.color || '#4f46e5',
+                      }}
+                    >
+                      {ev.title}
+                    </div>
+                  ))}
                   {academicList.map((ev, i) => (
                     <div key={i} className="cell-academic">
                       {ev.title}
@@ -1552,6 +1562,18 @@ export default function CalendarPage() {
             padding: 10px;
             font-size: 14px;
           }
+        }
+
+        .cell-user-event {
+          margin-top: 2px;
+          font-size: 12px;
+          padding: 2px 4px;
+          border-radius: 6px;
+          color: #ffffff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-weight: 600;
         }
       `}</style>
     </div>
