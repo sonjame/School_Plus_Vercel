@@ -21,6 +21,15 @@ export default function RootLayout({
 
   const effectiveDark = user?.level === 'admin' ? false : darkMode
 
+  const pathname = usePathname()
+
+  const hideMenu =
+    pathname === '/auth/login' ||
+    pathname === '/auth/signup' ||
+    pathname === '/auth/find-id' ||
+    pathname === '/auth/find-password' ||
+    pathname === '/auth/email'
+
   useEffect(() => {
     const restoreLogin = async () => {
       const savedUser = localStorage.getItem('loggedInUser')
@@ -401,7 +410,7 @@ export default function RootLayout({
         <ToastProvider>
           <ToastWatcher />
           {/* 모바일 햄버거 버튼 */}
-          {!isPC && !sidebarOpen && (
+          {!hideMenu && !isPC && !sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
               style={{
@@ -423,428 +432,434 @@ export default function RootLayout({
           )}
 
           {/* 사이드바 */}
-          <aside
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: sidebarOpen ? 0 : isPC ? '-220px' : '-260px',
-              width: isPC ? '220px' : '240px',
-              height: '100dvh',
-              maxHeight: '100dvh',
-              background:
-                user?.level === 'admin'
-                  ? 'linear-gradient(180deg, #0F172A, #020617)'
-                  : effectiveDark
-                    ? '#1e293b'
-                    : '#4DB8FF',
-
-              paddingTop: '20px',
-              paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
-              paddingLeft: '14px',
-              paddingRight: '14px',
-
-              boxSizing: 'border-box',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              transition: 'left 0.3s ease',
-              zIndex: 998,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              WebkitOverflowScrolling: 'touch',
-            }}
-          >
-            {/* 학교 이름 표시 */}
-            {/* 사이드바 헤더 */}
-            <div
+          {!hideMenu && (
+            <aside
               style={{
+                position: 'fixed',
+                top: 0,
+                left: sidebarOpen ? 0 : isPC ? '-220px' : '-260px',
+                width: isPC ? '220px' : '240px',
+                height: '100dvh',
+                maxHeight: '100dvh',
+                background:
+                  user?.level === 'admin'
+                    ? 'linear-gradient(180deg, #0F172A, #020617)'
+                    : effectiveDark
+                      ? '#1e293b'
+                      : '#4DB8FF',
+
+                paddingTop: '20px',
+                paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+                paddingLeft: '14px',
+                paddingRight: '14px',
+
+                boxSizing: 'border-box',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px',
+                flexDirection: 'column',
+                gap: '16px',
+                transition: 'left 0.3s ease',
+                zIndex: 998,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                WebkitOverflowScrolling: 'touch',
               }}
             >
-              {/* 학교 이름 (관리자일 때 숨김) */}
-              {user?.level !== 'admin' && (
-                <Link
-                  href="/"
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                  style={{
-                    fontSize: '20px',
-                    fontWeight: 700,
-                    color: 'white',
-                    textDecoration: 'none',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {user?.school ? `🏫 ${user.school}` : 'School Plus'}
-                </Link>
-              )}
-
-              {isPC && sidebarOpen && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  style={{
-                    background: 'rgba(0,0,0,0.25)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                  }}
-                >
-                  ⮜
-                </button>
-              )}
-
-              {/* 모바일 X 버튼 */}
-              {!isPC && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  style={{
-                    background: 'rgba(0,0,0,0.25)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {banRemainMs !== null && (
+              {/* 학교 이름 표시 */}
+              {/* 사이드바 헤더 */}
               <div
                 style={{
-                  background: '#FEE2E2',
-                  color: '#B91C1C',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  lineHeight: 1.4,
-                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '12px',
                 }}
               >
-                🚫 계정 이용 제한 중<br />⏳ 해제까지{' '}
-                <strong>{formatRemain(banRemainMs)}</strong>
-              </div>
-            )}
-
-            {/* 메뉴 */}
-            {/* ========================= */}
-            {/* 사이드바 메뉴 */}
-            {/* ========================= */}
-
-            {user?.level === 'admin' ? (
-              <>
-                <div
-                  style={{
-                    fontSize: 25,
-                    fontWeight: 700,
-                    color: '#E0F2FE',
-                    marginBottom: 6,
-                  }}
-                >
-                  🛡 관리자
-                </div>
-
-                <AdminMenuItem
-                  icon="🔔"
-                  label="관리자 알림"
-                  href="/admin/notifications"
-                />
-                <AdminMenuItem icon="🚨" label="신고된 게시글" href="/admin" />
-                <AdminMenuItem
-                  icon="👥"
-                  label="신고자 관리"
-                  href="/admin/reporters"
-                />
-                <AdminMenuItem
-                  icon="🛠"
-                  label="관리자 게시판"
-                  href="/board/admin"
-                />
-                <AdminMenuItem
-                  icon="💬"
-                  label="채팅 신고 관리"
-                  href="/admin/chat-report"
-                />
-                <AdminMenuItem
-                  icon="♻️"
-                  label="재가입 승인"
-                  href="/admin/rejoin-requests"
-                />
-                <AdminMenuItem
-                  icon="👤"
-                  label="사용자 정보"
-                  href="/admin/userinfo"
-                />
-              </>
-            ) : (
-              <>
-                {/* 👤 학생 전용 메뉴 그대로 */}
-
-                <MenuItem
-                  icon="👤"
-                  label="내정보"
-                  href="/my-info"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-
-                {/* 게시판 드롭다운 */}
-                <div
-                  style={{
-                    position: 'relative',
-                    overflow: 'visible',
-                  }}
-                >
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDropOpen((prev) => !prev)
+                {/* 학교 이름 (관리자일 때 숨김) */}
+                {user?.level !== 'admin' && (
+                  <Link
+                    href="/"
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
                     }}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: darkMode
-                        ? 'rgba(255,255,255,0.05)'
-                        : 'rgba(255,255,255,0.25)',
+                      fontSize: '20px',
+                      fontWeight: 700,
                       color: 'white',
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      border: darkMode
-                        ? '1px solid rgba(255,255,255,0.1)'
-                        : '1px solid rgba(255,255,255,0.4)',
-                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      lineHeight: 1.2,
                     }}
                   >
-                    <span style={{ fontSize: '18px' }}>📋</span>
-                    게시판
-                  </div>
+                    {user?.school ? `🏫 ${user.school}` : 'School Plus'}
+                  </Link>
+                )}
 
-                  {dropOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        marginTop: 8,
-                        width: 190,
+                {isPC && sidebarOpen && (
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                    }}
+                  >
+                    ⮜
+                  </button>
+                )}
 
-                        background: effectiveDark ? '#1e293b' : '#ffffff',
-                        border: effectiveDark ? '1px solid #334155' : 'none',
+                {/* 모바일 X 버튼 */}
+                {!isPC && (
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
 
-                        borderRadius: 12,
-                        padding: '6px 0',
-                        boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-                        zIndex: 9999,
-                      }}
-                    >
-                      {dropdownItem(
-                        '/board',
-                        '📚 전체 게시판',
-                        effectiveDark,
-                        () => {
-                          if (!isPC) {
-                            setSidebarOpen(false)
-                          }
-                        },
-                      )}
-
-                      {dropdownItem(
-                        '/board/myposts',
-                        '✏ 내가 쓴 글',
-                        effectiveDark,
-                        () => {
-                          if (!isPC) {
-                            setSidebarOpen(false)
-                          }
-                        },
-                      )}
-
-                      {dropdownItem(
-                        '/board/scrap',
-                        '⭐ 스크랩한 글',
-                        effectiveDark,
-                        () => {
-                          if (!isPC) {
-                            setSidebarOpen(false)
-                          }
-                        },
-                      )}
-                    </div>
-                  )}
+              {banRemainMs !== null && (
+                <div
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#B91C1C',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    lineHeight: 1.4,
+                    marginBottom: '8px',
+                  }}
+                >
+                  🚫 계정 이용 제한 중<br />⏳ 해제까지{' '}
+                  <strong>{formatRemain(banRemainMs)}</strong>
                 </div>
+              )}
 
-                <MenuItem
-                  icon="💬"
-                  label="채팅"
-                  href="/chat"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="📅"
-                  label="일정"
-                  href="/calendar"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="⏰"
-                  label="시간표"
-                  href="/timetable"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="📊"
-                  label="모의고사"
-                  href="/mockscores"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="📊"
-                  label="내신점수"
-                  href="/schooltest"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="🍚"
-                  label="급식표"
-                  href="/meal"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="📚"
-                  label="도서관"
-                  href="/Library"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-                <MenuItem
-                  icon="🏫"
-                  label="학교인증"
-                  href="/school_certification"
-                  darkMode={effectiveDark}
-                  onClick={() => {
-                    if (!isPC) {
-                      setSidebarOpen(false)
-                    }
-                  }}
-                />
-              </>
-            )}
+              {/* 메뉴 */}
+              {/* ========================= */}
+              {/* 사이드바 메뉴 */}
+              {/* ========================= */}
 
-            {/* 로그인/로그아웃 */}
-            <div style={{ marginTop: 'auto' }}>
-              {user ? (
+              {user?.level === 'admin' ? (
                 <>
                   <div
                     style={{
-                      color: 'white',
-                      marginBottom: '10px',
-                      fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: 25,
+                      fontWeight: 700,
+                      color: '#E0F2FE',
+                      marginBottom: 6,
                     }}
                   >
-                    👋 {user.name || user.username}님
-                    {user?.level === 'admin' && (
-                      <span
+                    🛡 관리자
+                  </div>
+
+                  <AdminMenuItem
+                    icon="🔔"
+                    label="관리자 알림"
+                    href="/admin/notifications"
+                  />
+                  <AdminMenuItem
+                    icon="🚨"
+                    label="신고된 게시글"
+                    href="/admin"
+                  />
+                  <AdminMenuItem
+                    icon="👥"
+                    label="신고자 관리"
+                    href="/admin/reporters"
+                  />
+                  <AdminMenuItem
+                    icon="🛠"
+                    label="관리자 게시판"
+                    href="/board/admin"
+                  />
+                  <AdminMenuItem
+                    icon="💬"
+                    label="채팅 신고 관리"
+                    href="/admin/chat-report"
+                  />
+                  <AdminMenuItem
+                    icon="♻️"
+                    label="재가입 승인"
+                    href="/admin/rejoin-requests"
+                  />
+                  <AdminMenuItem
+                    icon="👤"
+                    label="사용자 정보"
+                    href="/admin/userinfo"
+                  />
+                </>
+              ) : (
+                <>
+                  {/* 👤 학생 전용 메뉴 그대로 */}
+
+                  <MenuItem
+                    icon="👤"
+                    label="내정보"
+                    href="/my-info"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+
+                  {/* 게시판 드롭다운 */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      overflow: 'visible',
+                    }}
+                  >
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDropOpen((prev) => !prev)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        background: darkMode
+                          ? 'rgba(255,255,255,0.05)'
+                          : 'rgba(255,255,255,0.25)',
+                        color: 'white',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        border: darkMode
+                          ? '1px solid rgba(255,255,255,0.1)'
+                          : '1px solid rgba(255,255,255,0.4)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ fontSize: '18px' }}>📋</span>
+                      게시판
+                    </div>
+
+                    {dropOpen && (
+                      <div
                         style={{
-                          marginLeft: 4,
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: '#93C5FD',
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: 8,
+                          width: 190,
+
+                          background: effectiveDark ? '#1e293b' : '#ffffff',
+                          border: effectiveDark ? '1px solid #334155' : 'none',
+
+                          borderRadius: 12,
+                          padding: '6px 0',
+                          boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+                          zIndex: 9999,
                         }}
                       >
-                        (관리자)
-                      </span>
+                        {dropdownItem(
+                          '/board',
+                          '📚 전체 게시판',
+                          effectiveDark,
+                          () => {
+                            if (!isPC) {
+                              setSidebarOpen(false)
+                            }
+                          },
+                        )}
+
+                        {dropdownItem(
+                          '/board/myposts',
+                          '✏ 내가 쓴 글',
+                          effectiveDark,
+                          () => {
+                            if (!isPC) {
+                              setSidebarOpen(false)
+                            }
+                          },
+                        )}
+
+                        {dropdownItem(
+                          '/board/scrap',
+                          '⭐ 스크랩한 글',
+                          effectiveDark,
+                          () => {
+                            if (!isPC) {
+                              setSidebarOpen(false)
+                            }
+                          },
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-
-                      background:
-                        user?.level === 'admin'
-                          ? '#1E293B' // 다크 네이비 (관리자)
-                          : '#FF6B6B', // 빨강 (학생)
-
-                      color: 'white',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600,
+                  <MenuItem
+                    icon="💬"
+                    label="채팅"
+                    href="/chat"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
                     }}
-                  >
-                    로그아웃
-                  </button>
+                  />
+                  <MenuItem
+                    icon="📅"
+                    label="일정"
+                    href="/calendar"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="⏰"
+                    label="시간표"
+                    href="/timetable"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="📊"
+                    label="모의고사"
+                    href="/mockscores"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="📊"
+                    label="내신점수"
+                    href="/schooltest"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="🍚"
+                    label="급식표"
+                    href="/meal"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="📚"
+                    label="도서관"
+                    href="/Library"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
+                  <MenuItem
+                    icon="🏫"
+                    label="학교인증"
+                    href="/school_certification"
+                    darkMode={effectiveDark}
+                    onClick={() => {
+                      if (!isPC) {
+                        setSidebarOpen(false)
+                      }
+                    }}
+                  />
                 </>
-              ) : (
-                <MenuItem
-                  icon="🔐"
-                  label="로그인"
-                  href="/auth/login"
-                  darkMode={effectiveDark}
-                />
               )}
-            </div>
-          </aside>
+
+              {/* 로그인/로그아웃 */}
+              <div style={{ marginTop: 'auto' }}>
+                {user ? (
+                  <>
+                    <div
+                      style={{
+                        color: 'white',
+                        marginBottom: '10px',
+                        fontWeight: 600,
+                        fontSize: 14,
+                      }}
+                    >
+                      👋 {user.name || user.username}님
+                      {user?.level === 'admin' && (
+                        <span
+                          style={{
+                            marginLeft: 4,
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: '#93C5FD',
+                          }}
+                        >
+                          (관리자)
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+
+                        background:
+                          user?.level === 'admin'
+                            ? '#1E293B' // 다크 네이비 (관리자)
+                            : '#FF6B6B', // 빨강 (학생)
+
+                        color: 'white',
+                        borderRadius: '8px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      로그아웃
+                    </button>
+                  </>
+                ) : (
+                  <MenuItem
+                    icon="🔐"
+                    label="로그인"
+                    href="/auth/login"
+                    darkMode={effectiveDark}
+                  />
+                )}
+              </div>
+            </aside>
+          )}
 
           {/* PC 열기 버튼 (사이드바 밖) */}
-          {isPC && !sidebarOpen && (
+          {!hideMenu && isPC && !sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
               style={{
@@ -867,7 +882,7 @@ export default function RootLayout({
           )}
 
           {/* overlay */}
-          {!isPC && sidebarOpen && (
+          {!hideMenu && !isPC && sidebarOpen && (
             <div
               onClick={() => setSidebarOpen(false)} // ⭐ 핵심
               style={{
@@ -886,7 +901,8 @@ export default function RootLayout({
           <main
             className="min-h-screen"
             style={{
-              marginLeft: isPC ? (sidebarOpen ? '220px' : '0px') : '0px',
+              marginLeft:
+                !hideMenu && isPC ? (sidebarOpen ? '220px' : '0px') : '0px',
             }}
           >
             {children}
@@ -1038,6 +1054,7 @@ function AdminMenuItem({
   href: string
 }) {
   const pathname = usePathname()
+
   const active = pathname === href
 
   return (
