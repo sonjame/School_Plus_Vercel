@@ -8,6 +8,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
+  const [rememberId, setRememberId] = useState(false)
+
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
 
@@ -42,6 +44,15 @@ export default function LoginPage() {
     }
 
     restoreLogin()
+  }, [])
+
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('savedUsername')
+
+    if (savedUsername) {
+      setUsername(savedUsername)
+      setRememberId(true)
+    }
   }, [])
 
   // ⭐ Enter 키로 로그인 실행
@@ -119,6 +130,12 @@ export default function LoginPage() {
     // accessToken 따로 쓰고 싶으면 유지해도 됨 (선택)
     localStorage.setItem('accessToken', data.accessToken)
 
+    if (rememberId) {
+      localStorage.setItem('savedUsername', username)
+    } else {
+      localStorage.removeItem('savedUsername')
+    }
+
     localStorage.setItem('userId', data.user.id.toString())
     localStorage.setItem('userSchool', data.user.school)
 
@@ -154,15 +171,7 @@ export default function LoginPage() {
           padding: '20px',
         }}
       >
-        <div
-          style={{
-            width: '420px',
-            background: 'white',
-            borderRadius: '16px',
-            padding: '40px 30px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}
-        >
+        <div className="login-card">
           <h2
             style={{
               fontSize: '22px',
@@ -190,6 +199,21 @@ export default function LoginPage() {
               style={inputStyle}
             />
           </div>
+
+          <label className="remember-box">
+            <input
+              type="checkbox"
+              checked={rememberId}
+              onChange={(e) => setRememberId(e.target.checked)}
+              className="remember-input"
+            />
+
+            <span className="remember-toggle">
+              <span className="remember-circle" />
+            </span>
+
+            <span className="remember-text">아이디 저장</span>
+          </label>
 
           <div style={inputWrapper}>
             <input
@@ -316,6 +340,71 @@ export default function LoginPage() {
           font-size: 32px;
           font-weight: bold;
           margin-bottom: 6px;
+        }
+
+        .login-card {
+          width: min(90vw, 420px);
+          background: white;
+          border-radius: 16px;
+          padding: 40px 30px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (min-width: 1025px) {
+          .login-card {
+            width: 560px;
+            padding: 56px 46px;
+          }
+        }
+
+        .remember-box {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: -4px 0 16px;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .remember-input {
+          display: none;
+        }
+
+        .remember-toggle {
+          width: 42px;
+          height: 24px;
+          border-radius: 999px;
+          background: #dbeafe;
+          border: 1px solid #bfdbfe;
+          position: relative;
+          transition: all 0.2s ease;
+        }
+
+        .remember-circle {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: white;
+          position: absolute;
+          top: 2px;
+          left: 3px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+          transition: all 0.2s ease;
+        }
+
+        .remember-input:checked + .remember-toggle {
+          background: #4fc3f7;
+          border-color: #4fc3f7;
+        }
+
+        .remember-input:checked + .remember-toggle .remember-circle {
+          left: 20px;
+        }
+
+        .remember-text {
+          font-size: 14px;
+          font-weight: 600;
+          color: #475569;
         }
       `}</style>
     </>
