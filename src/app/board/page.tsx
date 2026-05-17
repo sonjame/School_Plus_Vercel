@@ -62,6 +62,7 @@ export default function BoardMainPage() {
       { key: 'free', title: '자유게시판', icon: '📝' },
       { key: 'promo', title: '홍보게시판', icon: '📢' },
       { key: 'club', title: '동아리게시판', icon: '🎯' },
+      { key: 'freshman', title: '신입생게시판', icon: '🌱' },
       { key: 'grade1', title: '1학년게시판', icon: '1️⃣' },
       { key: 'grade2', title: '2학년게시판', icon: '2️⃣' },
       { key: 'grade3', title: '3학년게시판', icon: '3️⃣' },
@@ -134,18 +135,23 @@ const getTitleStyle = (darkMode: boolean): React.CSSProperties => ({
 
 const grid: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))',
-  gap: '24px',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+  gap: '20px',
+  width: '100%',
+  justifyItems: 'center',
 }
 
 const card: React.CSSProperties = {
   textDecoration: 'none',
   color: 'inherit',
+  width: '95%',
+  maxWidth: '420px',
+  marginRight: '30px',
 }
 
 const getCardInnerStyle = (darkMode: boolean): React.CSSProperties => ({
   background: darkMode ? '#1e293b' : 'white',
-  padding: '24px',
+  padding: '20px',
   borderRadius: '16px',
   boxShadow: darkMode
     ? '0 4px 14px rgba(0,0,0,0.35)'
@@ -190,19 +196,18 @@ const getMiniPost = (darkMode: boolean): React.CSSProperties => ({
 const getOuterStyle = (darkMode: boolean): React.CSSProperties => ({
   minHeight: '100vh',
   background: darkMode ? '#0f172a' : 'white',
+  overflowX: 'hidden',
 })
 
 const getInnerStyle = (darkMode: boolean): React.CSSProperties => ({
-  width: '100%', // 🔥 전체 폭 사용
-  maxWidth: '95%',
+  width: '100%',
+  maxWidth: '1600px',
 
-  marginTop: 0,
-  marginBottom: 0,
-  marginLeft: 'auto',
-  marginRight: 'auto',
+  margin: '0 auto',
 
-  padding: '20px',
-
+  paddingLeft: '16px',
+  paddingRight: '16px',
+  paddingBottom: '16px',
   paddingTop: 'clamp(60px, 10vw, 80px)',
 
   background: darkMode ? '#0f172a' : 'white',
