@@ -21,7 +21,7 @@ export default function SignupPage() {
   const [schoolCode, setSchoolCode] = useState('')
   const [eduCode, setEduCode] = useState('')
   const [level, setLevel] = useState('')
-  const [grade, setGrade] = useState('1학년')
+  const [grade, setGrade] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -202,6 +202,9 @@ export default function SignupPage() {
     setSchoolCode(item.SD_SCHUL_CODE)
     setEduCode(item.ATPT_OFCDC_SC_CODE)
     setLevel(item.SCHUL_KND_SC_NM)
+
+    setGrade('') // ✅ 학교 변경 시 학년 초기화
+
     setSearchResults([])
     setIsSearching(false)
   }
@@ -210,6 +213,20 @@ export default function SignupPage() {
   const checkDuplicateId = async () => {
     if (!username.trim()) {
       showAlert('아이디를 입력해주세요.')
+      return
+    }
+
+    // ✅ 아이디 형식 먼저 검사
+    if (!validateUsername(username)) {
+      setIdAvailable(null)
+
+      setModalMessage(
+        '아이디는 5~20자의 영문 소문자와 숫자를 섞어서 입력해야 합니다.',
+      )
+
+      setModalType(null)
+      setShowModal(true)
+
       return
     }
 
@@ -244,8 +261,13 @@ export default function SignupPage() {
 
   // 제출 전 체크
   const handleSubmit = () => {
-    if (!realName || !username || !school) {
+    if (!realName || !username || !school || !grade) {
       showAlert('모든 정보를 입력해주세요.')
+      return
+    }
+
+    if (!schoolCode || !eduCode || !level) {
+      showAlert('학교 검색 결과에서 학교를 선택해주세요.')
       return
     }
 
@@ -495,19 +517,44 @@ export default function SignupPage() {
             />
 
             {/* 아이디 + 중복확인 버튼 */}
-            <div style={{ position: 'relative', marginTop: '12px' }}>
-              <input
-                style={{ ...inputStyle, paddingRight: '100px' }}
-                placeholder="아이디를 입력하세요"
-                value={username}
-                onChange={(e) => {
-                  const value = e.target.value
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, '')
-                  setUsername(value)
-                  setIdAvailable(null) // 아이디 바뀌면 중복확인 무효
+            <div style={{ marginTop: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
                 }}
-              />
+              >
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  placeholder="아이디를 입력하세요"
+                  value={username}
+                  onChange={(e) => {
+                    const value = e.target.value
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]/g, '')
+                    setUsername(value)
+                    setIdAvailable(null)
+                  }}
+                />
+
+                <button
+                  onClick={checkDuplicateId}
+                  style={{
+                    padding: '10px 12px',
+                    background: '#4FC3F7',
+                    color: 'white',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  중복확인
+                </button>
+              </div>
 
               <p
                 style={{
@@ -519,26 +566,6 @@ export default function SignupPage() {
                 ※ 아이디는 <strong>영문 소문자(a–z)</strong>와{' '}
                 <strong>숫자(0–9)</strong>만 입력할 수 있습니다.
               </p>
-
-              <button
-                onClick={checkDuplicateId}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '35%',
-                  transform: 'translateY(-50%)',
-                  padding: '8px 10px',
-                  background: '#4FC3F7',
-                  color: 'white',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                }}
-              >
-                중복확인
-              </button>
             </div>
 
             {/* 🔐 아이디 조건 안내 */}
@@ -604,7 +631,10 @@ export default function SignupPage() {
                 type={showPassword ? 'text' : 'password'}
                 placeholder="비밀번호를 입력하세요"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setPassword2('') // ✅ 비밀번호 바뀌면 확인 입력 초기화
+                }}
                 style={{ ...inputStyle, paddingRight: '48px' }}
               />
               <span
@@ -668,12 +698,42 @@ export default function SignupPage() {
               </p>
             )}
 
+            {/* ❌ 비밀번호 조건 불만족 */}
+            {password.length > 0 && !passwordCheck.valid && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#D32F2F',
+                  fontWeight: 600,
+                }}
+              >
+                ❌ 비밀번호 조건에 만족하지 않습니다. 다시 입력해주세요.
+              </p>
+            )}
+
             <input
               type="password"
-              placeholder="비밀번호를 다시 입력하세요"
+              placeholder={
+                password.length > 0 && !passwordCheck.valid
+                  ? '비밀번호 조건을 만족하세요'
+                  : '비밀번호를 다시 입력하세요'
+              }
               value={password2}
+              disabled={password.length === 0 || !passwordCheck.valid}
               onChange={(e) => setPassword2(e.target.value)}
-              style={{ ...inputStyle, marginTop: '12px' }}
+              style={{
+                ...inputStyle,
+                marginTop: '12px',
+                background:
+                  password.length === 0 || !passwordCheck.valid
+                    ? '#f3f4f6'
+                    : 'white',
+                cursor:
+                  password.length === 0 || !passwordCheck.valid
+                    ? 'not-allowed'
+                    : 'text',
+              }}
             />
 
             {/* 학교 검색 */}
@@ -682,8 +742,20 @@ export default function SignupPage() {
                 style={inputStyle}
                 placeholder="학교명을 입력하세요 (자동완성)"
                 value={school}
-                onChange={(e) => searchSchool(e.target.value)}
+                onChange={(e) => {
+                  setSchoolCode('')
+                  setEduCode('')
+                  setLevel('')
+                  setGrade('')
+                  searchSchool(e.target.value)
+                }}
               />
+
+              <p
+                style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}
+              >
+                ℹ️ 검색 결과에서 학교를 반드시 선택해야 가입할 수 있습니다.
+              </p>
 
               {isSearching && searchResults.length > 0 && (
                 <ul
@@ -723,6 +795,21 @@ export default function SignupPage() {
                   ))}
                 </ul>
               )}
+
+              {isSearching &&
+                school.trim().length >= 2 &&
+                searchResults.length === 0 && (
+                  <p
+                    style={{
+                      color: '#D32F2F',
+                      fontSize: '13px',
+                      marginTop: '8px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ❌ 검색 결과가 나오지 않습니다.
+                  </p>
+                )}
             </div>
 
             <select
@@ -730,9 +817,27 @@ export default function SignupPage() {
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
             >
-              <option>1학년</option>
-              <option>2학년</option>
-              <option>3학년</option>
+              <option value="">학년을 선택하세요</option>
+
+              {/* 중학교 */}
+              {level.includes('중학교') && (
+                <>
+                  <option>예비 중학생</option>
+                  <option>1학년</option>
+                  <option>2학년</option>
+                  <option>3학년</option>
+                </>
+              )}
+
+              {/* 고등학교 */}
+              {level.includes('고등학교') && (
+                <>
+                  <option>예비 고등학생</option>
+                  <option>1학년</option>
+                  <option>2학년</option>
+                  <option>3학년</option>
+                </>
+              )}
             </select>
 
             <p style={{ fontSize: '13px', color: '#d32f2f', marginTop: '6px' }}>
