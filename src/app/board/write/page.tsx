@@ -101,7 +101,15 @@ export default function WritePage() {
   useEffect(() => {
     if (!category) return
 
-    const myGrade = localStorage.getItem('userGrade')
+    const storedUser = localStorage.getItem('loggedInUser')
+
+    let myGrade = ''
+
+    if (storedUser) {
+      try {
+        myGrade = JSON.parse(storedUser).grade
+      } catch {}
+    }
 
     const isGradeBoard = ['grade1', 'grade2', 'grade3'].includes(category)
     const isGraduateBoard = category === 'graduate'
@@ -109,7 +117,16 @@ export default function WritePage() {
     let canWrite = true
 
     if (isGradeBoard) {
-      canWrite = category === myGrade
+      canWrite =
+        (category === 'grade1' && myGrade === '1학년') ||
+        (category === 'grade2' && myGrade === '2학년') ||
+        (category === 'grade3' && myGrade === '3학년')
+    }
+
+    const isFreshmanBoard = category === 'freshman'
+
+    if (isFreshmanBoard) {
+      canWrite = myGrade === '예비 중학생' || myGrade === '예비 고등학생'
     }
 
     if (isGraduateBoard) {
@@ -234,15 +251,17 @@ export default function WritePage() {
     function cleanContent(html: string) {
       return (
         html
-          // ❌ font-family 제거 줄 삭제 (폰트 유지하려면)
-          // .replace(/font-family:[^;"]+;?/g, '')
-
-          // 빈 style="" 제거
-          .replace(/\sstyle=""/g, '')
-
-          // 완전 빈 p 제거
+          // 빈 p 제거
           .replace(/<p>\s*<\/p>/g, '')
           .replace(/<p>(?:&nbsp;|\s)*<\/p>/g, '')
+
+          // 🔥 p 태그 제거 (핵심)
+          .replace(/<\/?p>/g, '')
+
+          // 🔥 기타 태그 제거 (선택)
+          .replace(/<[^>]*>?/g, '')
+
+          .trim()
       )
     }
     const res = await fetch('/api/posts', {
@@ -322,13 +341,15 @@ export default function WritePage() {
               ? '🛠 관리자 게시판'
               : category === 'graduate'
                 ? '🎓 졸업생 게시판'
-                : category === 'free'
-                  ? '자유게시판'
-                  : category === 'promo'
-                    ? '홍보게시판'
-                    : category === 'club'
-                      ? '동아리게시판'
-                      : `${category.replace('grade', '')}학년 게시판`}
+                : category === 'freshman'
+                  ? '🌱 신입생게시판'
+                  : category === 'free'
+                    ? '📝 자유게시판'
+                    : category === 'promo'
+                      ? '📢 홍보게시판'
+                      : category === 'club'
+                        ? '🎯 동아리게시판'
+                        : `${category.replace('grade', '')}학년 게시판`}
           </div>
 
           {/* 제목 */}
