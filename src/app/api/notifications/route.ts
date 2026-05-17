@@ -48,7 +48,7 @@ export async function GET(req: Request) {
         title: n.title,
         message: n.message,
         link: n.link,
-        isRead: !!n.is_read,
+        is_read: !!n.is_read,
         created_at: n.created_at,
       })),
     )
