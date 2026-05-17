@@ -43,15 +43,27 @@ export default function BoardTemplate({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const grade = localStorage.getItem('userGrade')
-    setMyGrade(grade)
+
+    const storedUser = localStorage.getItem('loggedInUser')
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser)
+      setMyGrade(parsed.grade)
+    } catch {
+      setMyGrade(null)
+    }
   }, [])
 
   // 🔒 작성 권한 체크
   const canWrite =
     category === 'admin' ||
     ['free', 'promo', 'club'].includes(category) ||
-    category === myGrade
+    (category === 'freshman' &&
+      ['예비 중학생', '예비 고등학생'].includes(myGrade || '')) ||
+    (category === 'grade1' && myGrade === '1학년') ||
+    (category === 'grade2' && myGrade === '2학년') ||
+    (category === 'grade3' && myGrade === '3학년')
 
   const getCommentCount = (id: string) => {
     const data = JSON.parse(localStorage.getItem(`comments_${id}`) || '[]')
@@ -446,9 +458,11 @@ export default function BoardTemplate({
                 marginLeft: 'auto',
               }}
             >
-              {category === 'admin'
-                ? '🔒 로그인한 사용자만 작성할 수 있습니다'
-                : '🔒 해당 학년만 작성 가능'}
+              {category === 'freshman'
+                ? '🌱 예비 학생만 작성 가능합니다'
+                : category === 'admin'
+                  ? '🔒 로그인한 사용자만 작성할 수 있습니다'
+                  : '🔒 해당 학년만 작성 가능'}
             </div>
           )}
         </div>
