@@ -258,18 +258,20 @@ export default function RootLayout({
 
   // ⭐ 로그아웃
   const handleLogout = () => {
-    showConfirm('정말 로그아웃 하시겠습니까?', () => {
-      // 🔥 로그인 정보 제거
+    showConfirm('정말 로그아웃 하시겠습니까?', async () => {
+      // ✅ 서버 로그아웃 요청
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      // ✅ localStorage 제거
       localStorage.removeItem('loggedInUser')
       localStorage.removeItem('accessToken')
       localStorage.removeItem('userId')
 
-      // ✅ sessionStorage만 초기화 (OK)
       sessionStorage.removeItem('banModalShown')
       sessionStorage.removeItem('unbanModalShown')
-
-      // ❗ banStatus는 절대 지우지 말 것
-      // localStorage.removeItem('banStatus')
 
       setUser(null)
 
