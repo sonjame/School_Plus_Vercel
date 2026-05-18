@@ -1371,19 +1371,42 @@ export default function ChatPage() {
 
     try {
       setIsSending(true)
-
       setInputText('')
-
       shouldScrollToBottomRef.current = true
 
-      socket.emit('sendMessage', {
-        roomId: currentRoomId,
-        type: isUrl(trimmed) ? 'url' : 'text',
-        content: trimmed,
+      const sendRes = await apiFetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: currentRoomId,
+          type: isUrl(trimmed) ? 'url' : 'text',
+          content: trimmed,
+        }),
       })
 
-      // 약간의 연타 방지 딜레이
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      if (!sendRes.ok) {
+        const err = await sendRes.json().catch(() => ({}))
+
+        setAlert({
+          open: true,
+          title: '전송 실패',
+          message: err.message || '메시지 전송에 실패했습니다.',
+        })
+
+        return
+      }
+
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const data = await safeJson<ChatMessage[]>(res)
+
+      setMessages(Array.isArray(data) ? data : [])
+      await refreshRooms()
+
+      socket.emit('refreshRoom', currentRoomId)
+
+      scrollToBottom()
+
+      await new Promise((resolve) => setTimeout(resolve, 300))
     } finally {
       setIsSending(false)
     }
@@ -1529,12 +1552,12 @@ export default function ChatPage() {
 
     /* =====================
      1️⃣ S3 업로드
-  ===================== */
+    ===================== */
     const { url, name } = await uploadWithProgress(file, 'file')
 
     /* =====================
      2️⃣ 메시지 저장 (🔥 핵심)
-  ===================== */
+    ===================== */
     const sendRes = await apiFetch('/api/chat/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1563,7 +1586,7 @@ export default function ChatPage() {
 
     /* =====================
      3️⃣ 성공 시 메시지 갱신
-  ===================== */
+    ===================== */
     shouldScrollToBottomRef.current = true
     const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
     const data = await safeJson<ChatMessage[]>(res)
@@ -2442,20 +2465,35 @@ export default function ChatPage() {
                   flexDirection: 'column',
                 }}
               >
-                {latestNotice && hideNotice && (
-                  <button
-                    onClick={() => setHideNotice(false)}
+                {currentRoom && latestNotice && hideNotice && (
+                  <div
                     style={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 20,
                       marginBottom: 8,
-                      fontSize: 12,
-                      color: '#2563eb',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      background: darkMode ? '#0f172a' : '#f9fafb',
+                      padding: '6px 0',
                     }}
                   >
-                    📢 공지 펼치기
-                  </button>
+                    <button
+                      onClick={() => setHideNotice(false)}
+                      style={{
+                        fontSize: 12,
+                        color: '#2563eb',
+                        background: darkMode ? '#1e293b' : '#E1F5FE',
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 999,
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                      }}
+                    >
+                      📢 공지 펼치기
+                    </button>
+                  </div>
                 )}
 
                 {/* 📢 상단 고정 공지 (최신 1개) */}
@@ -2594,6 +2632,10 @@ export default function ChatPage() {
                     }
 
                     if (msg.type === 'emoji') {
+                      const [emojiUrl, emojiText] = (msg.content || '').split(
+                        '|||',
+                      )
+
                       return (
                         <div
                           key={msg.id}
@@ -2604,26 +2646,52 @@ export default function ChatPage() {
                           }}
                         >
                           <div>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: COLORS.subText,
-                                marginBottom: 4,
-                                display: 'block',
-                              }}
-                            >
-                              {isMe ? '나' : msg.senderName}
-                            </span>
-
                             <img
-                              src={msg.fileUrl || msg.content}
+                              src={msg.fileUrl || emojiUrl}
                               alt="emoji"
                               style={{
                                 width: 120,
                                 maxWidth: '45vw',
                                 height: 'auto',
+                                display: 'block',
                               }}
                             />
+
+                            {emojiText && (
+                              <div
+                                style={{
+                                  marginTop: 6,
+                                  background: isMe ? '#4FC3F7' : '#e5e7eb',
+                                  color: isMe ? 'white' : '#111827',
+                                  padding: '10px 14px',
+                                  borderRadius: 14,
+                                  fontSize: 14,
+                                  maxWidth: 260,
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {emojiText}
+                              </div>
+                            )}
+
+                            {isMe && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                style={{
+                                  marginTop: 6,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#ef4444',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  display: 'block',
+                                  marginLeft: 'auto',
+                                }}
+                              >
+                                삭제
+                              </button>
+                            )}
                           </div>
                         </div>
                       )
