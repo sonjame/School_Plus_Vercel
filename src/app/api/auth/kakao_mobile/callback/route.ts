@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 
 export const runtime = 'nodejs'
-
-const KAKAO_AUTHORIZE_ENDPOINT =
-  'https://kauth.kakao.com/oauth/authorize'
 
 const KAKAO_TOKEN_ENDPOINT =
   'https://kauth.kakao.com/oauth/token'
@@ -18,8 +14,6 @@ const KAKAO_REDIRECT_URI =
 const APP_OAUTH_REDIRECT_URI =
   'myapp://oAuth/kakaooauth'
 
-const PKCE_COOKIE_NAME = 'kakao_code_verifier'
-
 function redirectToApp(params: Record<string, string>) {
   const query = new URLSearchParams(params).toString()
 
@@ -30,34 +24,6 @@ function redirectToApp(params: Record<string, string>) {
 
 function pickStr(v: unknown) {
   return typeof v === 'string' ? v : ''
-}
-
-function base64Url(buffer: Buffer) {
-  return buffer
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
-}
-
-function createCodeVerifier() {
-  return base64Url(crypto.randomBytes(32))
-}
-
-function createCodeChallenge(codeVerifier: string) {
-  return base64Url(
-    crypto
-      .createHash('sha256')
-      .update(codeVerifier)
-      .digest(),
-  )
-}
-
-function makeState(loginMode: string) {
-  const safeMode = loginMode.trim() || 'kakao:login'
-  const nonce = base64Url(crypto.randomBytes(12))
-
-  return `${safeMode}:${nonce}`
 }
 
 function actionFromState(state: string) {
@@ -79,28 +45,53 @@ function actionFromState(state: string) {
   return 'login'
 }
 
-function clearPkceCookie(res: NextResponse) {
-  res.cookies.set(PKCE_COOKIE_NAME, '', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 0,
-    path: '/',
-  })
-
-  return res
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
 
-  const mode = searchParams.get('mode') || ''
   const code = searchParams.get('code') || ''
   const state = searchParams.get('state') || ''
   const error = searchParams.get('error') || ''
   const errorDescription =
     searchParams.get('error_description') || ''
 
+  if (error) {
+    return redirectToApp({
+      provider: 'kakao',
+      error,
+      error_description: errorDescription,
+      state,
+      action: actionFromState(state),
+    })
+  }
+
+  if (!code) {
+    return redirectToApp({
+      provider: 'kakao',
+      error: 'missing_code',
+      state,
+      action: actionFromState(state),
+    })
+  }
+
+  if (!state) {
+    return redirectToApp({
+      provider: 'kakao',
+      error: 'missing_state',
+    })
+  }
+
+  // ✅ 서버는 더 이상 code_verifier를 저장하지 않음.
+  // ✅ 카카오가 준 code/state만 앱 딥링크로 넘김.
+  // ✅ 앱이 AsyncStorage에서 code_verifier를 꺼내 POST로 다시 보냄.
+  return redirectToApp({
+    provider: 'kakao',
+    code,
+    state,
+    action: actionFromState(state),
+  })
+}
+
+export async function POST(req: NextRequest) {
   const clientId =
     process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY?.trim()
 
@@ -108,106 +99,61 @@ export async function GET(req: NextRequest) {
     process.env.EXPO_PUBLIC_KAKAO_CLIENT_SECRET?.trim()
 
   if (!clientId) {
-    return redirectToApp({
-      provider: 'kakao',
-      error: 'missing_kakao_client_id',
-      state,
-    })
+    return NextResponse.json(
+      { error: 'missing_kakao_client_id' },
+      { status: 500 },
+    )
   }
 
   if (!clientSecret) {
-    return redirectToApp({
-      provider: 'kakao',
-      error: 'missing_kakao_client_secret',
-      state,
-    })
-  }
-
-  if (mode === 'start') {
-    const loginMode =
-      searchParams.get('login_mode') || 'kakao:login'
-
-    const newState = makeState(loginMode)
-
-    const codeVerifier = createCodeVerifier()
-    const codeChallenge = createCodeChallenge(codeVerifier)
-
-    const authorizeUrl = new URL(KAKAO_AUTHORIZE_ENDPOINT)
-
-    authorizeUrl.searchParams.set('client_id', clientId)
-    authorizeUrl.searchParams.set(
-      'redirect_uri',
-      KAKAO_REDIRECT_URI,
-    )
-    authorizeUrl.searchParams.set('response_type', 'code')
-    authorizeUrl.searchParams.set('state', newState)
-    authorizeUrl.searchParams.set(
-      'code_challenge',
-      codeChallenge,
-    )
-    authorizeUrl.searchParams.set(
-      'code_challenge_method',
-      'S256',
-    )
-
-    const res = NextResponse.redirect(
-      authorizeUrl.toString(),
-    )
-
-    res.cookies.set(PKCE_COOKIE_NAME, codeVerifier, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 60 * 5,
-      path: '/',
-    })
-
-    return res
-  }
-
-  if (error) {
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
-        error,
-        error_description: errorDescription,
-        state,
-        action: actionFromState(state),
-      }),
+    return NextResponse.json(
+      { error: 'missing_kakao_client_secret' },
+      { status: 500 },
     )
   }
+
+  let body: any = {}
+
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'invalid_json_body' },
+      { status: 400 },
+    )
+  }
+
+  const code = pickStr(body.code).trim()
+  const state = pickStr(body.state).trim()
+  const codeVerifier =
+    pickStr(body.code_verifier).trim()
 
   if (!code) {
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
+    return NextResponse.json(
+      {
         error: 'missing_code',
         state,
         action: actionFromState(state),
-      }),
+      },
+      { status: 400 },
     )
   }
 
   if (!state) {
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
-        error: 'missing_state',
-      }),
+    return NextResponse.json(
+      { error: 'missing_state' },
+      { status: 400 },
     )
   }
 
-  const codeVerifier =
-    req.cookies.get(PKCE_COOKIE_NAME)?.value || ''
-
   if (!codeVerifier) {
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
+    return NextResponse.json(
+      {
         error: 'missing_code_verifier',
         state,
         action: actionFromState(state),
-      }),
+      },
+      { status: 400 },
     )
   }
 
@@ -231,16 +177,16 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json().catch(() => ({}))
 
     if (!tokenRes.ok || !tokenData?.access_token) {
-      return clearPkceCookie(
-        redirectToApp({
-          provider: 'kakao',
+      return NextResponse.json(
+        {
           error:
             tokenData?.error_description ||
             tokenData?.error ||
             'token_exchange_failed',
           state,
           action: actionFromState(state),
-        }),
+        },
+        { status: 400 },
       )
     }
 
@@ -256,9 +202,8 @@ export async function GET(req: NextRequest) {
     const userData = await userRes.json().catch(() => ({}))
 
     if (!userRes.ok || !userData?.id) {
-      return clearPkceCookie(
-        redirectToApp({
-          provider: 'kakao',
+      return NextResponse.json(
+        {
           error:
             userData?.msg ||
             userData?.error_description ||
@@ -266,7 +211,8 @@ export async function GET(req: NextRequest) {
             'kakao_me_failed',
           state,
           action: actionFromState(state),
-        }),
+        },
+        { status: 400 },
       )
     }
 
@@ -282,25 +228,23 @@ export async function GET(req: NextRequest) {
 
     const action = actionFromState(state)
 
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
-        verified: '1',
-        social_id: socialId,
-        name,
-        social_email: email,
-        state,
-        action,
-      }),
-    )
+    return NextResponse.json({
+      provider: 'kakao',
+      verified: '1',
+      social_id: socialId,
+      name,
+      social_email: email,
+      state,
+      action,
+    })
   } catch {
-    return clearPkceCookie(
-      redirectToApp({
-        provider: 'kakao',
+    return NextResponse.json(
+      {
         error: 'server_token_exchange_failed',
         state,
         action: actionFromState(state),
-      }),
+      },
+      { status: 500 },
     )
   }
 }
