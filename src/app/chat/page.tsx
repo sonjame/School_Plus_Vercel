@@ -27,7 +27,15 @@ type ChatMessage = {
   senderName: string
   content: string
   createdAt: string
-  type: 'text' | 'image' | 'file' | 'url' | 'notice' | 'poll' | 'video'
+  type:
+    | 'text'
+    | 'image'
+    | 'file'
+    | 'url'
+    | 'notice'
+    | 'poll'
+    | 'video'
+    | 'emoji'
   fileUrl?: string
   fileName?: string
   readCount?: number
@@ -350,6 +358,7 @@ export default function ChatPage() {
   const [currentRoomId, setCurrentRoomId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
+  const [pendingEmoji, setPendingEmoji] = useState<string | null>(null)
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteMode, setInviteMode] = useState<'oneToOne' | 'group'>('oneToOne')
@@ -458,21 +467,43 @@ export default function ChatPage() {
     softBg: darkMode ? '#334155' : '#f3f4f6',
   }
 
-  const EMOJIS = [
-    '😀',
-    '😂',
-    '😍',
-    '🥰',
-    '😎',
-    '😭',
-    '😡',
-    '👍',
-    '👏',
-    '🙏',
-    '🔥',
-    '🎉',
-    '❤️',
-    '💯',
+  const EMOTICONS = [
+    {
+      name: '안녕',
+      url: '/emoticons/hello.png',
+    },
+    {
+      name: '화이팅',
+      url: '/emoticons/fighting.png',
+    },
+    {
+      name: '대박',
+      url: '/emoticons/amazing.png',
+    },
+    {
+      name: '시험망했어',
+      url: '/emoticons/exam_fail.png',
+    },
+    {
+      name: '출석완료',
+      url: '/emoticons/attendance.png',
+    },
+    {
+      name: '하트',
+      url: '/emoticons/heart.png',
+    },
+    {
+      name: '좋아해',
+      url: '/emoticons/love.png',
+    },
+    {
+      name: 'ㅋㅋㅋㅋ',
+      url: '/emoticons/lol.png',
+    },
+    {
+      name: '굿모닝',
+      url: '/emoticons/goodmorning.png',
+    },
   ]
 
   async function safeJson<T>(res: Response): Promise<T | null> {
@@ -1276,6 +1307,39 @@ export default function ChatPage() {
     socket.emit('refreshRoom', currentRoomId)
   }
 
+  const sendEmoji = async (emojiUrl: string) => {
+    if (isSending) return
+    if (isChatBanned) return
+    if (!currentRoomId) return
+
+    try {
+      setIsSending(true)
+      shouldScrollToBottomRef.current = true
+
+      await apiFetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: currentRoomId,
+          type: 'emoji',
+          content: emojiUrl,
+          fileUrl: emojiUrl,
+        }),
+      })
+
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const data = await safeJson<ChatMessage[]>(res)
+
+      setMessages(Array.isArray(data) ? data : [])
+      await refreshRooms()
+      socket.emit('refreshRoom', currentRoomId)
+
+      setShowEmojiPicker(false)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   /* -------------------------
      메시지 전송 핸들러
   ------------------------- */
@@ -1292,6 +1356,12 @@ export default function ChatPage() {
       } finally {
         setIsSending(false)
       }
+      return
+    }
+
+    if (pendingEmoji) {
+      await sendEmoji(pendingEmoji)
+      setPendingEmoji(null)
       return
     }
 
@@ -1907,7 +1977,9 @@ export default function ChatPage() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {room.lastMessage || '메시지가 없습니다.'}
+                      {room.lastMessage?.startsWith('/emoticons/')
+                        ? '이모티콘을 보냈습니다.'
+                        : room.lastMessage || '메시지가 없습니다.'}
                     </p>
                   </div>
                 )
@@ -2521,6 +2593,42 @@ export default function ChatPage() {
                       )
                     }
 
+                    if (msg.type === 'emoji') {
+                      return (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: isMe ? 'flex-end' : 'flex-start',
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: COLORS.subText,
+                                marginBottom: 4,
+                                display: 'block',
+                              }}
+                            >
+                              {isMe ? '나' : msg.senderName}
+                            </span>
+
+                            <img
+                              src={msg.fileUrl || msg.content}
+                              alt="emoji"
+                              style={{
+                                width: 120,
+                                maxWidth: '45vw',
+                                height: 'auto',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    }
+
                     if (msg.type === 'poll') {
                       const isMe = msg.senderId === (currentUser?.id || 0)
 
@@ -3106,6 +3214,37 @@ export default function ChatPage() {
                 )}
               </div>
 
+              {pendingEmoji && (
+                <div style={{ position: 'relative', marginRight: 8 }}>
+                  <img
+                    src={pendingEmoji}
+                    alt="선택한 이모티콘"
+                    style={{
+                      width: 64,
+                      height: 64,
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <button
+                    onClick={() => setPendingEmoji(null)}
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      border: 'none',
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      color: 'white',
+                      width: 20,
+                      height: 20,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <input
                 type="text"
                 placeholder={
@@ -3115,8 +3254,8 @@ export default function ChatPage() {
                       ? '메시지를 입력하세요…'
                       : '채팅방을 먼저 선택하세요.'
                 }
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                value={inputText ?? ''}
+                onChange={(e) => setInputText(e.target.value ?? '')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && !blockMessage) {
                     e.preventDefault()
@@ -3172,7 +3311,7 @@ export default function ChatPage() {
               <div style={{ position: 'relative' }}>
                 <button
                   type="button"
-                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
                   style={{
                     flexShrink: 0,
                     width: 36,
@@ -3232,20 +3371,29 @@ export default function ChatPage() {
                         ❌
                       </button>
                     </div>
-                    {EMOJIS.map((emoji) => (
+                    {EMOTICONS.map((emoji) => (
                       <button
-                        key={emoji}
+                        key={emoji.url}
                         onClick={() => {
-                          setInputText((prev) => prev + emoji)
+                          setPendingEmoji(emoji.url)
+                          setShowEmojiPicker(false)
                         }}
                         style={{
-                          fontSize: 16,
-                          background: 'transparent',
                           border: 'none',
+                          background: 'transparent',
+                          padding: 4,
                           cursor: 'pointer',
                         }}
                       >
-                        {emoji}
+                        <img
+                          src={emoji.url}
+                          alt={emoji.name}
+                          style={{
+                            width: 72,
+                            height: 72,
+                            objectFit: 'contain',
+                          }}
+                        />
                       </button>
                     ))}
                   </div>
@@ -3258,7 +3406,9 @@ export default function ChatPage() {
                 disabled={
                   isSending ||
                   !currentRoom ||
-                  (!inputText.trim() && pendingImages.length === 0)
+                  (!inputText.trim() &&
+                    pendingImages.length === 0 &&
+                    !pendingEmoji)
                 }
                 style={{
                   width: 70,
@@ -3276,11 +3426,12 @@ export default function ChatPage() {
                     (inputText.trim() || pendingImages.length > 0)
                       ? 'pointer'
                       : 'default',
-
                   background:
                     !isSending &&
                     currentRoom &&
-                    (inputText.trim() || pendingImages.length > 0)
+                    (inputText.trim() ||
+                      pendingImages.length > 0 ||
+                      pendingEmoji)
                       ? '#4FC3F7'
                       : '#e5e7eb',
 
