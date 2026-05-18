@@ -2335,9 +2335,9 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 120 : 72,
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 150 : 72,
                 scrollPaddingBottom:
-                  keyboardHeight > 0 ? keyboardHeight + 120 : 72,
+                  keyboardHeight > 0 ? keyboardHeight + 150 : 72,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2961,7 +2961,7 @@ export default function ChatPage() {
 
                 bottom:
                   isTouchDevice && keyboardHeight > 0
-                    ? `calc(${keyboardHeight}px + env(safe-area-inset-bottom))`
+                    ? `calc(${keyboardHeight}px + env(safe-area-inset-bottom) + 24px)`
                     : 0,
 
                 zIndex: 9999,
