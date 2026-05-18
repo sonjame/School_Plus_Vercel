@@ -1037,8 +1037,11 @@ export default function ChatPage() {
         window.innerHeight - viewport.height - viewport.offsetTop,
       )
 
+      const safeKeyboard =
+        keyboard > 80 ? Math.round(keyboard + viewport.offsetTop + 40) : 0
+
       setViewportHeight(Math.round(viewport.height))
-      setKeyboardHeight(keyboard > 80 ? Math.round(keyboard) : 0)
+      setKeyboardHeight(safeKeyboard)
 
       setTimeout(() => {
         scrollToBottom()
