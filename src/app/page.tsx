@@ -1092,7 +1092,17 @@ export default function HomePage() {
                               textOverflow: 'ellipsis',
                             }}
                           >
-                            {msg.content}
+                            {msg.type === 'emoji'
+                              ? '😊 이모티콘을 보냈습니다.'
+                              : msg.type === 'image'
+                                ? '📷 사진을 보냈습니다.'
+                                : msg.type === 'file'
+                                  ? '📄 파일을 보냈습니다.'
+                                  : msg.type === 'video'
+                                    ? '🎥 동영상을 보냈습니다.'
+                                    : msg.type === 'poll'
+                                      ? '📊 투표를 보냈습니다.'
+                                      : msg.content}
                           </div>
                         </div>
                       ))}
