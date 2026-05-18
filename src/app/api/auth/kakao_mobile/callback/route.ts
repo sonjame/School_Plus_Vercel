@@ -5,95 +5,192 @@ export const runtime = 'nodejs'
 const KAKAO_TOKEN_ENDPOINT =
   'https://kauth.kakao.com/oauth/token'
 
-// ✅ 서버에서는 redirect_uri를 하드코딩
+const KAKAO_USER_ENDPOINT =
+  'https://kapi.kakao.com/v2/user/me'
+
+// ✅ 서버 callback 고정
 const KAKAO_REDIRECT_URI =
   'https://school-plus-vercel.vercel.app/api/auth/kakao_mobile/callback'
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
+// ✅ 네 앱 실제 callback 페이지
+const APP_OAUTH_REDIRECT_URI =
+  'myapp://oAuth/kakaooauth'
 
-  const code = searchParams.get('code') || ''
-  const state = searchParams.get('state') || ''
-  const error = searchParams.get('error') || ''
+function redirectToApp(params: Record<string, string>) {
+  const query =
+    new URLSearchParams(params).toString()
+
+  return NextResponse.redirect(
+    `${APP_OAUTH_REDIRECT_URI}?${query}`
+  )
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } =
+    new URL(req.url)
+
+  const code =
+    searchParams.get('code') || ''
+
+  const state =
+    searchParams.get('state') || ''
+
+  const error =
+    searchParams.get('error') || ''
+
   const errorDescription =
     searchParams.get('error_description') || ''
 
   if (error) {
-    return NextResponse.redirect(
-      `myapp://oauth?error=${encodeURIComponent(error)}` +
-        `&error_description=${encodeURIComponent(errorDescription)}` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    return redirectToApp({
+      provider: 'kakao',
+      error,
+      error_description:
+        errorDescription,
+      state,
+    })
   }
 
   if (!code) {
-    return NextResponse.redirect(
-      `myapp://oauth?error=missing_code` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    return redirectToApp({
+      provider: 'kakao',
+      error: 'missing_code',
+      state,
+    })
   }
 
-  // ✅ 요청한 환경변수명으로 고정
   const clientId =
-    process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY?.trim()
+    process.env
+      .EXPO_PUBLIC_KAKAO_REST_API_KEY
+      ?.trim()
 
   const clientSecret =
-    process.env.EXPO_PUBLIC_KAKAO_CLIENT_SECRET?.trim()
+    process.env
+      .EXPO_PUBLIC_KAKAO_CLIENT_SECRET
+      ?.trim()
 
   if (!clientId) {
-    return NextResponse.redirect(
-      `myapp://oauth?error=missing_kakao_client_id` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    return redirectToApp({
+      provider: 'kakao',
+      error:
+        'missing_kakao_client_id',
+      state,
+    })
   }
 
   if (!clientSecret) {
-    return NextResponse.redirect(
-      `myapp://oauth?error=missing_kakao_client_secret` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    return redirectToApp({
+      provider: 'kakao',
+      error:
+        'missing_kakao_client_secret',
+      state,
+    })
   }
 
   try {
-    const tokenRes = await fetch(KAKAO_TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type':
-          'application/x-www-form-urlencoded;charset=utf-8',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: KAKAO_REDIRECT_URI,
-        code,
-      }).toString(),
-    })
+    /* 1️⃣ token 교환 */
+    const tokenRes =
+      await fetch(
+        KAKAO_TOKEN_ENDPOINT,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/x-www-form-urlencoded;charset=utf-8',
+          },
+          body:
+            new URLSearchParams({
+              grant_type:
+                'authorization_code',
+              client_id:
+                clientId,
+              client_secret:
+                clientSecret,
+              redirect_uri:
+                KAKAO_REDIRECT_URI,
+              code,
+            }).toString(),
+        }
+      )
 
     const tokenData =
-      await tokenRes.json().catch(() => ({}))
+      await tokenRes
+        .json()
+        .catch(() => ({}))
 
-    if (!tokenRes.ok || !tokenData?.access_token) {
-      const message =
-        tokenData?.error_description ||
-        tokenData?.error ||
-        'token_exchange_failed'
-
-      return NextResponse.redirect(
-        `myapp://oauth?error=${encodeURIComponent(message)}` +
-          `&state=${encodeURIComponent(state)}`
-      )
+    if (
+      !tokenRes.ok ||
+      !tokenData?.access_token
+    ) {
+      return redirectToApp({
+        provider: 'kakao',
+        error:
+          tokenData
+            ?.error_description ||
+          tokenData?.error ||
+          'token_exchange_failed',
+        state,
+      })
     }
 
-    return NextResponse.redirect(
-      `myapp://oauth?provider=kakao` +
-        `&access_token=${encodeURIComponent(tokenData.access_token)}` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    /* 2️⃣ 사용자 정보 조회 */
+    const userRes =
+      await fetch(
+        KAKAO_USER_ENDPOINT,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${tokenData.access_token}`,
+          },
+        }
+      )
+
+    const userData =
+      await userRes
+        .json()
+        .catch(() => ({}))
+
+    if (
+      !userRes.ok ||
+      !userData?.id
+    ) {
+      return redirectToApp({
+        provider: 'kakao',
+        error:
+          'kakao_user_fetch_failed',
+        state,
+      })
+    }
+
+    const kakaoAccount =
+      userData.kakao_account ||
+      {}
+
+    const profile =
+      kakaoAccount.profile ||
+      {}
+
+    /* 3️⃣ 앱으로 반환 */
+    return redirectToApp({
+      provider: 'kakao',
+      verified: '1',
+      social_id: String(
+        userData.id
+      ),
+      name:
+        profile.nickname ||
+        '',
+      social_email:
+        kakaoAccount.email ||
+        '',
+      state,
+    })
   } catch {
-    return NextResponse.redirect(
-      `myapp://oauth?error=server_token_exchange_failed` +
-        `&state=${encodeURIComponent(state)}`
-    )
+    return redirectToApp({
+      provider: 'kakao',
+      error:
+        'server_token_exchange_failed',
+      state,
+    })
   }
 }
