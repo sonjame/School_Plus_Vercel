@@ -2959,7 +2959,10 @@ export default function ChatPage() {
 
                 right: 0,
 
-                bottom: isTouchDevice ? `${keyboardHeight + 44}px` : 0,
+                bottom:
+                  isTouchDevice && keyboardHeight > 0
+                    ? `calc(${keyboardHeight}px + env(safe-area-inset-bottom))`
+                    : 0,
 
                 zIndex: 9999,
 
