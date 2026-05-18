@@ -92,6 +92,10 @@ export default function SignupPage() {
     return regex.test(id)
   }
 
+  const validateRealName = (name: string) => {
+    return /^[가-힣]{3,4}$/.test(name)
+  }
+
   // 🔎 비밀번호 조건 체크 결과
   const passwordCheck = validatePassword(password)
 
@@ -156,8 +160,8 @@ export default function SignupPage() {
   // 공통 alert
   const showAlert = (msg: string) => {
     setModalMessage(msg)
+    setModalType(null)
     setShowModal(true)
-    setTimeout(() => setShowModal(false), 1500)
   }
 
   // 인증
@@ -263,6 +267,11 @@ export default function SignupPage() {
   const handleSubmit = () => {
     if (!realName || !username || !school || !grade) {
       showAlert('모든 정보를 입력해주세요.')
+      return
+    }
+
+    if (!validateRealName(realName)) {
+      showAlert('이름은 한글 3~4자로 입력해주세요. 초성만 입력할 수 없습니다.')
       return
     }
 
@@ -511,10 +520,47 @@ export default function SignupPage() {
             {/* 실명 */}
             <input
               style={inputStyle}
-              placeholder="이름을 입력하세요 (실명)"
+              placeholder="한글 이름 3~4자 입력"
               value={realName}
-              onChange={(e) => setRealName(e.target.value)}
+              maxLength={4}
+              onChange={(e) => {
+                setRealName(e.target.value.slice(0, 4))
+              }}
+              onBlur={() => {
+                setRealName((prev) =>
+                  prev
+                    .replace(/[ㄱ-ㅎㅏ-ㅣ]/g, '')
+                    .replace(/[^가-힣]/g, '')
+                    .slice(0, 4),
+                )
+              }}
             />
+
+            {realName.length > 0 && !validateRealName(realName) && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#D32F2F',
+                  fontWeight: 600,
+                }}
+              >
+                ❌ 이름은 한글 3~4자만 입력 가능합니다.
+              </p>
+            )}
+
+            {realName.length > 0 && validateRealName(realName) && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#2E7D32',
+                  fontWeight: 600,
+                }}
+              >
+                ✅ 올바른 이름 형식입니다.
+              </p>
+            )}
 
             {/* 아이디 + 중복확인 버튼 */}
             <div style={{ marginTop: '12px' }}>
