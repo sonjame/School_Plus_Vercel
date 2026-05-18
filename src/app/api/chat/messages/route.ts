@@ -36,6 +36,24 @@ export async function POST(req: Request) {
 
     const { roomId, type, content, fileUrl, fileName } = body
 
+    const allowedTypes = [
+      'text',
+      'image',
+      'file',
+      'url',
+      'notice',
+      'poll',
+      'video',
+      'emoji',
+    ]
+
+    if (!allowedTypes.includes(type)) {
+      return NextResponse.json(
+        { message: 'INVALID_MESSAGE_TYPE' },
+        { status: 400 },
+      )
+    }
+
     const roomIdNum = Number(roomId)
     if (!Number.isFinite(roomIdNum) || !type) {
       return NextResponse.json({ message: 'BAD_REQUEST' }, { status: 400 })
