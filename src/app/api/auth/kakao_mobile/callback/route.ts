@@ -53,10 +53,6 @@ function createCodeChallenge(codeVerifier: string) {
   )
 }
 
-function createState() {
-  return base64Url(crypto.randomBytes(24))
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
 
@@ -89,11 +85,12 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ✅ 1. 로그인 시작 단계
-  // 앱은 이 URL을 열어야 함:
-  // https://school-plus-vercel.vercel.app/api/auth/kakao_mobile/callback?mode=start
   if (mode === 'start') {
-    const newState = createState()
+    const loginMode =
+      searchParams.get('login_mode') || 'kakao:login'
+
+    const newState = loginMode
+
     const codeVerifier = createCodeVerifier()
     const codeChallenge = createCodeChallenge(codeVerifier)
 
@@ -122,7 +119,7 @@ export async function GET(req: NextRequest) {
       value: codeVerifier,
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
+      sameSite: 'none',
       path: '/',
       maxAge: 60 * 5,
     })
@@ -130,7 +127,6 @@ export async function GET(req: NextRequest) {
     return res
   }
 
-  // ✅ 2. 카카오가 에러를 준 경우
   if (error) {
     return redirectToApp({
       provider: 'kakao',
@@ -156,7 +152,8 @@ export async function GET(req: NextRequest) {
   }
 
   const cookieName = `${PKCE_COOKIE_PREFIX}${state}`
-  const codeVerifier = req.cookies.get(cookieName)?.value || ''
+  const codeVerifier =
+    req.cookies.get(cookieName)?.value || ''
 
   if (!codeVerifier) {
     return redirectToApp({
