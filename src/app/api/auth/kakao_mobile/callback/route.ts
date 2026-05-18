@@ -18,7 +18,22 @@ const KAKAO_REDIRECT_URI =
 const APP_OAUTH_REDIRECT_URI =
   'myapp://oAuth/kakaooauth'
 
-const PKCE_COOKIE_PREFIX = 'kakao_pkce_'
+const PKCE_TTL_MS = 5 * 60 * 1000
+
+type PkceStoreValue = {
+  codeVerifier: string
+  expiresAt: number
+}
+
+const globalForKakaoPkce = globalThis as typeof globalThis & {
+  __kakaoPkceStore?: Map<string, PkceStoreValue>
+}
+
+const pkceStore =
+  globalForKakaoPkce.__kakaoPkceStore ??
+  new Map<string, PkceStoreValue>()
+
+globalForKakaoPkce.__kakaoPkceStore = pkceStore
 
 function redirectToApp(params: Record<string, string>) {
   const query = new URLSearchParams(params).toString()
@@ -53,7 +68,45 @@ function createCodeChallenge(codeVerifier: string) {
   )
 }
 
+function cleanupExpiredPkce() {
+  const now = Date.now()
+
+  for (const [key, value] of pkceStore.entries()) {
+    if (value.expiresAt <= now) {
+      pkceStore.delete(key)
+    }
+  }
+}
+
+function makeState(loginMode: string) {
+  const safeMode = loginMode.trim() || 'kakao:login'
+  const nonce = base64Url(crypto.randomBytes(12))
+
+  return `${safeMode}:${nonce}`
+}
+
+function actionFromState(state: string) {
+  const parts = state.split(':')
+  const provider = parts[0] || ''
+  const action = parts[1] || ''
+
+  if (provider !== 'kakao') return 'login'
+
+  if (
+    action === 'signup' ||
+    action === 'login' ||
+    action === 'find-id' ||
+    action === 'find-password'
+  ) {
+    return action
+  }
+
+  return 'login'
+}
+
 export async function GET(req: NextRequest) {
+  cleanupExpiredPkce()
+
   const { searchParams } = new URL(req.url)
 
   const mode = searchParams.get('mode') || ''
@@ -89,10 +142,15 @@ export async function GET(req: NextRequest) {
     const loginMode =
       searchParams.get('login_mode') || 'kakao:login'
 
-    const newState = loginMode
+    const newState = makeState(loginMode)
 
     const codeVerifier = createCodeVerifier()
     const codeChallenge = createCodeChallenge(codeVerifier)
+
+    pkceStore.set(newState, {
+      codeVerifier,
+      expiresAt: Date.now() + PKCE_TTL_MS,
+    })
 
     const authorizeUrl = new URL(KAKAO_AUTHORIZE_ENDPOINT)
 
@@ -112,19 +170,7 @@ export async function GET(req: NextRequest) {
       'S256',
     )
 
-    const res = NextResponse.redirect(authorizeUrl.toString())
-
-    res.cookies.set({
-      name: `${PKCE_COOKIE_PREFIX}${newState}`,
-      value: codeVerifier,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      path: '/',
-      maxAge: 60 * 5,
-    })
-
-    return res
+    return NextResponse.redirect(authorizeUrl.toString())
   }
 
   if (error) {
@@ -133,6 +179,7 @@ export async function GET(req: NextRequest) {
       error,
       error_description: errorDescription,
       state,
+      action: actionFromState(state),
     })
   }
 
@@ -141,6 +188,7 @@ export async function GET(req: NextRequest) {
       provider: 'kakao',
       error: 'missing_code',
       state,
+      action: actionFromState(state),
     })
   }
 
@@ -151,15 +199,15 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const cookieName = `${PKCE_COOKIE_PREFIX}${state}`
-  const codeVerifier =
-    req.cookies.get(cookieName)?.value || ''
+  const pkce = pkceStore.get(state)
+  pkceStore.delete(state)
 
-  if (!codeVerifier) {
+  if (!pkce?.codeVerifier) {
     return redirectToApp({
       provider: 'kakao',
       error: 'missing_code_verifier',
       state,
+      action: actionFromState(state),
     })
   }
 
@@ -176,26 +224,22 @@ export async function GET(req: NextRequest) {
         client_secret: clientSecret,
         redirect_uri: KAKAO_REDIRECT_URI,
         code,
-        code_verifier: codeVerifier,
+        code_verifier: pkce.codeVerifier,
       }).toString(),
     })
 
-    const tokenData = await tokenRes
-      .json()
-      .catch(() => ({}))
+    const tokenData = await tokenRes.json().catch(() => ({}))
 
     if (!tokenRes.ok || !tokenData?.access_token) {
-      const res = redirectToApp({
+      return redirectToApp({
         provider: 'kakao',
         error:
           tokenData?.error_description ||
           tokenData?.error ||
           'token_exchange_failed',
         state,
+        action: actionFromState(state),
       })
-
-      res.cookies.delete(cookieName)
-      return res
     }
 
     const accessToken = String(tokenData.access_token)
@@ -210,7 +254,7 @@ export async function GET(req: NextRequest) {
     const userData = await userRes.json().catch(() => ({}))
 
     if (!userRes.ok || !userData?.id) {
-      const res = redirectToApp({
+      return redirectToApp({
         provider: 'kakao',
         error:
           userData?.msg ||
@@ -218,10 +262,8 @@ export async function GET(req: NextRequest) {
           userData?.error ||
           'kakao_me_failed',
         state,
+        action: actionFromState(state),
       })
-
-      res.cookies.delete(cookieName)
-      return res
     }
 
     const socialId = String(userData.id)
@@ -234,26 +276,23 @@ export async function GET(req: NextRequest) {
       userData?.kakao_account?.email,
     ).trim()
 
-    const res = redirectToApp({
+    const action = actionFromState(state)
+
+    return redirectToApp({
       provider: 'kakao',
       verified: '1',
       social_id: socialId,
       name,
       social_email: email,
       state,
+      action,
     })
-
-    res.cookies.delete(cookieName)
-
-    return res
   } catch {
-    const res = redirectToApp({
+    return redirectToApp({
       provider: 'kakao',
       error: 'server_token_exchange_failed',
       state,
+      action: actionFromState(state),
     })
-
-    res.cookies.delete(cookieName)
-    return res
   }
 }
