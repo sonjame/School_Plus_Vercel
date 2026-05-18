@@ -93,9 +93,8 @@ export default function SignupPage() {
   }
 
   const validateRealName = (name: string) => {
-    return /^[가-힣]{3,4}$/.test(name)
+    return /^[가-힣]{2,4}$/.test(name)
   }
-
   // 🔎 비밀번호 조건 체크 결과
   const passwordCheck = validatePassword(password)
 
@@ -271,7 +270,7 @@ export default function SignupPage() {
     }
 
     if (!validateRealName(realName)) {
-      showAlert('이름은 한글 3~4자로 입력해주세요. 초성만 입력할 수 없습니다.')
+      showAlert('이름은 한글 2~4자로 입력해주세요. 초성만 입력할 수 없습니다.')
       return
     }
 
@@ -520,7 +519,7 @@ export default function SignupPage() {
             {/* 실명 */}
             <input
               style={inputStyle}
-              placeholder="한글 이름 3~4자 입력"
+              placeholder="한글 이름 2~4자 입력"
               value={realName}
               maxLength={4}
               onChange={(e) => {
@@ -545,7 +544,7 @@ export default function SignupPage() {
                   fontWeight: 600,
                 }}
               >
-                ❌ 이름은 한글 3~4자만 입력 가능합니다.
+                ❌ 이름은 한글 2~4자만 입력 가능합니다.
               </p>
             )}
 
