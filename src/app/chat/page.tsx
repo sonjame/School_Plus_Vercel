@@ -1052,7 +1052,12 @@ export default function ChatPage() {
 
       setInputBarTop(
         open
-          ? Math.round(viewport.offsetTop + viewport.height - barHeight - 8)
+          ? Math.round(
+              viewport.offsetTop +
+                viewport.height -
+                barHeight -
+                (isIPad ? 48 : 8),
+            )
           : null,
       )
     }
@@ -1068,7 +1073,7 @@ export default function ChatPage() {
       window.visualViewport?.removeEventListener('scroll', updateViewport)
       window.removeEventListener('resize', updateViewport)
     }
-  }, [])
+  }, [isIPad])
 
   useEffect(() => {
     const handleFocus = () => {
@@ -2351,8 +2356,8 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: keyboardOpen ? 140 : 72,
-                scrollPaddingBottom: keyboardOpen ? 140 : 72,
+                paddingBottom: keyboardOpen ? 180 : 72,
+                scrollPaddingBottom: keyboardOpen ? 180 : 72,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
