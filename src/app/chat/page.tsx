@@ -365,6 +365,8 @@ export default function ChatPage() {
   const [viewportHeight, setViewportHeight] = useState(0)
   const [isTouchDevice, setIsTouchDevice] = useState(false)
 
+  const [isIPad, setIsIPad] = useState(false)
+
   const showRoomList = !isMobile || currentRoomId === null
   const showChatRoom = !isMobile || currentRoomId !== null
 
@@ -1155,6 +1157,9 @@ export default function ChatPage() {
         'ontouchstart' in window
 
       setIsMobile(window.innerWidth <= 1024 && isTouch)
+      setIsIPad(
+        isTouch && window.innerWidth >= 768 && window.innerWidth <= 1366,
+      )
     }
     check()
     window.addEventListener('resize', check)
@@ -2960,18 +2965,24 @@ export default function ChatPage() {
                 gap: 8,
                 background: darkMode ? '#1e293b' : 'white',
 
-                position: keyboardOpen
-                  ? 'fixed'
-                  : isTouchDevice
+                position:
+                  isIPad && keyboardOpen
                     ? 'fixed'
-                    : 'sticky',
+                    : isTouchDevice
+                      ? 'fixed'
+                      : 'sticky',
 
                 top:
-                  keyboardOpen && inputBarTop !== null
+                  isIPad && keyboardOpen && inputBarTop !== null
                     ? `${inputBarTop}px`
                     : undefined,
 
-                bottom: keyboardOpen ? 'auto' : 0,
+                bottom:
+                  isIPad && keyboardOpen
+                    ? 'auto'
+                    : isTouchDevice && keyboardHeight > 0
+                      ? `calc(${keyboardHeight}px + env(safe-area-inset-bottom) + 24px)`
+                      : 0,
 
                 left:
                   isTouchDevice && !isMobile && showRoomList
