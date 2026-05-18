@@ -5,6 +5,9 @@ export const runtime = 'nodejs'
 const KAKAO_TOKEN_ENDPOINT =
   'https://kauth.kakao.com/oauth/token'
 
+const KAKAO_USER_ENDPOINT =
+  'https://kapi.kakao.com/v2/user/me'
+
 const KAKAO_REDIRECT_URI =
   'https://school-plus-vercel.vercel.app/api/auth/kakao_mobile/callback'
 
@@ -17,6 +20,10 @@ function redirectToApp(params: Record<string, string>) {
   return NextResponse.redirect(
     `${APP_OAUTH_REDIRECT_URI}?${query}`,
   )
+}
+
+function pickStr(v: unknown) {
+  return typeof v === 'string' ? v : ''
 }
 
 export async function GET(req: NextRequest) {
@@ -98,10 +105,45 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    const accessToken = String(tokenData.access_token)
+
+    const userRes = await fetch(KAKAO_USER_ENDPOINT, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    const userData = await userRes.json().catch(() => ({}))
+
+    if (!userRes.ok || !userData?.id) {
+      return redirectToApp({
+        provider: 'kakao',
+        error:
+          userData?.msg ||
+          userData?.error_description ||
+          userData?.error ||
+          'kakao_me_failed',
+        state,
+      })
+    }
+
+    const socialId = String(userData.id)
+
+    const name = pickStr(
+      userData?.kakao_account?.profile?.nickname,
+    ).trim()
+
+    const email = pickStr(
+      userData?.kakao_account?.email,
+    ).trim()
+
     return redirectToApp({
       provider: 'kakao',
       verified: '1',
-      access_token: String(tokenData.access_token),
+      social_id: socialId,
+      name,
+      social_email: email,
       state,
     })
   } catch {
