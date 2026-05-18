@@ -358,6 +358,10 @@ export default function ChatPage() {
 
   const [keyboardHeight, setKeyboardHeight] = useState(0)
 
+  const inputBarRef = useRef<HTMLDivElement | null>(null)
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const [inputBarTop, setInputBarTop] = useState<number | null>(null)
+
   const [viewportHeight, setViewportHeight] = useState(0)
   const [isTouchDevice, setIsTouchDevice] = useState(false)
 
@@ -1037,15 +1041,18 @@ export default function ChatPage() {
         window.innerHeight - viewport.height - viewport.offsetTop,
       )
 
-      const safeKeyboard =
-        keyboard > 80 ? Math.round(keyboard + viewport.offsetTop + 40) : 0
+      const open = keyboard > 80
+      const barHeight = inputBarRef.current?.offsetHeight ?? 56
 
       setViewportHeight(Math.round(viewport.height))
-      setKeyboardHeight(safeKeyboard)
+      setKeyboardHeight(open ? Math.round(keyboard) : 0)
+      setKeyboardOpen(open)
 
-      setTimeout(() => {
-        scrollToBottom()
-      }, 80)
+      setInputBarTop(
+        open
+          ? Math.round(viewport.offsetTop + viewport.height - barHeight - 8)
+          : null,
+      )
     }
     checkTouch()
     updateViewport()
@@ -2338,9 +2345,8 @@ export default function ChatPage() {
                 paddingTop: 12,
                 paddingRight: 16,
                 paddingLeft: 16,
-                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 150 : 72,
-                scrollPaddingBottom:
-                  keyboardHeight > 0 ? keyboardHeight + 150 : 72,
+                paddingBottom: keyboardOpen ? 140 : 72,
+                scrollPaddingBottom: keyboardOpen ? 140 : 72,
                 background: darkMode ? '#0f172a' : '#f9fafb',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2945,6 +2951,7 @@ export default function ChatPage() {
 
             {/* 입력 영역 */}
             <div
+              ref={inputBarRef}
               style={{
                 padding: '8px 12px',
                 borderTop: '1px solid #e5e7eb',
@@ -2953,7 +2960,18 @@ export default function ChatPage() {
                 gap: 8,
                 background: darkMode ? '#1e293b' : 'white',
 
-                position: isTouchDevice ? 'fixed' : 'sticky',
+                position: keyboardOpen
+                  ? 'fixed'
+                  : isTouchDevice
+                    ? 'fixed'
+                    : 'sticky',
+
+                top:
+                  keyboardOpen && inputBarTop !== null
+                    ? `${inputBarTop}px`
+                    : undefined,
+
+                bottom: keyboardOpen ? 'auto' : 0,
 
                 left:
                   isTouchDevice && !isMobile && showRoomList
@@ -2961,11 +2979,6 @@ export default function ChatPage() {
                     : 0,
 
                 right: 0,
-
-                bottom:
-                  isTouchDevice && keyboardHeight > 0
-                    ? `calc(${keyboardHeight}px + env(safe-area-inset-bottom) + 24px)`
-                    : 0,
 
                 zIndex: 9999,
 
