@@ -1156,10 +1156,11 @@ export default function ChatPage() {
         window.matchMedia('(pointer: coarse)').matches ||
         'ontouchstart' in window
 
-      setIsMobile(window.innerWidth <= 1024 && isTouch)
-      setIsIPad(
-        isTouch && window.innerWidth >= 768 && window.innerWidth <= 1366,
-      )
+      const ipad =
+        isTouch && window.innerWidth >= 768 && window.innerWidth <= 1366
+
+      setIsIPad(ipad)
+      setIsMobile((window.innerWidth <= 1024 && isTouch) || ipad)
     }
     check()
     window.addEventListener('resize', check)
