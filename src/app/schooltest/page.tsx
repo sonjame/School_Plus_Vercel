@@ -58,6 +58,8 @@ export default function GradePage() {
   const [isMobile, setIsMobile] = useState(false)
   const [subjectAlertOpen, setSubjectAlertOpen] = useState(false)
 
+  const [isSaving, setIsSaving] = useState(false)
+
   /* 🌙 다크모드 상태 */
   const [darkMode, setDarkMode] = useState(false)
 
@@ -169,27 +171,33 @@ export default function GradePage() {
       return
     }
 
-    const res = await apiFetch('/api/exam-score', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        year: selectedYear,
-        semester,
-        exam: selectedExam,
-        scores,
-      }),
-    })
+    try {
+      setIsSaving(true)
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      alert(err.message || '점수 저장 실패')
-      return
+      const res = await apiFetch('/api/exam-score', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          year: selectedYear,
+          semester,
+          exam: selectedExam,
+          scores,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || '점수 저장 실패')
+        return
+      }
+
+      reloadScores()
+      setSavedModalOpen(true)
+    } finally {
+      setIsSaving(false)
     }
-
-    await reloadScores()
-    setSavedModalOpen(true)
   }
 
   const reloadScores = async () => {
@@ -458,6 +466,19 @@ export default function GradePage() {
         <p>과목명을 입력하세요.</p>
       </Modal>
 
+      <Modal
+        open={isSaving}
+        title="저장 중..."
+        onClose={() => {}}
+        onConfirm={() => {}}
+        confirmText=""
+        showCancel={false}
+        hideFooter
+        darkMode={darkMode}
+      >
+        <p>점수를 저장하고 있습니다...</p>
+      </Modal>
+
       <div
         style={{
           ...styles.wrapper,
@@ -612,6 +633,7 @@ export default function GradePage() {
                     type={maskScore ? 'password' : 'text'}
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    maxLength={3}
                     style={{
                       ...styles.scoreInput,
                       width: isMobile ? 64 : 80,
@@ -625,7 +647,14 @@ export default function GradePage() {
                     value={scores[subj] ?? ''}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^\d]/g, '')
-                      const num = raw === '' ? undefined : Number(raw)
+
+                      let num = raw === '' ? undefined : Number(raw)
+
+                      // ✅ 최대 100점 제한
+                      if (num !== undefined) {
+                        if (num < 0) num = 0
+                        if (num > 100) num = 100
+                      }
 
                       setScoresByExam((prev) => {
                         const nextExam = { ...(prev[selectedExam] || {}) }
@@ -688,12 +717,14 @@ export default function GradePage() {
             <button
               style={{
                 ...styles.saveBtn,
-                boxShadow: darkMode ? '0 5px 16px rgba(37,99,235,0.7)' : 'none',
+                opacity: isSaving ? 0.6 : 1,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
               }}
               onClick={saveAll}
+              disabled={isSaving}
             >
               <span className="material-symbols-rounded">save</span>
-              점수 저장
+              {isSaving ? '저장 중...' : '점수 저장'}
             </button>
           </div>
 
