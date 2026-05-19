@@ -266,11 +266,25 @@ export default function SignupPage() {
 
   // 제출 전 체크
   const handleSubmit = () => {
-    if (!realName || !username || !school || !grade) {
-      showAlert('모든 정보를 입력해주세요.')
+    if (!realName && !username) {
+      showAlert('이름과 아이디를 입력해주세요.')
       return
     }
 
+    if (!realName) {
+      showAlert('이름을 입력해주세요.')
+      return
+    }
+
+    if (!username) {
+      showAlert('아이디를 입력해주세요.')
+      return
+    }
+
+    if (!school || !grade) {
+      showAlert('학교와 학년을 입력해주세요.')
+      return
+    }
     if (!validateRealName(realName)) {
       showAlert('이름은 한글 2~4자로 입력해주세요. 초성만 입력할 수 없습니다.')
       return
@@ -792,6 +806,32 @@ export default function SignupPage() {
                     : 'text',
               }}
             />
+
+            {password2.length > 0 && password !== password2 && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#D32F2F',
+                  fontWeight: 600,
+                }}
+              >
+                ❌ 비밀번호가 일치하지 않습니다.
+              </p>
+            )}
+
+            {password2.length > 0 && password === password2 && (
+              <p
+                style={{
+                  fontSize: '13px',
+                  marginTop: '6px',
+                  color: '#2E7D32',
+                  fontWeight: 600,
+                }}
+              >
+                ✅ 비밀번호가 일치합니다.
+              </p>
+            )}
 
             {/* 학교 검색 */}
             <div style={{ position: 'relative', marginTop: '12px' }}>
