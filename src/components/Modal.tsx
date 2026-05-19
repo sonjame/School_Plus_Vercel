@@ -11,6 +11,7 @@ interface ModalProps {
   danger?: boolean
   showCancel?: boolean
   darkMode?: boolean // 🌙 다크모드 추가
+  hideFooter?: boolean
   children: React.ReactNode
 }
 
@@ -22,6 +23,7 @@ export default function Modal({
   confirmText = '확인',
   danger,
   showCancel = true,
+  hideFooter = false,
   darkMode = false, // 기본 false
   children,
 }: ModalProps) {
@@ -80,19 +82,21 @@ export default function Modal({
 
         <div style={contentStyle}>{children}</div>
 
-        <div style={styles.actions}>
-          {showCancel && (
-            <button style={cancelBtnStyle} onClick={onClose}>
-              취소
-            </button>
-          )}
+        {!hideFooter && (
+          <div style={styles.actions}>
+            {showCancel && (
+              <button style={cancelBtnStyle} onClick={onClose}>
+                취소
+              </button>
+            )}
 
-          {onConfirm && (
-            <button style={confirmBtnStyle} onClick={onConfirm}>
-              {confirmText}
-            </button>
-          )}
-        </div>
+            {onConfirm && (
+              <button style={confirmBtnStyle} onClick={onConfirm}>
+                {confirmText}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
