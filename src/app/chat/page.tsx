@@ -1238,6 +1238,19 @@ export default function ChatPage() {
      현재 방, 메시지 필터링
   ------------------------- */
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || null
+
+  const getUnreadCount = (msg: ChatMessage) => {
+    if (!currentRoom || msg.senderId !== currentUser?.id) return 0
+
+    const totalReaders = Math.max(
+      0,
+      (currentRoom.participants?.length ?? 1) - 1,
+    )
+
+    const readReaders = Math.min(totalReaders, Number(msg.readCount ?? 0))
+
+    return Math.max(0, totalReaders - readReaders)
+  }
   const roomMessages = messages
     .filter((m) => m.roomId === currentRoomId)
     .filter((m) => m.type !== 'notice') // 🔥 공지 제외
@@ -1432,6 +1445,19 @@ export default function ChatPage() {
 
     socket.emit('joinRoom', currentRoomId)
 
+    const handleConnect = () => {
+      if (!currentRoomId) return
+      socket.emit('joinRoom', currentRoomId)
+    }
+
+    const handleDisconnect = () => {
+      console.log('socket disconnected')
+    }
+
+    socket.on('connect', handleConnect)
+    socket.on('reconnect', handleConnect)
+    socket.on('disconnect', handleDisconnect)
+
     const handleReceiveMessage = async (message: any) => {
       if (Number(message.roomId) !== Number(currentRoomId)) return
 
@@ -1466,10 +1492,31 @@ export default function ChatPage() {
 
     socket.on('roomRead', handleRoomRead)
 
+    const handleMessageDeleted = async (data: {
+      roomId: number
+      messageId: number
+    }) => {
+      if (Number(data.roomId) !== Number(currentRoomId)) return
+
+      const res = await apiFetch(`/api/chat/messages/${currentRoomId}`)
+      const list = await safeJson<ChatMessage[]>(res)
+
+      setMessages(Array.isArray(list) ? list : [])
+      await refreshRooms()
+    }
+
+    socket.on('messageDeleted', handleMessageDeleted)
+
     return () => {
       socket.emit('leaveRoom', currentRoomId)
+
       socket.off('roomRead', handleRoomRead)
       socket.off('receiveMessage', handleReceiveMessage)
+      socket.off('messageDeleted', handleMessageDeleted)
+
+      socket.off('connect', handleConnect)
+      socket.off('reconnect', handleConnect)
+      socket.off('disconnect', handleDisconnect)
     }
   }, [currentRoomId, currentUser?.token])
 
@@ -1536,9 +1583,20 @@ export default function ChatPage() {
           return
         }
 
+        // ✅ 내 화면 즉시 갱신
         const list = await apiFetch(`/api/chat/messages/${currentRoomId}`)
         const data = await safeJson<ChatMessage[]>(list)
+
         setMessages(Array.isArray(data) ? data : [])
+
+        // ✅ 상대방 화면 실시간 갱신
+        socket.emit('messageDeleted', {
+          roomId: currentRoomId,
+          messageId,
+        })
+
+        // ✅ 채팅방 목록 마지막 메시지 갱신
+        await refreshRooms()
       },
     })
   }
@@ -2575,7 +2633,7 @@ export default function ChatPage() {
                 )}
 
                 {currentRoom &&
-                  roomMessages.map((msg) => {
+                  roomMessages.map((msg, index) => {
                     const isMe = msg.senderId === (currentUser?.id || 0)
                     if (msg.type === 'notice') {
                       const isOwner = msg.senderId === currentUser?.id
@@ -2636,6 +2694,8 @@ export default function ChatPage() {
                         '|||',
                       )
 
+                      const unreadCount = getUnreadCount(msg)
+
                       return (
                         <div
                           key={msg.id}
@@ -2645,53 +2705,67 @@ export default function ChatPage() {
                             marginBottom: 12,
                           }}
                         >
-                          <div>
-                            <img
-                              src={msg.fileUrl || emojiUrl}
-                              alt="emoji"
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-end',
+                              gap: 6,
+                              flexDirection: isMe ? 'row' : 'row-reverse',
+                            }}
+                          >
+                            <div
                               style={{
-                                width: 120,
-                                maxWidth: '45vw',
-                                height: 'auto',
-                                display: 'block',
+                                fontSize: 10,
+                                color: COLORS.subText,
+                                whiteSpace: 'nowrap',
+                                textAlign: isMe ? 'right' : 'left',
+                                marginBottom: 2,
                               }}
-                            />
+                            >
+                              {isMe && unreadCount > 0 && (
+                                <div
+                                  style={{
+                                    color: '#f59e0b',
+                                    fontWeight: 700,
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  {unreadCount}
+                                </div>
+                              )}
 
-                            {emojiText && (
-                              <div
-                                style={{
-                                  marginTop: 6,
-                                  background: isMe ? '#4FC3F7' : '#e5e7eb',
-                                  color: isMe ? 'white' : '#111827',
-                                  padding: '10px 14px',
-                                  borderRadius: 14,
-                                  fontSize: 14,
-                                  maxWidth: 260,
-                                  wordBreak: 'break-word',
-                                }}
-                              >
-                                {emojiText}
-                              </div>
-                            )}
+                              <div>{formatKST(msg.createdAt)}</div>
+                            </div>
 
-                            {isMe && (
-                              <button
-                                onClick={() => handleDeleteMessage(msg.id)}
+                            <div>
+                              <img
+                                src={msg.fileUrl || emojiUrl}
+                                alt="emoji"
                                 style={{
-                                  marginTop: 6,
-                                  border: 'none',
-                                  background: 'transparent',
-                                  color: '#ef4444',
-                                  fontSize: 12,
-                                  cursor: 'pointer',
-                                  fontWeight: 600,
+                                  width: 120,
+                                  maxWidth: '45vw',
+                                  height: 'auto',
                                   display: 'block',
-                                  marginLeft: 'auto',
                                 }}
-                              >
-                                삭제
-                              </button>
-                            )}
+                              />
+
+                              {emojiText && (
+                                <div
+                                  style={{
+                                    marginTop: 6,
+                                    background: isMe ? '#4FC3F7' : '#e5e7eb',
+                                    color: isMe ? 'white' : '#111827',
+                                    padding: '8px 12px',
+                                    borderRadius: 14,
+                                    fontSize: 14,
+                                    maxWidth: 220,
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {emojiText}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )
@@ -2789,7 +2863,7 @@ export default function ChatPage() {
 
                     return (
                       <div
-                        key={msg.id}
+                        key={`${msg.id ?? 'temp'}-${msg.createdAt ?? ''}-${msg.senderId ?? ''}-${index}`}
                         onClick={() => {
                           if (!reportMode) return
                           if (msg.senderId === currentUser?.id) return
