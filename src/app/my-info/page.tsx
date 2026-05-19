@@ -111,6 +111,16 @@ export default function MyInfoPagePreview() {
 
   // 🔐 재로그인 안내 모달
   const [showReloginModal, setShowReloginModal] = useState(false)
+
+  useEffect(() => {
+    if (!showReloginModal) return
+
+    const timer = setTimeout(() => {
+      forceLogout()
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [showReloginModal])
   const [reloginReason, setReloginReason] = useState<
     'password' | 'school' | 'class' | null
   >(null)
@@ -118,11 +128,13 @@ export default function MyInfoPagePreview() {
   // 🔥 강제 로그아웃 함수
   const forceLogout = () => {
     localStorage.removeItem('loggedInUser')
+    localStorage.removeItem('accessToken')
     localStorage.removeItem('eduCode')
     localStorage.removeItem('schoolCode')
     localStorage.removeItem('school')
+    localStorage.removeItem('class_num')
 
-    window.location.href = '/auth/login'
+    window.location.replace('/auth/login')
   }
 
   // 🎓 현재 학년 계산
@@ -528,13 +540,19 @@ export default function MyInfoPagePreview() {
       }),
     )
 
+    // 🔥 기존 반값과 비교
+    const prevClassNum = user.classNum ?? null
+    const nextClassNum = data.classNum ?? null
+
     // UI 정리
     setShowClassForm(false)
     setClassInput('')
 
-    // 🔐 반 변경 후 재로그인 요구
-    setReloginReason('class')
-    setShowReloginModal(true)
+    // ✅ 실제로 반이 변경된 경우만 로그아웃
+    if (prevClassNum !== nextClassNum) {
+      setReloginReason('class')
+      setShowReloginModal(true)
+    }
   }
 
   if (!user) {
@@ -1203,6 +1221,7 @@ export default function MyInfoPagePreview() {
           >
             <input
               type="text"
+              inputMode="numeric"
               placeholder="반 입력 (숫자만, 예: 3)"
               value={classInput}
               onChange={(e) =>
