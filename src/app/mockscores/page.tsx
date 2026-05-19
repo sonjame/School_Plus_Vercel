@@ -64,6 +64,19 @@ export default function ScoresPage() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [showModal, setShowModal] = useState(false)
 
+  const limitScore = (value: string, max: number) => {
+    if (value === '') return ''
+
+    let num = Number(value)
+
+    if (isNaN(num)) return ''
+
+    if (num < 0) num = 0
+    if (num > max) num = max
+
+    return String(num)
+  }
+
   // 🌙 다크모드
   const [darkMode, setDarkMode] = useState(false)
 
@@ -985,12 +998,16 @@ export default function ScoresPage() {
                     </div>
                   </>
                 )}
-
                 <input
                   type="number"
+                  min={0}
+                  max={100}
                   value={scores.korean}
                   onChange={(e) =>
-                    setScores({ ...scores, korean: e.target.value })
+                    setScores({
+                      ...scores,
+                      korean: limitScore(e.target.value, 100),
+                    })
                   }
                 />
               </div>
@@ -1038,9 +1055,14 @@ export default function ScoresPage() {
 
                 <input
                   type="number"
+                  min={0}
+                  max={100}
                   value={scores.math}
                   onChange={(e) =>
-                    setScores({ ...scores, math: e.target.value })
+                    setScores({
+                      ...scores,
+                      math: limitScore(e.target.value, 100),
+                    })
                   }
                 />
               </div>
@@ -1049,9 +1071,14 @@ export default function ScoresPage() {
                 <label>영어 (100점)</label>
                 <input
                   type="number"
+                  min={0}
+                  max={100}
                   value={scores.english}
                   onChange={(e) =>
-                    setScores({ ...scores, english: e.target.value })
+                    setScores({
+                      ...scores,
+                      english: limitScore(e.target.value, 100),
+                    })
                   }
                 />
               </div>
@@ -1060,9 +1087,14 @@ export default function ScoresPage() {
                 <label>한국사 (50점)</label>
                 <input
                   type="number"
+                  min={0}
+                  max={50}
                   value={scores.history}
                   onChange={(e) =>
-                    setScores({ ...scores, history: e.target.value })
+                    setScores({
+                      ...scores,
+                      history: limitScore(e.target.value, 50),
+                    })
                   }
                 />
               </div>
@@ -1079,13 +1111,16 @@ export default function ScoresPage() {
 
                 <div className="input-box">
                   <label>통합사회 (50점)</label>
+
                   <input
                     type="number"
+                    min={0}
+                    max={50}
                     value={exploreScores.sub1}
                     onChange={(e) =>
                       setExploreScores({
                         ...exploreScores,
-                        sub1: e.target.value,
+                        sub1: limitScore(e.target.value, 50),
                       })
                     }
                   />
@@ -1093,13 +1128,16 @@ export default function ScoresPage() {
 
                 <div className="input-box" style={{ marginTop: 10 }}>
                   <label>통합과학 (50점)</label>
+
                   <input
                     type="number"
+                    min={0}
+                    max={50}
                     value={exploreScores.sub2}
                     onChange={(e) =>
                       setExploreScores({
                         ...exploreScores,
-                        sub2: e.target.value,
+                        sub2: limitScore(e.target.value, 50),
                       })
                     }
                   />
@@ -1197,13 +1235,16 @@ export default function ScoresPage() {
                 {explorationSubjects[0] && (
                   <div className="input-box">
                     <label>{explorationSubjects[0]}</label>
+
                     <input
                       type="number"
+                      min={0}
+                      max={50}
                       value={exploreScores.sub1}
                       onChange={(e) =>
                         setExploreScores({
                           ...exploreScores,
-                          sub1: e.target.value,
+                          sub1: limitScore(e.target.value, 50),
                         })
                       }
                     />
@@ -1213,13 +1254,16 @@ export default function ScoresPage() {
                 {explorationSubjects[1] && (
                   <div className="input-box" style={{ marginTop: 10 }}>
                     <label>{explorationSubjects[1]}</label>
+
                     <input
                       type="number"
+                      min={0}
+                      max={50}
                       value={exploreScores.sub2}
                       onChange={(e) =>
                         setExploreScores({
                           ...exploreScores,
-                          sub2: e.target.value,
+                          sub2: limitScore(e.target.value, 50),
                         })
                       }
                     />
@@ -1255,10 +1299,15 @@ export default function ScoresPage() {
                 {secondLang && (
                   <div className="input-box" style={{ marginTop: 15 }}>
                     <label>{secondLang} (50점)</label>
+
                     <input
                       type="number"
+                      min={0}
+                      max={50}
                       value={secondLangScore}
-                      onChange={(e) => setSecondLangScore(e.target.value)}
+                      onChange={(e) =>
+                        setSecondLangScore(limitScore(e.target.value, 50))
+                      }
                     />
                   </div>
                 )}
