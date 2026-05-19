@@ -64,6 +64,8 @@ export default function ScoresPage() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [showModal, setShowModal] = useState(false)
 
+  const [isSaving, setIsSaving] = useState(false)
+
   const limitScore = (value: string, max: number) => {
     if (value === '') return ''
 
@@ -544,22 +546,28 @@ export default function ScoresPage() {
       return
     }
 
-    await fetch('/api/mock-scores', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`, // ✅ 수정 완료
-      },
-      body: JSON.stringify({
-        year,
-        grade,
-        month: selectedMonth,
-        scores: payload,
-      }),
-    })
+    try {
+      setIsSaving(true)
 
-    setShowModal(true)
-    setTimeout(() => setShowModal(false), 1500)
+      await fetch('/api/mock-scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          year,
+          grade,
+          month: selectedMonth,
+          scores: payload,
+        }),
+      })
+
+      setShowModal(true)
+      setTimeout(() => setShowModal(false), 1500)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleSearchUniv = async () => {
@@ -2330,6 +2338,16 @@ export default function ScoresPage() {
           color: #e5e7eb;
         }
       `}</style>
+
+      {isSaving && (
+        <div className="modal-backdrop">
+          <div className="modal-box">
+            <div className="modal-icon">⏳</div>
+            <p>점수를 저장중입니다...</p>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
