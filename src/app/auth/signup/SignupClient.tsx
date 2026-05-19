@@ -30,6 +30,8 @@ export default function SignupPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
 
+  const [signupLoading, setSignupLoading] = useState(false)
+
   const [class_num, setClassNum] = useState('') // 반 (예: 3반)
 
   // ⭐ 아이디 중복체크 관련
@@ -317,86 +319,96 @@ export default function SignupPage() {
   }
 
   const handleFinalSubmit = async () => {
-    const social = JSON.parse(localStorage.getItem('socialUser') || '{}')
+    // 🔒 중복 클릭 방지
+    if (signupLoading) return
 
-    let provider: 'email' | 'kakao' | 'google' = 'email'
+    setSignupLoading(true)
 
-    if (social?.id && social.provider) {
-      provider = social.provider
-    }
+    try {
+      const social = JSON.parse(localStorage.getItem('socialUser') || '{}')
 
-    const body = {
-      username,
-      password,
-      name: realName,
-      email: verifiedEmail || null,
-      provider,
-      social_id: social.id || null,
-      school,
-      schoolCode,
-      eduCode,
-      level,
-      grade,
-      class_num: class_num ? Number(class_num) : null, // ⭐ 핵심
-    }
+      let provider: 'email' | 'kakao' | 'google' = 'email'
 
-    // 🔑 일반 회원만 비밀번호 포함
-    if (!social.id) {
-      body.password = password
-    }
+      if (social?.id && social.provider) {
+        provider = social.provider
+      }
 
-    const res = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+      const body = {
+        username,
+        password,
+        name: realName,
+        email: verifiedEmail || null,
+        provider,
+        social_id: social.id || null,
+        school,
+        schoolCode,
+        eduCode,
+        level,
+        grade,
+        class_num: class_num ? Number(class_num) : null,
+      }
 
-    if (res.ok) {
-      showAlert('회원가입 완료!')
-      localStorage.removeItem('socialUser')
-      setTimeout(() => {
-        window.location.href = '/auth/login'
-      }, 1500)
-    } else {
-      try {
-        const err = await res.json()
+      // 🔑 일반 회원만 비밀번호 포함
+      if (!social.id) {
+        body.password = password
+      }
 
-        // 🛡 관리자 승인 필요
-        if (err.status === 'WAIT') {
-          const formattedDate = new Date(err.rejoinAvailableAt).toLocaleString(
-            'ko-KR',
-            {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (res.ok) {
+        showAlert('회원가입 완료!')
+        localStorage.removeItem('socialUser')
+
+        setTimeout(() => {
+          window.location.href = '/auth/login'
+        }, 1500)
+      } else {
+        try {
+          const err = await res.json()
+
+          if (err.status === 'WAIT') {
+            const formattedDate = new Date(
+              err.rejoinAvailableAt,
+            ).toLocaleString('ko-KR', {
               timeZone: 'Asia/Seoul',
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
               hour: '2-digit',
               minute: '2-digit',
-            },
-          )
+            })
 
-          setModalMessage(
-            `탈퇴 후 30일 이내에는 재가입할 수 없습니다.\n\n재가입 가능일:\n${formattedDate}`,
-          )
+            setModalMessage(
+              `탈퇴 후 30일 이내에는 재가입할 수 없습니다.\n\n재가입 가능일:\n${formattedDate}`,
+            )
 
-          setModalType('WAIT')
-          setShowModal(true)
-          return
+            setModalType('WAIT')
+            setShowModal(true)
+            return
+          }
+
+          if (err.status === 'NEED_ADMIN_APPROVAL') {
+            setModalMessage(
+              '이 계정은 탈퇴 이력이 있어\n관리자 승인이 필요합니다.',
+            )
+
+            setModalType('NEED_ADMIN_APPROVAL')
+            setShowModal(true)
+            return
+          }
+
+          showAlert(err.message || '회원가입 실패')
+        } catch {
+          showAlert('회원가입 실패')
         }
-
-        if (err.status === 'NEED_ADMIN_APPROVAL') {
-          setModalMessage(
-            '이 계정은 탈퇴 이력이 있어\n관리자 승인이 필요합니다.',
-          )
-          setModalType('NEED_ADMIN_APPROVAL')
-          setShowModal(true)
-          return
-        }
-
-        showAlert(err.message || '회원가입 실패')
-      } catch {
-        showAlert('회원가입 실패')
       }
+    } finally {
+      // 🔓 다시 활성화
+      setSignupLoading(false)
     }
   }
 
@@ -890,8 +902,10 @@ export default function SignupPage() {
             </p>
 
             <input
+              type="number"
+              inputMode="numeric"
               style={{ ...inputStyle, marginTop: '12px' }}
-              placeholder="반을 입력하세요 (선택, 예: 3반)"
+              placeholder="반 번호 입력 (숫자만, 예: 3)"
               value={class_num}
               onChange={(e) => {
                 const value = e.target.value.replace(/[^0-9]/g, '')
@@ -988,8 +1002,16 @@ export default function SignupPage() {
                     >
                       취소
                     </button>
-                    <button className="ok-btn" onClick={handleFinalSubmit}>
-                      확인
+                    <button
+                      className="ok-btn"
+                      onClick={handleFinalSubmit}
+                      disabled={signupLoading}
+                      style={{
+                        opacity: signupLoading ? 0.6 : 1,
+                        cursor: signupLoading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {signupLoading ? '가입 중...' : '확인'}
                     </button>
                   </div>
                 </div>
@@ -1004,7 +1026,16 @@ export default function SignupPage() {
             <div className="modal-box">
               <div className="modal-icon">⚠️</div>
 
-              <p style={{ whiteSpace: 'pre-line' }}>{modalMessage}</p>
+              <p
+                style={{
+                  whiteSpace: 'pre-line',
+                  fontSize: '17px',
+                  fontWeight: 600,
+                  lineHeight: 1.6,
+                }}
+              >
+                {modalMessage}
+              </p>
 
               {/* ⏳ 30일 대기 */}
               {modalType === 'WAIT' && (
