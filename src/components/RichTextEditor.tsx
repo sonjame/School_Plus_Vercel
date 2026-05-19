@@ -14,6 +14,22 @@ interface Props {
   darkMode?: boolean
 }
 
+function isMarkActive(editor: any, mark: string) {
+  return (
+    editor.isActive(mark) ||
+    editor.state.storedMarks?.some((m: any) => m.type.name === mark)
+  )
+}
+
+function isColorActive(editor: any, color: string) {
+  return (
+    editor.isActive('textStyle', { color }) ||
+    editor.state.storedMarks?.some(
+      (m: any) => m.type.name === 'textStyle' && m.attrs.color === color,
+    )
+  )
+}
+
 export default function RichTextEditor({
   value,
   onChange,
@@ -96,28 +112,28 @@ export default function RichTextEditor({
           </select>
 
           <IconBtn
-            active={editor.isActive('bold')}
+            active={isMarkActive(editor, 'bold')}
             onClick={() => editor.chain().focus().toggleBold().run()}
             icon="format_bold"
             darkMode={darkMode}
           />
 
           <IconBtn
-            active={editor.isActive('italic')}
+            active={isMarkActive(editor, 'italic')}
             onClick={() => editor.chain().focus().toggleItalic().run()}
             icon="format_italic"
             darkMode={darkMode}
           />
 
           <IconBtn
-            active={editor.isActive('underline')}
+            active={isMarkActive(editor, 'underline')}
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             icon="format_underlined"
             darkMode={darkMode}
           />
 
           <IconBtn
-            active={editor.isActive('strike')}
+            active={isMarkActive(editor, 'strike')}
             onClick={() => editor.chain().focus().toggleStrike().run()}
             icon="format_strikethrough"
             darkMode={darkMode}
@@ -172,15 +188,25 @@ export default function RichTextEditor({
         </div>
 
         {/* 본문 */}
-        <EditorContent
-          editor={editor}
+        <div
+          onClick={() => {
+            if (!editor) return
+
+            if (editor.isEmpty) {
+              editor.commands.focus('start')
+            } else {
+              editor.commands.focus()
+            }
+          }}
           style={{
             padding: 16,
             minHeight: 250,
             cursor: 'text',
             color: darkMode ? '#f1f5f9' : '#111827',
           }}
-        />
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
       <style jsx global>{`
         .ProseMirror {
@@ -205,6 +231,10 @@ export default function RichTextEditor({
         .ProseMirror h6 {
           margin: 0 !important;
         }
+
+        .ProseMirror {
+          min-height: 250px;
+        }
       `}</style>
     </>
   )
@@ -224,10 +254,7 @@ function IconBtn({
   return (
     <button
       type="button"
-      onMouseDown={(e) => {
-        e.preventDefault()
-        onClick()
-      }}
+      onClick={onClick}
       style={{
         border: 'none',
         outline: 'none',
@@ -277,7 +304,7 @@ function ColorBtn({
         width: 18,
         height: 18,
         borderRadius: '50%',
-        border: editor.isActive('textStyle', { color })
+        border: isColorActive(editor, color)
           ? `2px solid ${darkMode ? '#fff' : '#000'}`
           : `1px solid ${darkMode ? '#64748b' : '#ccc'}`,
         background: color,
