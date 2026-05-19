@@ -1231,7 +1231,7 @@ export default function MyInfoPagePreview() {
             />
 
             <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-              반을 모르면 비워두셔도 됩니다.
+              반 숫자만 입력을 해주세요 (예 3반이면 = 3).
             </p>
 
             <button
