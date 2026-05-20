@@ -430,40 +430,21 @@ export default function MyInfoPagePreview() {
 
     const data = await res.json()
 
-    if (!res.ok) {
-      alert(data.message)
-      return
-    }
+if (!res.ok) {
+  alert(data.message)
+  return
+}
 
-    const updatedUser = {
-      ...user,
-      school: data.school,
-      eduCode: data.eduCode,
-      schoolCode: data.schoolCode,
-      level: data.level,
-    }
+setShowConfirmModal(false)
+setShowSchoolForm(false)
 
-    // 🔥 기존 loggedInUser 가져오기
-    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
+setReloginReason('school')
+setShowReloginModal(true)
 
-    setUser(updatedUser)
-
-    // 🔥 token 절대 유지
-    localStorage.setItem(
-      'loggedInUser',
-      JSON.stringify({
-        ...prev,
-        ...updatedUser,
-        token: prev.token,
-      }),
-    )
-
-    setShowConfirmModal(false)
-    setShowSchoolForm(false)
-
-    setReloginReason('school')
-    setShowReloginModal(true)
-  }
+// ✅ 모달이 안 뜨거나 타이머가 씹히는 경우 대비
+setTimeout(() => {
+  forceLogout()
+}, 800)
 
   const handleCancelSchoolChange = () => setShowConfirmModal(false)
 
