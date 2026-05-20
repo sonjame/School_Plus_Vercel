@@ -210,6 +210,33 @@ export async function POST(
       commentSchoolCode = decoded.school_code
     }
 
+    const normalizedContent = String(content).trim()
+    const normalizedParent = parent ?? null
+
+    const [[recentComment]]: any = await db.query(
+      `
+  SELECT id
+  FROM post_comments
+  WHERE post_id = ?
+    AND user_id = ?
+    AND content = ?
+    AND (
+      (parent_id IS NULL AND ? IS NULL)
+      OR parent_id = ?
+    )
+    AND created_at >= DATE_SUB(NOW(), INTERVAL 3 SECOND)
+  LIMIT 1
+  `,
+      [postId, userId, normalizedContent, normalizedParent, normalizedParent],
+    )
+
+    if (recentComment) {
+      return NextResponse.json(
+        { message: '이미 등록된 댓글입니다.' },
+        { status: 409 },
+      )
+    }
+
     const id = crypto.randomUUID()
 
     await db.query(
@@ -224,7 +251,7 @@ export async function POST(
         postId,
         userId,
         commentAuthor,
-        content,
+        normalizedContent,
         parent ?? null,
         commentSchoolCode,
       ],
@@ -451,9 +478,9 @@ export async function POST(
 
     return NextResponse.json({
       id,
-      content,
+      content: normalizedContent,
       author: commentAuthor,
-      parent: parent ?? null,
+      parent: normalizedParent,
       user_id: userId,
       created_at: new Date().toISOString(),
       likes: 0,
