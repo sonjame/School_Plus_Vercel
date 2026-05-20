@@ -510,7 +510,17 @@ export default function RootLayout({
                       fontSize: '16px',
                     }}
                   >
-                    ⮜
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 8,
+                        height: 8,
+                        marginLeft: 5,
+                        borderLeft: '2px solid white',
+                        borderBottom: '2px solid white',
+                        transform: 'rotate(45deg)',
+                      }}
+                    />
                   </button>
                 )}
 
@@ -879,7 +889,17 @@ export default function RootLayout({
                 fontSize: '16px',
               }}
             >
-              ⮞
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 8,
+                  height: 8,
+                  marginRight: 5,
+                  borderRight: '2px solid white',
+                  borderTop: '2px solid white',
+                  transform: 'rotate(45deg)',
+                }}
+              />
             </button>
           )}
 
