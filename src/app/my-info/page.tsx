@@ -364,6 +364,7 @@ setTimeout(() => {
   forceLogout()
 }, 800)
   }
+}
 
   /** 🔹 학교 검색 */
   const handleSchoolSearch = async (keyword: string) => {
