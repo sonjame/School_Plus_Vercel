@@ -126,13 +126,23 @@ export default function MyInfoPagePreview() {
   >(null)
 
   // 🔥 강제 로그아웃 함수
-  const forceLogout = () => {
+  const forceLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', {
+        method: 'POST',
+      })
+    } catch (e) {
+      console.error('logout api error:', e)
+    }
+
     localStorage.removeItem('loggedInUser')
     localStorage.removeItem('accessToken')
     localStorage.removeItem('eduCode')
     localStorage.removeItem('schoolCode')
     localStorage.removeItem('school')
     localStorage.removeItem('class_num')
+
+    sessionStorage.clear()
 
     window.location.replace('/auth/login')
   }
@@ -358,13 +368,7 @@ export default function MyInfoPagePreview() {
 
     setReloginReason('password')
     setShowReloginModal(true)
-
-    // ✅ 강제 로그아웃 보장
-setTimeout(() => {
-  forceLogout()
-}, 800)
   }
-
 
   /** 🔹 학교 검색 */
   const handleSchoolSearch = async (keyword: string) => {
@@ -436,22 +440,18 @@ setTimeout(() => {
 
     const data = await res.json()
 
-if (!res.ok) {
-  alert(data.message)
-  return
-}
+    if (!res.ok) {
+      alert(data.message)
+      return
+    }
 
-setShowConfirmModal(false)
-setShowSchoolForm(false)
+    setShowConfirmModal(false)
+    setShowSchoolForm(false)
 
-setReloginReason('school')
-setShowReloginModal(true)
+    setReloginReason('school')
+    setShowReloginModal(true)
+  }
 
-// ✅ 모달이 안 뜨거나 타이머가 씹히는 경우 대비
-setTimeout(() => {
-  forceLogout()
-}, 800)
-}
   const handleCancelSchoolChange = () => setShowConfirmModal(false)
 
   const handleDeleteAccount = async () => {
@@ -506,26 +506,6 @@ setTimeout(() => {
       alert(data.message || '반 저장 중 오류가 발생했습니다.')
       return
     }
-
-    // ✅ React state 업데이트
-    const updatedUser = {
-      ...user,
-      classNum: data.classNum,
-    }
-
-    setUser(updatedUser)
-
-    // 🔥 user 전체 기준으로 저장 (profileImageUrl 유지)
-    const prev = JSON.parse(localStorage.getItem('loggedInUser') || '{}')
-
-    localStorage.setItem(
-      'loggedInUser',
-      JSON.stringify({
-        ...prev,
-        ...updatedUser, // ← 핵심
-        token: prev.token,
-      }),
-    )
 
     // 🔥 기존 반값과 비교
     const prevClassNum = user.classNum ?? null
