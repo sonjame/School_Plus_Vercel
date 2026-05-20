@@ -364,7 +364,7 @@ setTimeout(() => {
   forceLogout()
 }, 800)
   }
-}
+
 
   /** 🔹 학교 검색 */
   const handleSchoolSearch = async (keyword: string) => {
@@ -451,7 +451,7 @@ setShowReloginModal(true)
 setTimeout(() => {
   forceLogout()
 }, 800)
-
+}
   const handleCancelSchoolChange = () => setShowConfirmModal(false)
 
   const handleDeleteAccount = async () => {
