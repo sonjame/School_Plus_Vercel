@@ -358,6 +358,11 @@ export default function MyInfoPagePreview() {
 
     setReloginReason('password')
     setShowReloginModal(true)
+
+    // ✅ 강제 로그아웃 보장
+setTimeout(() => {
+  forceLogout()
+}, 800)
   }
 
   /** 🔹 학교 검색 */
