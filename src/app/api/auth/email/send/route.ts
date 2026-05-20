@@ -5,7 +5,8 @@ import { emailStore } from '@/src/lib/emailStore'
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  const { email } = await req.json()
+  const body = await req.json()
+  const email = String(body.email || '').trim().toLowerCase()
 
   if (!email) {
     return NextResponse.json({ success: false })
@@ -28,7 +29,6 @@ export async function POST(req: Request) {
     text: `인증코드: ${code}`,
   })
 
-  // ✅ 이메일별 코드 저장
   emailStore.set(email, code)
 
   return NextResponse.json({ success: true })
