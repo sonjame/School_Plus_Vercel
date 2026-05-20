@@ -795,12 +795,46 @@ export default function CalendarPage() {
               <input
                 type="time"
                 value={newStartTime}
+                onClick={(e) => {
+                  const input = e.currentTarget
+
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker()
+                  } else {
+                    input.focus()
+                  }
+                }}
+                onFocus={(e) => {
+                  const input = e.currentTarget
+
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker()
+                  }
+                }}
                 onChange={(e) => setNewStartTime(e.target.value)}
               />
+
               <span>~</span>
+
               <input
                 type="time"
                 value={newEndTime}
+                onClick={(e) => {
+                  const input = e.currentTarget
+
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker()
+                  } else {
+                    input.focus()
+                  }
+                }}
+                onFocus={(e) => {
+                  const input = e.currentTarget
+
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker()
+                  }
+                }}
                 onChange={(e) => setNewEndTime(e.target.value)}
               />
             </div>
@@ -1544,6 +1578,21 @@ export default function CalendarPage() {
         .page-wrapper.dark .rp-card-title {
           color: #f9fafb; /* 거의 흰색 */
           font-weight: 600;
+        }
+
+        .time-row input[type='time'] {
+          position: relative;
+          cursor: pointer;
+        }
+
+        /* 🔥 시계 아이콘 클릭 영역을 전체로 확장 */
+        .time-row input[type='time']::-webkit-calendar-picker-indicator {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
         }
 
         /* ===============================
