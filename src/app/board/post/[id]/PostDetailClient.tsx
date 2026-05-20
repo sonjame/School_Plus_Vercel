@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type React from 'react'
 import { apiFetch } from '@/src/lib/apiFetch'
 
@@ -32,6 +32,13 @@ export default function PostDetailPage() {
   const [reportOpen, setReportOpen] = useState(false)
   const [reportType, setReportType] = useState('')
   const [reportText, setReportText] = useState('')
+
+  //중복 방지
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+
+  const commentLockRef = useRef(false)
+  const replyLockRef = useRef(false)
 
   // 🔍 이미지 뷰어 (확대)
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -313,67 +320,92 @@ export default function PostDetailPage() {
   ------------------------------------------- */
 
   const writeComment = async () => {
-    if (await checkBanAndAlert()) return
+    if (commentLockRef.current) return
+    commentLockRef.current = true
+    setIsSubmittingComment(true)
 
-    if (!canComment) {
-      showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
-      return
+    try {
+      if (await checkBanAndAlert()) return
+
+      if (!canComment) {
+        showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
+        return
+      }
+
+      if (!commentValue.trim()) return
+
+      const content = commentValue.trim()
+
+      const res = await apiFetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          parent: null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        showAlert(data?.message || '댓글 작성에 실패했습니다.')
+        return
+      }
+
+      const newComment = await res.json()
+
+      setComments((prev) => [...prev, newComment])
+      setCommentValue('')
+    } finally {
+      commentLockRef.current = false
+      setIsSubmittingComment(false)
     }
-
-    if (!commentValue.trim()) return
-
-    const res = await apiFetch(`/api/posts/${postId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content: commentValue,
-        parent: null,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      showAlert(data?.message || '댓글 작성에 실패했습니다.')
-      return
-    }
-
-    const newComment = await res.json()
-    setComments((prev) => [...prev, newComment])
-    setCommentValue('')
   }
 
   /* ------------------------------------------
      대댓글 작성 (실명)
   ------------------------------------------- */
   const writeReply = async () => {
-    if (await checkBanAndAlert()) return
+    if (replyLockRef.current) return
+    replyLockRef.current = true
+    setIsSubmittingReply(true)
 
-    if (!canComment) {
-      showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
-      return
+    try {
+      if (await checkBanAndAlert()) return
+
+      if (!canComment) {
+        showAlert('해당 학년 게시판에는 댓글을 작성할 수 없습니다.')
+        return
+      }
+
+      if (!replyValue.trim() || !replyTarget) return
+
+      const cleanedContent = replyValue.replace(/^@\S+\s*/, '').trim()
+      if (!cleanedContent) return
+
+      const parentId = replyTarget
+
+      const res = await apiFetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          content: cleanedContent,
+          parent: parentId,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        showAlert(data?.message || '답글 작성에 실패했습니다.')
+        return
+      }
+
+      const newReply = await res.json()
+
+      setComments((prev) => [...prev, newReply])
+      setReplyValue('')
+      setReplyTarget(null)
+    } finally {
+      replyLockRef.current = false
+      setIsSubmittingReply(false)
     }
-
-    if (!replyValue.trim() || !replyTarget) return
-
-    const cleanedContent = replyValue.replace(/^@\S+\s*/, '')
-
-    const res = await apiFetch(`/api/posts/${postId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content: cleanedContent, // ✅ 여기로 변경
-        parent: replyTarget,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json()
-      showAlert(data?.message || '답글 작성에 실패했습니다.')
-      return
-    }
-
-    const newReply = await res.json()
-    setComments((prev) => [...prev, newReply])
-    setReplyValue('')
-    setReplyTarget(null)
   }
 
   /* 댓글 수정 */
@@ -900,8 +932,12 @@ export default function PostDetailPage() {
                   onChange={(e) => setReplyValue(e.target.value)}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={btnBlue} onClick={writeReply}>
-                    답글 작성
+                  <button
+                    style={btnBlue}
+                    onClick={writeReply}
+                    disabled={isSubmittingReply}
+                  >
+                    {isSubmittingReply ? '작성 중...' : '답글 작성'}
                   </button>
                   <button style={btnGray} onClick={() => setReplyTarget(null)}>
                     취소
@@ -1453,8 +1489,12 @@ export default function PostDetailPage() {
                 value={commentValue}
                 onChange={(e) => setCommentValue(e.target.value)}
               />
-              <button style={btnBlue} onClick={writeComment}>
-                댓글 작성
+              <button
+                style={btnBlue}
+                onClick={writeComment}
+                disabled={isSubmittingComment}
+              >
+                {isSubmittingComment ? '작성 중...' : '댓글 작성'}
               </button>
             </>
           ) : (
