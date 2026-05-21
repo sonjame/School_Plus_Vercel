@@ -234,12 +234,18 @@ export default function TimetablePage() {
   }, [])
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
+    const check = () => {
+      const width = window.innerWidth
+
+      // 아이패드 세로 포함
+      setIsMobile(width <= 1024)
+    }
+
     check()
+
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-
   /* ----------------- 초기 로드 ----------------- */
   useEffect(() => {
     if (!myUserId) return
@@ -1104,6 +1110,7 @@ export default function TimetablePage() {
           style={{
             width: '100%',
             overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}
         >
           <div
@@ -1116,8 +1123,8 @@ export default function TimetablePage() {
             <div
               ref={tableRef}
               style={{
-                width: isMobile ? '100%' : 1000,
-                maxWidth: '100%',
+                width: '100%',
+                minWidth: isMobile ? 700 : 1000,
                 margin: '0 auto',
                 background: darkMode ? '#020617' : '#fff',
               }}
